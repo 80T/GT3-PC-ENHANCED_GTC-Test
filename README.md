@@ -90,3 +90,37 @@ configure the settings, and play.
 - Fill money: A large amount of credits on a new game
 - Unlock Arcade tracks: Unlocks every track in every mode, including ones that weren't available in certain modes
 - Unlock all licenses: Sets a bronze medal on every license test
+
+
+# Technical
+
+## File jumping + References in source code
+
+### 1. Install the C/C++ extension in VS Code
+In the Extensions view (Ctrl+Shift+X), search for C/C++ by Microsoft. This is what does the jumping.
+### 2. Run `setup.cmd`
+It installs or completes Visual Studio Build Tools; expect a UAC prompt and an installer window the first time.
+Then it sets up build\. That step writes build\compile_commands.json, the file navigation needs. You don't have to build the game first.
+### 3. Open the repo in VS Code with File > Open Folder.
+The shipped .vscode/settings.json finds the compile database relative to the folder you open.
+### 4. Let it index.
+The first time, the status bar shows IntelliSense working through ~650 files for a few minutes. After that, it opens instantly.
+If the CMake Tools extension is installed and offers to configure the project, decline. It isn't needed, and its default settings may try a 64-bit setup in build\, which this project refuses.
+
+### 5. Usage
+| Key | Function |
+| -------- | -------- |
+|F12 / Ctrl+click	|	go to definition
+|Alt+F12			|	peek the definition in place
+|Shift+F12			|	find all references
+|Alt+← / Alt+→		|	back / forward through your jumps
+|Ctrl+P				|	open a file by name
+|Ctrl+T				|	find a function or class anywhere
+
+Adding or renaming source files needs nothing extra: the next build.cmd updates the compile database by itself.
+
+### 6. If jumping doesn't work
+- No build\compile_commands.json: run setup.cmd or build.cmd again.
+- Wrong folder open: File > Open Folder on the repo root itself.
+- Results look stale or incomplete: Ctrl+Shift+P, then C/C++: Reset IntelliSense Database, then let it re-index.
+- A .vscode\c_cpp_properties.json exists (VS Code sometimes offers to create one): its settings win over the shipped one. Delete it, or add "compileCommands": "${workspaceFolder}/build/compile_commands.json" to it.
