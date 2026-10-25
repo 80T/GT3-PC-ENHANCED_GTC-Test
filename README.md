@@ -15,6 +15,26 @@ configure the settings, and play.
 
 # Perfect 1:1 parity with the PlayStation 2 original, only better:
 
+<p align="center">
+  <img src="https://github.com/Silentwarior112/GT3-PC-ENHANCED/blob/main/ss1.PNG">
+</p>
+
+<p align="center">
+  <img src="https://github.com/Silentwarior112/GT3-PC-ENHANCED/blob/main/ss2.PNG">
+</p>
+
+<p align="center">
+  <img src="https://github.com/Silentwarior112/GT3-PC-ENHANCED/blob/main/ss3.PNG">
+</p>
+
+<p align="center">
+  <img src="https://github.com/Silentwarior112/GT3-PC-ENHANCED/blob/main/ss4.PNG">
+</p>
+
+<p align="center">
+  <img src="https://github.com/Silentwarior112/GT3-PC-ENHANCED/blob/main/ss5.PNG">
+</p>
+
 ### Graphics quality
 - All original graphics, reproduced more accurately and with better clarity than emulation.
 - Fully dynamic aspect ratio control: HUD and Field of view re-calibrate automatically.
@@ -25,6 +45,7 @@ configure the settings, and play.
 
 ### Game Engine
 - A mild hybrid between the original GT3 engine, and the additional backend features from GT Concept
+- Options menu via the Hotkey (Default is F2)
 - Debug Camera and Look-around Chase camera with the Right Stick
 - Unlimited cars in the garage + Extra list controls: `Left and Right = 10` and `L1 and R1 = 100`
 - Movies: Added standard H.264 .MP4 file support for mods
