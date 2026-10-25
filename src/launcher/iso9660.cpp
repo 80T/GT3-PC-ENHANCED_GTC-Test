@@ -1,0 +1,344 @@
+/* iso9660.cpp - read-only access to an ISO 9660 disc image (iso9660.h).
+ *
+ * ECMA-119 layout used here:
+ *   volume descriptors from sector 16, one per sector: +0 type (1 primary,
+ *   255 terminator), +1 "CD001", +6 version 1.  Primary descriptor: +40
+ *   volume identifier (32 characters), +80 volume space size (both-endian
+ *   32-bit), +128 logical block size (both-endian 16-bit), +156 the root
+ *   directory record (34 bytes).
+ *   directory record: +0 length, +2 extent sector (both-endian 32-bit), +10
+ *   data length (both-endian 32-bit), +25 flags (0x02 directory, 0x80 more
+ *   extents follow in the next record), +26 interleave unit size, +27
+ *   interleave gap, +32 name length, +33 name ("\0" is the directory
+ *   itself, "\1" its parent; files end in ";1").  Records never cross a
+ *   sector boundary: the rest of a sector is zero-filled.
+ * Both-endian fields hold the value twice, little-endian then big-endian.
+ * The little-endian half is used; some mastering tools write a wrong
+ * big-endian half, and the PS2's own driver reads only the little-endian
+ * half too. */
+#include "iso9660.h"
+#include "util.h"
+
+#include <windows.h>
+
+#include <string.h>
+
+namespace iso9660 {
+namespace {
+
+constexpr uint32_t kFirstDescriptor = 16;
+constexpr uint32_t kMaxDescriptors = 64;      /* give up on a terminator-less image after this */
+constexpr uint32_t kMaxDirectorySize = 16u << 20;
+
+uint32_t le32(const uint8_t *p) { return p[0] | p[1] << 8 | p[2] << 16 | (uint32_t)p[3] << 24; }
+uint16_t le16(const uint8_t *p) { return (uint16_t)(p[0] | p[1] << 8); }
+
+/* "GT3.VOL;1" -> "GT3.VOL"; "README." -> "README" (an empty extension). */
+std::string plain_name(const char *s, size_t n)
+{
+    std::string name(s, n);
+    size_t semi = name.find(';');
+    if (semi != std::string::npos)
+        name.resize(semi);
+    if (!name.empty() && name.back() == '.')
+        name.pop_back();
+    return name;
+}
+
+bool same_name(const std::string &a, const std::string &b)
+{
+    if (a.size() != b.size())
+        return false;
+    for (size_t i = 0; i < a.size(); i++) {
+        char x = a[i], y = b[i];
+        if (x >= 'a' && x <= 'z')
+            x -= 32;
+        if (y >= 'a' && y <= 'z')
+            y -= 32;
+        if (x != y)
+            return false;
+    }
+    return true;
+}
+
+/* Fills `e` from a directory record; false when the record is malformed. */
+bool parse_record(const uint8_t *r, size_t avail, Entry *e, uint8_t *flags)
+{
+    if (avail < 34 || r[0] < 34 || r[0] > avail)
+        return false;
+    uint8_t name_len = r[32];
+    if (33u + name_len > r[0])
+        return false;
+    Extent x;
+    x.lba = le32(r + 2);
+    x.size = le32(r + 10);
+    *flags = r[25];
+    e->name = plain_name(reinterpret_cast<const char *>(r + 33), name_len);
+    e->is_directory = (r[25] & 0x02) != 0;
+    e->extents.assign(1, x);
+    e->size = x.size;
+    return true;
+}
+
+} // namespace
+
+Image::~Image() { close(); }
+
+void Image::close()
+{
+    if (handle_)
+        CloseHandle(handle_);
+    handle_ = nullptr;
+    image_size_ = 0;
+    volume_sectors_ = 0;
+    volume_id_.clear();
+    root_ = Entry();
+}
+
+bool Image::read_raw(uint64_t offset, void *buf, uint32_t size, std::wstring *error) const
+{
+    /* A positioned read on a synchronous handle: the OVERLAPPED only carries
+     * the offset, so several threads may read the same Image. */
+    uint8_t *p = static_cast<uint8_t *>(buf);
+    while (size) {
+        OVERLAPPED ov = {};
+        ov.Offset = (DWORD)offset;
+        ov.OffsetHigh = (DWORD)(offset >> 32);
+        DWORD got = 0;
+        if (!ReadFile(handle_, p, size, &got, &ov)) {
+            DWORD err = GetLastError();
+            if (error)
+                *error = err == ERROR_HANDLE_EOF ? std::wstring(L"it ends too early (is the image complete?)")
+                                                 : util::system_error_text(err);
+            return false;
+        }
+        if (got == 0) {
+            if (error)
+                *error = L"it ends too early (is the image complete?)";
+            return false;
+        }
+        p += got;
+        offset += got;
+        size -= got;
+    }
+    return true;
+}
+
+bool Image::open(const std::wstring &path, std::wstring *error)
+{
+    close();
+    HANDLE h = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
+                           FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
+    if (h == INVALID_HANDLE_VALUE) {
+        if (error)
+            *error = L"the file could not be opened (" + util::system_error_text(GetLastError()) + L")";
+        return false;
+    }
+    handle_ = h;
+    path_ = path;
+    LARGE_INTEGER sz;
+    if (!GetFileSizeEx(h, &sz)) {
+        if (error)
+            *error = L"the file could not be read (" + util::system_error_text(GetLastError()) + L")";
+        close();
+        return false;
+    }
+    image_size_ = (uint64_t)sz.QuadPart;
+
+    const wchar_t *not_iso = L"this file is not a disc image (no ISO 9660 file system)";
+    if (image_size_ < (uint64_t)(kFirstDescriptor + 1) * kSectorSize) {
+        if (error)
+            *error = not_iso;
+        close();
+        return false;
+    }
+
+    /* The primary volume descriptor: the first type-1 descriptor. */
+    uint8_t d[kSectorSize];
+    bool found = false;
+    for (uint32_t s = kFirstDescriptor; s < kFirstDescriptor + kMaxDescriptors; s++) {
+        if ((uint64_t)(s + 1) * kSectorSize > image_size_)
+            break;
+        if (!read_raw((uint64_t)s * kSectorSize, d, kSectorSize, error)) {
+            close();
+            return false;
+        }
+        if (memcmp(d + 1, "CD001", 5) != 0)
+            break;
+        if (d[0] == 255)
+            break;
+        if (d[0] == 1) {
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        if (error)
+            *error = not_iso;
+        close();
+        return false;
+    }
+    if (le16(d + 128) != kSectorSize) {
+        if (error)
+            *error = L"this disc image uses an unsupported sector size (not a DVD image)";
+        close();
+        return false;
+    }
+    volume_sectors_ = le32(d + 80);
+    volume_id_.assign(reinterpret_cast<const char *>(d + 40), 32);
+    while (!volume_id_.empty() && (volume_id_.back() == ' ' || volume_id_.back() == '\0'))
+        volume_id_.pop_back();
+
+    uint8_t flags = 0;
+    if (!parse_record(d + 156, 34, &root_, &flags) || !root_.is_directory) {
+        if (error)
+            *error = L"the disc image's root directory is damaged";
+        close();
+        return false;
+    }
+    root_.name.clear();
+    return true;
+}
+
+bool Image::read(const Entry &file, uint64_t offset, void *buf, uint32_t size, std::wstring *error) const
+{
+    if (offset > file.size || size > file.size - offset) {
+        if (error)
+            *error = L"read past the end of " + util::widen(file.name);
+        return false;
+    }
+    uint8_t *p = static_cast<uint8_t *>(buf);
+    for (const Extent &x : file.extents) {
+        if (size == 0)
+            break;
+        if (offset >= x.size) {
+            offset -= x.size;
+            continue;
+        }
+        uint32_t n = (uint32_t)(x.size - offset) < size ? (uint32_t)(x.size - offset) : size;
+        if (!read_raw((uint64_t)x.lba * kSectorSize + offset, p, n, error))
+            return false;
+        p += n;
+        size -= n;
+        offset = 0;
+    }
+    return true;
+}
+
+bool Image::read_all(const Entry &file, std::string *out, std::wstring *error) const
+{
+    if (file.size > (64u << 20)) {
+        if (error)
+            *error = util::widen(file.name) + L" is too large to read at once";
+        return false;
+    }
+    out->assign((size_t)file.size, '\0');
+    return file.size == 0 || read(file, 0, &(*out)[0], (uint32_t)file.size, error);
+}
+
+bool Image::inside_image(const Entry &file) const
+{
+    for (const Extent &x : file.extents)
+        if ((uint64_t)x.lba * kSectorSize + x.size > image_size_)
+            return false;
+    return true;
+}
+
+bool Image::read_dir(const Entry &dir, std::vector<Entry> *out, std::wstring *error) const
+{
+    out->clear();
+    if (!dir.is_directory || dir.size > kMaxDirectorySize) {
+        if (error)
+            *error = L"the disc image's directories are damaged";
+        return false;
+    }
+    std::string data;
+    if (!read_all(dir, &data, error))
+        return false;
+    const uint8_t *b = reinterpret_cast<const uint8_t *>(data.data());
+    size_t pos = 0, end = data.size();
+    bool more_extents = false;   /* the previous record had flag 0x80 */
+    while (pos < end) {
+        size_t sector_end = (pos / kSectorSize + 1) * kSectorSize;
+        if (sector_end > end)
+            sector_end = end;
+        if (b[pos] == 0) {
+            /* Zero padding up to the next sector. */
+            pos = sector_end;
+            continue;
+        }
+        Entry e;
+        uint8_t flags = 0;
+        if (!parse_record(b + pos, sector_end - pos, &e, &flags)) {
+            if (error)
+                *error = L"the disc image's directories are damaged";
+            return false;
+        }
+        uint8_t name_len = b[pos + 32];
+        bool self_or_parent = name_len == 1 && (b[pos + 33] == 0 || b[pos + 33] == 1);
+        if (b[pos + 26] || b[pos + 27]) {
+            /* Interleaved files (CD-XA audio / video) do not occur on PS2 DVDs. */
+            if (error)
+                *error = L"the disc image has an interleaved file (" + util::widen(e.name) + L"), which is not supported";
+            return false;
+        }
+        if (!self_or_parent) {
+            if (more_extents && !out->empty() && same_name(out->back().name, e.name)) {
+                out->back().extents.push_back(e.extents[0]);
+                out->back().size += e.size;
+            } else {
+                out->push_back(e);
+            }
+        }
+        more_extents = (flags & 0x80) != 0;
+        pos += b[pos];
+    }
+    return true;
+}
+
+bool Image::list(const Entry &dir, std::vector<Entry> *out, std::wstring *error) const
+{
+    return read_dir(dir, out, error);
+}
+
+bool Image::find(const std::string &path, Entry *out, std::wstring *error) const
+{
+    Entry cur = root_;
+    size_t pos = 0;
+    for (;;) {
+        while (pos < path.size() && (path[pos] == '/' || path[pos] == '\\'))
+            pos++;
+        if (pos >= path.size())
+            break;
+        size_t next = path.find_first_of("/\\", pos);
+        if (next == std::string::npos)
+            next = path.size();
+        std::string want = plain_name(path.data() + pos, next - pos);
+        pos = next;
+
+        if (!cur.is_directory) {
+            if (error)
+                *error = util::widen(path) + L" was not found on the disc";
+            return false;
+        }
+        std::vector<Entry> entries;
+        if (!read_dir(cur, &entries, error))
+            return false;
+        bool found = false;
+        for (Entry &e : entries)
+            if (same_name(e.name, want)) {
+                cur = std::move(e);
+                found = true;
+                break;
+            }
+        if (!found) {
+            if (error)
+                *error = util::widen(path) + L" was not found on the disc";
+            return false;
+        }
+    }
+    *out = cur;
+    return true;
+}
+
+} // namespace iso9660

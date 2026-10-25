@@ -1,0 +1,214 @@
+﻿# GT3 PC: the game, the engine, the platform layer and the executable.
+
+# Options shared by the decompiled code (game and kept engine files):
+# /FI: MSVC spellings of the decomp's GNU C++ and the C library mapping
+# (include/pc_prelude.h); /permissive: pre-standard C++ in places (the egcs
+# dialect); /bigobj: a few translation units are large;
+# /Zc:threadSafeInit-: function-local statics without the C++11 guard (its
+# lock would deadlock when the game scheduler switches threads inside a
+# static's constructor; one game thread runs at a time, as on the EE).
+set(GT3_DECOMP_OPTIONS /FI${GT3PC_ROOT}/include/pc_prelude.h /permissive /bigobj /EHsc /W0 /Zc:threadSafeInit-)
+
+# ---- the game: the decompiled C++ of src/game --------------------------------
+file(GLOB_RECURSE GT3_GAME_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/game/*.cpp)
+# Files still being ported (VU0 / MMI inline assembly): none left (the
+# rewritten asm: docs/asm.md).
+set(GT3_GAME_PENDING
+)
+foreach(f ${GT3_GAME_PENDING})
+    list(REMOVE_ITEM GT3_GAME_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/game/${f})
+endforeach()
+
+add_library(gt3_game OBJECT ${GT3_GAME_SOURCES})
+target_include_directories(gt3_game PUBLIC ${GT3PC_ROOT}/include ${GT3PC_ROOT}/src)
+target_compile_options(gt3_game PRIVATE ${GT3_DECOMP_OPTIONS})
+target_compile_definitions(gt3_game PRIVATE GT3_PC=1)
+
+# ---- the engine: Polyphony's libraries, kept where portable --------------------
+# The portable C++ of src/engine compiles as the game does; the hardware
+# parts (graphics, IOP clients, movies, sound output, memory card, pads) are
+# the native replacements under src/engine/*/native and src/platform.
+set(GT3_ENGINE_SOURCES
+    engine/pdistd/T432_bignum.cpp
+    engine/pdistd/T433_safer.cpp
+    engine/pdistd/T471_unit_arena.cpp
+    engine/pdistd/T497_hash.cpp
+    engine/pdistd/T530_allocator.cpp
+    engine/pdistd/T530a_printf_tables.cpp
+    engine/pdistd/T531_random.cpp
+    engine/pdistd/T532_heap.cpp
+    engine/pdistd/T533_printf.cpp
+    engine/pdistd/T534_sprintf.cpp
+    engine/pdistd/T535_vsprintf.cpp
+    engine/pdistd/T536_bit_stream_buffer.cpp
+    engine/pdistd/T537_gzip_inflate.cpp
+    engine/pdistd/T538_fmod_wrap.cpp
+    engine/pdistd/T539_print_format.cpp
+    engine/io/T500_vol_toc.cpp
+    engine/io/T501_memorycard_manager.cpp
+    engine/io/T502_file_resolve.cpp
+    engine/io/T503_vol_thread.cpp
+    engine/io/T504_file_queue.cpp
+    engine/io/T505_host_files.cpp
+    engine/io/T506_image_pack.cpp
+    engine/io/T507_async_loader.cpp
+    engine/io/T508_loader_thread.cpp
+    engine/io/T509_serialize.cpp
+    engine/io/T510_vol_device.cpp
+    engine/io/T511_inflate_loader.cpp
+    engine/io/T525_sector_cache.cpp
+    engine/io/T526_iso9660.cpp
+    engine/text/T496_font.cpp
+    engine/text/T498_font_print.cpp
+    engine/text/T499_font_metrics.cpp
+    engine/text/T517_realtime_text.cpp
+    engine/gfx/T451_model_set.cpp
+    engine/gfx/T452_model_anim.cpp
+    engine/gfx/T454_sprite_model.cpp
+    engine/gfx/T512_render_context.cpp
+    engine/gfx/T513_vram_allocator.cpp
+    engine/gfx/T514_gs_buffer.cpp
+    engine/gfx/T515_tex_set.cpp
+    engine/input/T472_analog_curve.cpp
+    engine/input/T474_control.cpp
+    engine/input/T475_pad_manager.cpp
+    engine/input/T476_port_base.cpp
+    engine/input/T477_ps_port.cpp
+    engine/input/T478_steering_ps_port.cpp
+    engine/input/T479_usb_steering_port.cpp
+    engine/input/T480_ieee1394_port.cpp
+    engine/media/T529_mpegif.cpp
+    # the G002 player's interface and pdimpeg over the native movie code
+    # (gt3_media below; docs/movies.md)
+    engine/media/mpeg_player_pc.cpp
+    engine/pdi/T522_pdimpeg.cpp
+    engine/system/T473_link_session.cpp
+    engine/system/thread_util.cpp
+    engine/system/scf_lock.cpp
+    engine/io/hostfs_io.cpp
+    engine/pdi/pdistd_misc.cpp
+    engine/pdi/T519_pdicdvd.cpp
+    engine/pdi/T523_pdipipe.cpp
+    engine/pdi/T524_iop_load_module_base.cpp
+    engine/pdi/T541_pdi1394.cpp
+    engine/pdi/pdi1394_rpc.cpp
+    engine/input/usb_pc.cpp
+    engine/io/mcard_io.cpp
+    engine/pdistd/fastmath.cpp
+    engine/io/file_missing.cpp
+    # the sound: the EE voice manager / sequencer (decomp) and the IOP clients
+    # rewritten over the native SPU2 (engine/sound/native, docs/sound.md)
+    engine/sound/sound_driver.cpp
+    engine/sound/sound_seq.cpp
+    engine/pdi/T520_pdispu2.cpp
+    engine/pdi/T521_pdibgm.cpp
+    # pgl, the graphics library: the decomp's C with its packet writing
+    # replaced by recordings for the native renderer (gt3_render below;
+    # docs/pgl.md, docs/renderer.md)
+    engine/pgl/pgl_driver.cpp
+    engine/pgl/pgl_core.cpp
+    engine/pgl/pgl_vu0.cpp
+    engine/pgl/pgl_lighting.cpp
+    engine/pgl/pgl_prim.cpp
+    engine/pgl/pgl_tex1.cpp
+    engine/pgl/pgl_font.cpp
+    engine/pgl/pgl_flare.cpp
+    engine/pgl/pgl_particles.cpp
+    engine/pgl/pgl_color_filter.cpp
+)
+add_library(gt3_engine OBJECT ${GT3_ENGINE_SOURCES})
+target_include_directories(gt3_engine PUBLIC ${GT3PC_ROOT}/include ${GT3PC_ROOT}/src)
+target_compile_options(gt3_engine PRIVATE ${GT3_DECOMP_OPTIONS})
+target_compile_definitions(gt3_engine PRIVATE GT3_PC=1)
+
+# ---- the platform layer -------------------------------------------------------
+add_library(gt3_platform STATIC
+    platform/log.cpp
+    platform/pc_libc.cpp
+    platform/paths.cpp
+    platform/settings.cpp
+    platform/language.cpp
+    platform/scheduler.cpp
+    platform/ee_kernel.cpp
+    platform/window.cpp
+    platform/disc.cpp
+    platform/host_file.cpp
+    platform/pc_time.cpp
+    platform/pad_pc.cpp
+    platform/gamepad.cpp
+    platform/input_map.cpp
+    platform/wheel.cpp
+    platform/debug_camera.cpp
+    platform/memcard.cpp
+    platform/heap_arena.cpp
+    platform/gpu.cpp
+    platform/frame_monitor.cpp
+    platform/frame_step.cpp
+    platform/overlay.cpp
+    platform/settings_menu.cpp
+    platform/system_menu.cpp
+    platform/audio.cpp
+    platform/audio_ks.cpp
+    platform/crash.cpp
+)
+target_include_directories(gt3_platform PUBLIC ${GT3PC_ROOT}/include ${GT3PC_ROOT}/src)
+target_link_libraries(gt3_platform PUBLIC winmm d3d11 dxgi d3dcompiler dbghelp)
+
+# ---- the controllers: SDL3, delay-loaded (cmake/sdl3.cmake) -----------------------
+include(${GT3PC_ROOT}/cmake/sdl3.cmake)
+target_link_libraries(gt3_platform PUBLIC gt3_sdl3)
+
+# ---- the sound: the native SPU2 / BGM player (standard C++, its own options:
+# not the decomp's prelude, guarded statics) and the output above (kernel
+# streaming, WASAPI) ------------------------------------------------------------
+add_subdirectory(engine/sound/native)
+target_link_libraries(gt3_platform PUBLIC gt3_sound_native ole32 avrt setupapi ksuser)
+
+# ---- the movies: the native MPEG-2 / IPU decoder and the movie services
+# (standard C++, not the decomp's prelude; docs/movies.md) ------------------------
+include(${CMAKE_CURRENT_SOURCE_DIR}/engine/media/native/sources.cmake)
+add_library(gt3_media STATIC ${GT3_MEDIA_NATIVE_SOURCES} ${GT3_MEDIA_SERVICE_SOURCES})
+target_include_directories(gt3_media PUBLIC ${GT3PC_ROOT}/src)
+target_link_libraries(gt3_media PUBLIC gt3_platform gt3_sound_native)
+
+# ---- the renderer: pgl's native side on Direct3D 11 - the command lists, the
+# GS state executor, render targets, the VRAM registry and texture decoding
+# (gstex), the VU1 model decoder (gt3vif), pgl_math (standard C++, not the
+# decomp's prelude; docs/renderer.md) ------------------------------------------------
+add_library(gt3_render STATIC
+    engine/pgl/native/pgl_render.cpp
+    engine/pgl/native/pgl_exec.cpp
+    engine/pgl/native/pgl_targets.cpp
+    engine/pgl/native/pgl_textures.cpp
+    engine/pgl/native/pgl_flicker.cpp
+    engine/pgl/native/pgl_models.cpp
+    engine/pgl/native/pgl_d3d.cpp
+    engine/pgl/native/pgl_queue.cpp
+    engine/pgl/native/pgl_prewarm.cpp
+    engine/pgl/native/pgl_math.cpp
+    engine/pgl/native/pgl_state_gs.cpp
+    engine/pgl/native/pgl_state_prim.cpp
+    engine/pgl/native/gs_tex1.cpp
+    engine/pgl/native/gs_tex_decode.cpp
+    engine/pgl/native/gs_tex_format.cpp
+    engine/pgl/native/gs_tex_layout.cpp
+    engine/pgl/native/gs_tex_space.cpp
+    engine/pgl/native/vif_model.cpp
+)
+target_include_directories(gt3_render PUBLIC ${GT3PC_ROOT}/src)
+target_link_libraries(gt3_render PUBLIC gt3_platform dbghelp)
+
+# ---- the executable -------------------------------------------------------------
+add_executable(gt3pc WIN32
+    main/main.cpp
+    main/static_inits.cpp
+    main/gt3pc.rc
+    $<TARGET_OBJECTS:gt3_game>
+    $<TARGET_OBJECTS:gt3_engine>
+)
+target_include_directories(gt3pc PRIVATE ${GT3PC_ROOT}/include ${GT3PC_ROOT}/src ${CMAKE_CURRENT_SOURCE_DIR}/main)
+target_link_libraries(gt3pc PRIVATE gt3_platform gt3_media gt3_render)
+target_link_options(gt3pc PRIVATE /LARGEADDRESSAWARE)
+add_custom_command(TARGET gt3pc POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${GT3PC_SDL3_DLL} $<TARGET_FILE_DIR:gt3pc>)
+add_subdirectory(launcher)

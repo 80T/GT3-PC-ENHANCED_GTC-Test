@@ -1,0 +1,3 @@
+#include "resource.h"
+
+IDI_GT3PC ICON "../../gt3pc.ico"

@@ -1,0 +1,4 @@
+#include "resource.h"
+
+IDI_GT3LAUNCHER ICON "../../gt3pc.ico"
+IDR_BACKGROUND RCDATA "../../launcher_bg.png"

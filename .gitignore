@@ -1,0 +1,19 @@
+# Build output
+/build/
+
+# Downloaded by the build (cmake/sdl3.cmake)
+/third_party/
+
+# The user's game data (never shipped)
+/gt3_disc/
+gt3.vol
+memcard1/
+memcard2/
+*.log
+
+# What the diagnostics write (diag\*.cmd)
+/diag/*
+!/diag/*.cmd
+
+__pycache__/
+*.pyc
