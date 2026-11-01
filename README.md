@@ -48,7 +48,51 @@ configure the settings, and play.
 - Options menu via the Hotkey (Default is F2)
 - Debug Camera and Look-around Chase camera with the Right Stick
 - Unlimited cars in the garage + Extra list controls: `Left and Right = 10` and `L1 and R1 = 100`
+- Race songs: Added .mp3 and .wav file support for custom music, and automatic .ads file conversion to .wav
+```
+bgm\
+  mySong.mp3 (Launcher automatically adds the song to the game's database)
+
+In the launcher, you can enter the song manager to fix the song's metadata.
+The automatic conversion only provides basic information
+
+Note: The audio in original race songs were normalized to be as loud as possible, so
+adding a normally mastered song will sound quiet. You can increase the race song volume in the Options menu (F2)
+```
 - Movies: Added standard H.264 .MP4 file support for mods
+```
+stream\
+  opening.pss  <-- Original movie file
+  opening.mp4  <-- Custom 59.94 fps movie file will load instead if it exists
+```
+- Fonts: Added .otf and .ttf file support for mods
+```
+font\system\
+    sw_12.ttf
+    sw_16.ttf
+    sw_20.ttf
+    sq_9.ttf
+    kanji.ttf
+font\menu\
+    speed.ttf
+    meter.ttf
+    odo.ttf
+    rank.ttf
+    gearr.ttf
+```
+- Parameter Database: Changed the proprietary format to standard SQLite.
+```
+When installing game files, the launcher will automatically convert the proprietary
+database format into SQLite.
+
+To edit the database, get SQLite Studio and open the db files with it.
+
+database\
+  common.sqlite3 <-- Shared database data
+  paramdb.sqlite3 <-- JP Region's database
+  paramdb_eu.sqlite3 <-- Database for european group of regions: BR,FR,GR,IT,SP
+  paramdb_us.sqlite3 <-- US Region's database
+```
 - I.Link is untouched
 
 ### Display
@@ -67,6 +111,7 @@ configure the settings, and play.
 - Rear view mirror toggles (Turning them off dramatically increases frame rate)
 
 ### Audio
+- Volume controls
 - Two audio output options: Kernel Streaming for ultra-low latency, or Windows WASAPI
 
 ### Game Settings
