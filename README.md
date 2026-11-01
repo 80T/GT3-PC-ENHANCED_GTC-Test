@@ -63,7 +63,7 @@ adding a normally mastered song will sound quiet. You can increase the race song
 ```
 stream\
   opening.pss  <-- Original movie file
-  opening.mp4  <-- Custom 59.94 fps movie file will load instead if it exists
+  opening.mp4  <-- Custom movie file will load instead if it exists
 ```
 - Fonts: Added .otf and .ttf file support for mods
 ```
