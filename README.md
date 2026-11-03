@@ -142,7 +142,7 @@ font\menu\
 Tip: The game uses unicode values that ttf / otf files usually never use for certain symbols or characters. So a regular ttf / otf
 will have a few missing symbols / characters. A good otf / ttf replacement will need to be customized, programs like FontForge can do so.
 ```
-- Parameter Database: Changed the proprietary format to standard SQLite.
+- Parameter Databases: Changed the proprietary formats to standard SQLite.
 ```
 When installing game files, the launcher will automatically convert the proprietary
 database format into SQLite.
@@ -154,6 +154,14 @@ database\
   paramdb.sqlite3 <-- JP Region's database
   paramdb_eu.sqlite3 <-- Database for european group of regions: BR,FR,GR,IT,SP
   paramdb_us.sqlite3 <-- US Region's database
+
+gameconf\
+  demoplay.sqlite3
+  product.sqlite3 <-- The game uses this one.
+  product_test.sqlite3
+
+text\
+  realtime.sqlite3
 ```
 - I.Link is untouched
 
