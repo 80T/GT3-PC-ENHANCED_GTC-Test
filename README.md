@@ -45,13 +45,63 @@ configure the settings, and play.
 
 ### Game Engine
 - A mild hybrid between the original GT3 engine, and the additional backend features from GT Concept
-- Options menu via the Hotkey (Default is F2)
-- Debug Camera and Look-around Chase camera with the Right Stick
-- Unlimited cars in the garage + Extra list controls: `Left and Right = 10` and `L1 and R1 = 100`
-- Race songs: Added .mp3 and .wav file support for custom music, and automatic .ads file conversion to .wav
 ```
+Gran Turismo Concept had significant engine updates and even some improvements and bug fixes to the physics,
+however NONE of the physics-related things carried over from GT Concept are enabled. They are available in the code
+as toggles at src\include\game\enhanced\<all files inside the folder>
+
+The significant features used are:
+ 1. Some replay camera behavior
+ 2. GTC's zoom button in replays with Triangle
+ 3. Some sound-related updates in relation to the camera
+ 4. All HUD-related updates, except for the change in the needle's appearance
+ 5. Car animation system, mainly for the Toyota Pod
+```
+- Options menu via the Hotkey (Default is F2 or the controller's Home Button)
+```
+  + Display
+  + Graphics
+  + Split Screen layout: Horizontal, Vertical, or a Separate monitor
+  + Audio output / Volume
+  + Game settings and modifiers
+  + Controls: Deadzones, toggle between using the wheel or gamepad if both are connected
+  + Debug: Developer cheats
+```
+- Escape menu via the Hotkey (Default is Esc or holding the controller's Home Button for a few seconds)
+```
+  - Restart
+  - Restart as New Game
+  - Exit
+```
+- Debug Camera and Look-around Chase camera with the Right Stick
+```
+Controls:
+- Enter Debug Camera (Default is F7)
+- Move
+- Look
+- FOV control
+- Y-axis look toggle
+- Ground Collision toggle
+- Lock Camera (Holds camera in place and switches back to game controls)
+```
+
+- Unlimited cars in the garage
+```
+Extra list controls: Left and Right = 10
+L1 and R1 = 100
+```
+- Race songs: Added .mp3 and .wav file support for custom music, and automatic .ads file conversion to .wav
+- Song changer in races: Press the Hotkey to open it (Default is SELECT on the controller, or M)
+  Use UP and DOWN on the Controller to change songs, SELECT to close
+```
+You can point the launcher's song manager to any file or folder on your system.
+Alternatively, you can specifically place songs in the game data's bgm folder directly.
+If you place .ads song files in the bgm folder, the launcher will convert the .ads
+file to .wav and add it to the song database automatically.
+
 bgm\
   mySong.mp3 (Launcher automatically adds the song to the game's database)
+  songFromAnotherGT.ads (Launcher automatically converts and adds the song to the game's database)
 
 In the launcher, you can enter the song manager to fix the song's metadata.
 The automatic conversion only provides basic information
@@ -60,13 +110,22 @@ Note: The audio in original race songs were normalized to be as loud as possible
 adding a normally mastered song will sound quiet. You can increase the race song volume in the Options menu (F2)
 ```
 - Movies: Added standard H.264 .MP4 file support for mods
+- .ipic preview frames: Changed to standard .png, and the game pre-caches them to memory on startup.
+  When the game is installed, the launcher automatically converts ipic files into png.
+  Any .mp4 files in the stream folder will get their 1st frame automatically cached.
+  Any custom .pss files will require a manual insertion of a preview frame png.
 ```
+[root folder]\cache\movie_frames\midfield.png <-- Cached 1st frame of stream\midfield.mp4
+
 stream\
-  opening.pss  <-- Original movie file
-  opening.mp4  <-- Custom movie file will load instead if it exists
+  opening.pss  <-- Original intro movie file
+  opening.mp4  <-- Custom intro movie file will load instead if it exists
+  course\
+    akasaka.png <-- Preview frame for akasaka.pss (Arcade mode's Tokyo R246 course)
 ```
 - Fonts: Added .otf and .ttf file support for mods
 ```
+If you want to change the game's fonts, place the files like so:
 font\system\
     sw_12.ttf
     sw_16.ttf
@@ -79,6 +138,9 @@ font\menu\
     odo.ttf
     rank.ttf
     gearr.ttf
+
+Tip: The game uses unicode values that ttf / otf files usually never use for certain symbols or characters. So a regular ttf / otf
+will have a few missing symbols / characters. A good otf / ttf replacement will need to be customized, programs like FontForge can do so.
 ```
 - Parameter Database: Changed the proprietary format to standard SQLite.
 ```
