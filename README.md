@@ -8,7 +8,8 @@ Based on the `GT3 Enhanced engine` from the [Gran Turismo 3 Decompilation](https
 
 ## How to install
 Download the compiled package, or compile from the source code with `build.cmd`.
-Then open the launcher, extract the game files from any of the three main versions,
+Then open the launcher, extract the game files from any of the three main versions
+or run the game from a disc file directly,
 configure the settings, and play.
 
 
@@ -57,13 +58,25 @@ The significant features used are:
  4. All HUD-related updates, except for the change in the needle's appearance
  5. Car animation system, mainly for the Toyota Pod
 ```
+- Additional game engine features:
+```
+- Suspension ride height fix: Cars can have different front and rear heights + fixed slope logic
+- Dynamic Brake model positions: Wheel models can push the brake model back to prevent the models clipping into eachother
+- More cars in a race: Up to 32 cars. 1st - 6th are still the only results counted, anything lower than 6th is considered a 6th placement.
+- Optional Rev Cut behavior: Realistic mode.
+- Optional Gear Shift behavior: Realistic mode, and Realistic + Clutch mode
+- Clutch support
+- H-shifter support
+```
 - Options menu via the Hotkey (Default is F2 or the controller's Home Button)
 ```
   + Display
   + Graphics
+  + Cameras: Adjust FOV, enable cockpit cam, calibrate / edit / add new race cameras
   + Split Screen layout: Horizontal, Vertical, or a Separate monitor
   + Audio output / Volume
   + Game settings and modifiers
+  + Challenge Modes
   + Controls: Deadzones, toggle between using the wheel or gamepad if both are connected
   + Debug: Developer cheats
 ```
@@ -73,7 +86,7 @@ The significant features used are:
   - Restart as New Game
   - Exit
 ```
-- Debug Camera and Look-around Chase camera with the Right Stick
+- Debug Camera and Look-around support with the Right Stick during racing and menus
 ```
 Controls:
 - Enter Debug Camera (Default is F7)
@@ -163,22 +176,75 @@ gameconf\
 text\
   realtime.sqlite3
 ```
-- I.Link is untouched
+- External Texture replacement system (Default hotkey is F10)
+```
+> Toggle Replacements on/off in the popup window or the hotkey
+> Toggle Texture Dumping with 2 modes: Select and All. Select allows finding one texture on-screen and dumping only that one.
+> Pre-Cache mode: Allows caching texture replacements for better performance. Keep it off while making replacements.
+> Compression: Turn on to save disk space
+> Refresh Button / Texture selector in the popup window
+
+- Dumped textures go into the tex_replacements folder
+- To use replacements, add a texture replacement folder in the textures manager in the launcher.
+
+- Textures are hashed by content only, so no ghost / duplicate dumps can occur.
+```
+- I.Link is untouched.
+```
+Online functionality will not be added to this project.
+If you want to make an online version of this, see the plugin system below
+```
+- Game Engine Plugins
+```
+GT3 PC Enhanced supports overrides of the launcher and game executable with its engine plugin system.
+A custom launcher and executable can be created and integrated into the base launcher as a selectable game engine
+with it's own data folder separate from the base Gran Turismo 3: A-Spec engine this project provides.
+
+This allows easy support for mods that make engine changes without over-complicating the installation process.
+Because custom engines fully override the default launcher and executable, mods can have fully custom launchers
+and their own settings. All engines share the same gt3pc.ini settings file, so your settings are retained across
+different engines. Only the game data (mod folders) are separately configured per-engine.
+
+To make a custom build of this project as a plugin, simply run `Build Mod Plugin.cmd`, then find the output in `build/plugins`.
+Inside the plugin's folder is `engine.txt`, this allows you to set the mod's title.
+```
 
 ### Display
 - Windowed, Borderless, and Exclusive Fullscreen support
 - Fully dynamic resolution
 - Effective frame rate control: VSync (1-3 frame buffer), or Frame Time control
+- Frame rate monitor
 - Multi-Monitor Support: Play with multiple monitors
 - Split-Screen Multi-monitor: 2-Player mode can make use of a 2nd Monitor
+- Menus aspect ratio control
+- Movie aspect ratio control
 
 ### Graphics
-- Anti-Aliasing; FXAA and MSAA
-- Resolution scaling: 10% - 400% Supersampling
-- Detail toggle: Can force the game to always use the best LOD
+- Resolution: 10% - 400% Supersampling
+- Anti-Aliasing: FXAA and MSAA
+- Anisotropic Filtering: Up to 16x
+- Detail: Can force the game to always use the best LOD
+- Road Reflection Quality
+- Road Reflection Resolution
+- Car Reflections Quality
+- Environment Map Detail / Resolution
+- Depth of Field effect in replays
 - Render distance modifier
-- Field of view settings
-- Rear view mirror toggles (Turning them off dramatically increases frame rate)
+- Showroom Wheel models in races
+- Showroom Tire models in races
+
+### Cameras
+- Field of View modifiers
+- Rear view mirror toggles
+- Replay cameras during races
+- Chase cam angle modifier
+- Cockpit camera & settings
+  - Use the car's showroom model while in the cockpit view (good for the few convertibles in the game)
+- Custom Cameras: Create your own global camera or per-car cameras
+  Position, tilt, angle, and rigidity settings
+
+### Split Screen
+- Split screen display modes
 
 ### Audio
 - Volume controls
@@ -188,9 +254,26 @@ text\
 - Language
 - Units
 - Starting Credits: Default, 15,000 or 18,000
-- Split-screen settings
-- Maximum width of the Race HUD
-- HUD Safe zone setting
+- HUD Settings:
+  - HUD layout settings
+  - HUD element color customizer
+- Extra features and modifiers
+  - Course Scaler: Distort tracks by scaling their x, y, or z axes
+  - Prize Car Randomizer: Awarded prize cars are fully random, not seeded.
+    - Prize pool includes unused cars found in the game's files and database, such as developer sample cars
+  - Course Randomizer: GT Mode Races use a random course + Icon change to ?
+  - Unrestricted wheels: Any car can enter the wheel shop
+  - Buy cars not for sale
+  - Cars in a race
+  - Rev Cut behavior
+  - Gear Shift behavior
+  - Car Grip / Power / Tire wear modifiers
+  - Surface modifiers
+
+### Challenge Modes
+- Money Decay: You lose more money each day. Can you stay ahead of the daily tax?
+- Car Decay: Your cars become weaker each day. Find the optimal route to win every race.
+- Course Shrinkage: Courses get smaller each day. Can you make it to the end before traffic jams?
 
 ### Controls
 - Keyboard / Mouse, Controllers, and Wheels are supported
@@ -205,6 +288,11 @@ text\
 - Fill money: A large amount of credits on a new game
 - Unlock Arcade tracks: Unlocks every track in every mode, including ones that weren't available in certain modes
 - Unlock all licenses: Sets a bronze medal on every license test
+- Course forcer: Any race loads the selected course file instead.
+- Lap forcer: Any race has this many laps.
+- Race Time forcer: Any timed race lasts this long.
+- Course Mode forcer: Forces a certain finish line position
+- Race model in menus: Loads the race model of a car in menus w/ LOD level selector
 
 
 # Technical
