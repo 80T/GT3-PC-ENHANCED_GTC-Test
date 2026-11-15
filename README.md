@@ -189,6 +189,18 @@ text\
 
 - Textures are hashed by content only, so no ghost / duplicate dumps can occur.
 ```
+- Mod manager
+```
+The launcher features a manager for mod folders.
+Mods that have unique game files specific to it are added here.
+Mod folders can use `mod.png` and `mod.txt` for its thumbnail image and description.
+The manager also has a template mod folder maker.
+```
+- Texture pack manager
+```
+The launcher features a manager for texture packs.
+Texture pack folder can use `mod.png` and `mod.txt` for its thumbnail image and description.
+```
 - I.Link is untouched.
 ```
 Online functionality will not be added to this project.
