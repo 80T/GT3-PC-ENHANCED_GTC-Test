@@ -44,6 +44,16 @@ configure the settings, and play.
 - Optimized for PC, with some multi-threading implemented to produce very high and consistent frame rates.
 - True High Frame Rate support
 
+### Launcher
+- The launcher is a lightweight 640x360 window that holds the settings and access to managers
+(Mods, Textures, Saves, etc.)
+```
+The launcher's background is `launcher_bg.png`.
+Both the launcher and the main executable use `gt3pc.ico` for their program icon.
+The background and icon are embedded into the programs when built. Changing them requires
+compiling the source again (run build.cmd)
+```
+
 ### Game Engine
 - A mild hybrid between the original GT3 engine, and the additional backend features from GT Concept
 ```
