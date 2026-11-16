@@ -47,6 +47,9 @@ configure the settings, and play.
 ### Launcher
 - The launcher is a lightweight 640x360 window that holds the settings and access to managers
 (Mods, Textures, Saves, etc.)
+<p align="center">
+  <img src="https://github.com/Silentwarior112/GT3-PC-ENHANCED/blob/main/ss6.PNG">
+</p>
 ```
 The launcher's background is `launcher_bg.png`.
 Both the launcher and the main executable use `gt3pc.ico` for their program icon.
