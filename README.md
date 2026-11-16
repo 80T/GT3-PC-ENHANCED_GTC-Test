@@ -243,7 +243,7 @@ Inside the plugin's folder is `engine.txt`, this allows you to set the mod's tit
 
 ### Graphics
 - Resolution: 10% - 400% Supersampling
-- Anti-Aliasing: FXAA and MSAA
+- Anti-Aliasing: FXAA, MSAA, AGSS
 - Anisotropic Filtering: Up to 16x
 - Detail: Can force the game to always use the best LOD
 - Road Reflection Quality
