@@ -6,32 +6,7 @@
 
 namespace spu2 {
 
-static inline uint32_t rd32(const uint8_t *p)
-{
-    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
-}
-
-bool ads_parse_header(const uint8_t *head, uint32_t size, AdsHeader *out)
-{
-    if (size < ADS_HEAD_BYTES)
-        return false;
-    if (std::memcmp(head, "SShd", 4) != 0 || std::memcmp(head + 0x20, "SSbd", 4) != 0)
-        return false;
-    if (rd32(head + 4) != 0x18)
-        return false;
-    AdsHeader h;
-    h.type = rd32(head + 0x08);
-    h.rate = rd32(head + 0x0C);
-    h.channels = rd32(head + 0x10);
-    h.interleave = rd32(head + 0x14);
-    h.loopStart = (int32_t)rd32(head + 0x18);
-    h.loopEnd = (int32_t)rd32(head + 0x1C);
-    h.bodySize = rd32(head + 0x24);
-    if (h.channels < 1 || h.channels > 2 || h.interleave == 0 || (h.interleave & 15) || h.rate == 0)
-        return false;
-    *out = h;
-    return true;
-}
+/* (ads_parse_header: bgm_files.cpp) */
 
 AdsStream::AdsStream()
 {

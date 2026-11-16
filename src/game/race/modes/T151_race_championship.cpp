@@ -14,6 +14,15 @@
  * in progress into the save data (GameStatus::championship, T422).
  * run_championship (T053) drives it.
  *
+ * PC (ROADMAP 35): a championship of up to PC_RACE_CARS_MAX cars, as many
+ * as its organization's entries (6, or [Game] RaceCars): entries[] holds
+ * PC_RACE_CARS_MAX (an entry past the race's cars has no car: carCode 0,
+ * order -1, no points), the orders run over the race's cars with the player
+ * last, the points of the 7th and lower are the 6th's (RaceDataBase::
+ * getChampionshipPoint), suspend / resume keep the entrants past the
+ * save's 8 in its extension (ChampionshipSave::pcSetEntrant, T422).  A
+ * 6-car championship is as before.
+ *
  * RaceChampionship is the race mode of a championship race: RaceArcade's
  * members (T134) with the championship points board (ResultChampionship)
  * instead of the arcade result; a registered race class.
@@ -77,7 +86,7 @@
 RaceChampionshipInformation::RaceChampionshipInformation()
 {
     /* implicit: RaceGTmodeInformation (base constructor), CarEquipments (constructor of each entry's car), ~CarEquipments, ~RaceGTmodeInformation (exception cleanup) */
-    for (int i = 0; i < CHAMPIONSHIP_ENTRIES; i++) {
+    for (int i = 0; i < PC_RACE_CARS_MAX; i++) {    /* PC: every entry (was CHAMPIONSHIP_ENTRIES) */
         entries[i].points = 0;
         entries[i].order = -1;
     }
@@ -108,13 +117,22 @@ void RaceChampionshipInformation::setupOrganization(RaceOrganization *org)
         setupNextSession(org);
 }
 
+/* PC (ROADMAP 35): the cars of the race (GT3's loops ran over 6): its
+ * organization's entries, at most PC_RACE_CARS_MAX (entries[]). */
+static int champ_race_cars(RaceOrganization *org)
+{
+    int count = org->entries->count;
+    return count < PC_RACE_CARS_MAX ? count : PC_RACE_CARS_MAX;
+}
+
 // FUNC 0x0018DF70 RaceChampionshipInformation::applyEntryOrder
 //   The order of entries 0..5 into the race cars (RaceEntryCar::order).
-//   Callers: orderByTime, orderByPowerWeight.
+//   Callers: orderByTime, orderByPowerWeight.  (PC: every car of the race.)
 void RaceChampionshipInformation::applyEntryOrder(RaceOrganization *org)
 {
     RaceEntryCar **cars = org->entries->cars;
-    for (int i = 0; i < GTMODE_RACE_CARS; i++)
+    int count = champ_race_cars(org);       /* PC: was GTMODE_RACE_CARS */
+    for (int i = 0; i < count; i++)
         cars[i]->order = entries[i].order;
 }
 
@@ -134,21 +152,23 @@ void RaceChampionshipInformation::applyEntryOrder(RaceOrganization *org)
 //   forms, counters, statement orders, accessors / inline helpers for the
 //   cars, operator new[] calls, chained stores, laundered pointers, an EH
 //   region, -fno-strict-aliasing, the reference compiler.
+//   PC (ROADMAP 35): every car of the race (cars; GT3's were 6).
 void RaceChampionshipInformation::orderByTime(RaceOrganization *org)
 {
     int i;                                  /* one counter for all loops (retail's $s0) */
-    int *place = new int[GTMODE_RACE_CARS]; /* implicit: operator new[] (new-expression) */
-    int *taken = new int[GTMODE_RACE_CARS];
-    u32 *bestLap = new u32[GTMODE_RACE_CARS];
-    for (i = 0; i < GTMODE_RACE_CARS; i++) {
+    int cars = champ_race_cars(org);        /* PC: was GTMODE_RACE_CARS */
+    int *place = new int[cars];             /* implicit: operator new[] (new-expression) */
+    int *taken = new int[cars];
+    u32 *bestLap = new u32[cars];
+    for (i = 0; i < cars; i++) {
         taken[i] = 0;
         place[i] = 0;
         bestLap[i] = 0;
     }
-    for (i = 0; i < GTMODE_RACE_CARS; i++)
+    for (i = 0; i < cars; i++)
         bestLap[i] = car_best_lap(org->entries->cars[i]->state);
-    for (i = 0; i < GTMODE_RACE_CARS; i++) {
-        for (int j = i + 1; j < GTMODE_RACE_CARS; j++) {
+    for (i = 0; i < cars; i++) {
+        for (int j = i + 1; j < cars; j++) {
             if (bestLap[i] != bestLap[j]) {
                 if (bestLap[j] < bestLap[i])
                     place[i]++;
@@ -157,7 +177,7 @@ void RaceChampionshipInformation::orderByTime(RaceOrganization *org)
             }
         }
     }
-    for (i = 0; i < GTMODE_RACE_CARS; i++) {
+    for (i = 0; i < cars; i++) {
         int pos = place[i];
         while (taken[pos] == 1)
             pos++;
@@ -183,19 +203,22 @@ void RaceChampionshipInformation::orderByTime(RaceOrganization *org)
 //   &condition / &rpm (sp+0x1350 / 0x1370) above the clearing loop; retail
 //   computes them in the second loop's preheader (loop.c) and does not
 //   strength-reduce weightPerPower[i] (one i*4 for both arrays).
+//   PC (ROADMAP 35): every car of the race (cars; GT3's were 6), the player
+//   last (cars - 1; GT3's 6th).
 void RaceChampionshipInformation::orderByPowerWeight(RaceOrganization *org)
 {
     int i;                                  /* one counter for all loops (retail's $s2) */
-    entries[0].order = GTMODE_RACE_CARS - 1;
-    int *place = new int[GTMODE_RACE_CARS]; /* implicit: operator new[] (new-expression) */
-    int *taken = new int[GTMODE_RACE_CARS];
-    f32 *weightPerPower = new f32[GTMODE_RACE_CARS];
-    for (i = 0; i < GTMODE_RACE_CARS; i++) {
+    int cars = champ_race_cars(org);        /* PC: was GTMODE_RACE_CARS */
+    entries[0].order = cars - 1;
+    int *place = new int[cars];             /* implicit: operator new[] (new-expression) */
+    int *taken = new int[cars];
+    f32 *weightPerPower = new f32[cars];
+    for (i = 0; i < cars; i++) {
         taken[i] = 0;
         place[i] = 0;
         weightPerPower[i] = 0;
     }
-    for (i = 0; i < GTMODE_RACE_CARS; i++) {
+    for (i = 0; i < cars; i++) {
         ShowRoomCar car;                    /* sp+0x0000 */
         CarCondition condition;             /* sp+0x1350 */
         int rpm;                            /* sp+0x1370 */
@@ -205,8 +228,8 @@ void RaceChampionshipInformation::orderByPowerWeight(RaceOrganization *org)
          * (game/app/pc_units.h) */
         weightPerPower[i] = (f32)(weight / car.pcPowerGame(&rpm, 0));
     }
-    for (i = 1; i < GTMODE_RACE_CARS; i++) {
-        for (int j = i + 1; j < GTMODE_RACE_CARS; j++) {
+    for (i = 1; i < cars; i++) {
+        for (int j = i + 1; j < cars; j++) {
             if (weightPerPower[i] != weightPerPower[j]) {
                 if (weightPerPower[j] < weightPerPower[i])
                     place[i]++;
@@ -215,7 +238,7 @@ void RaceChampionshipInformation::orderByPowerWeight(RaceOrganization *org)
             }
         }
     }
-    for (i = 1; i < GTMODE_RACE_CARS; i++) {
+    for (i = 1; i < cars; i++) {
         int pos = place[i];
         while (taken[pos] == 1)
             pos++;
@@ -237,10 +260,12 @@ void RaceChampionshipInformation::orderByPowerWeight(RaceOrganization *org)
 //   check; retail's addresses are constants, lw 0x1E0($zero)).  GCC 14 would
 //   turn the null dereference into a trap: there a pointer it cannot see is
 //   NULL reads the same bytes.  Caller: result_list_from_entries (T102, the
-//   standings).
+//   standings).  PC (ROADMAP 35): over every entry (was 6): the race's cars
+//   hold the orders 0..count - 1 and come first; an entry past them has
+//   order -1 (or a bigger race's: found after the race's own).
 ChampionshipEntry RaceChampionshipInformation::getEntryByOrder(int order)
 {
-    for (int i = 0; i < GTMODE_RACE_CARS; i++) {
+    for (int i = 0; i < PC_RACE_CARS_MAX; i++) {    /* PC: was GTMODE_RACE_CARS */
         if (entries[i].order == order) {
             if (i == 0)
                 entries[i].highlight = true;
@@ -269,7 +294,7 @@ ChampionshipEntry RaceChampionshipInformation::getEntryByOrder(int order)
 //   chosen (selectEnemies = 1).  Caller: setupFirstSession.
 void RaceChampionshipInformation::pickEnemies(RaceOrganization *org)
 {
-    int count = org->entries->count;
+    int count = champ_race_cars(org);       /* PC: entries[PC_RACE_CARS_MAX] (was org->entries->count) */
     assignCarRange(org, 1, count);
     for (int i = 1; i < count; i++)
         entries[i].car = org->entries->cars[i]->info; /* implicit: CarEquipments::operator= (assignment) */
@@ -284,11 +309,40 @@ void RaceChampionshipInformation::pickEnemies(RaceOrganization *org)
 //   (moveEntryOrder(0, count - 1); count as read on entry).  The loop
 //   after orderByPowerWeight is empty in the original (count iterations of
 //   nothing).  Caller: setupOrganization.
+/* PC (ROADMAP 35): the cars of the race whose entry has no car (carCode 0)
+ * - a championship resumed from a save with fewer entrants than the race
+ * now has (an older save keeps 8, of which a 6-car championship used 6) -
+ * get drawn opponents (RaceInformation slot 13, from the first such entry
+ * on), kept in their entries as pickEnemies keeps them; the entries with a
+ * car are put back by the callers' loops after it.  Nothing for a
+ * championship that drew its own. */
+static void champ_fill_entries(RaceChampionshipInformation *info, RaceOrganization *org, int count)
+{
+    int first;
+
+    for (first = 1; first < count; first++) {
+        if (info->entries[first].car.carCode == 0)
+            break;
+    }
+    if (first >= count)
+        return;
+    printf("PC: championship: entries %d..%d have no car (a save of fewer entrants): drawn\n",
+           first, count - 1);
+    info->assignCarRange(org, first, count);
+    for (int i = first; i < count; i++) {
+        if (info->entries[i].car.carCode == 0) {
+            info->entries[i].car = org->entries->cars[i]->info; /* implicit: CarEquipments::operator= */
+            info->entries[i].points = 0;
+        }
+    }
+}
+
 void RaceChampionshipInformation::setupFirstSession(RaceOrganization *org)
 {
     int i;                                  /* one counter for both loops (retail's $s0) */
-    int count = org->entries->count;
+    int count = champ_race_cars(org);       /* PC: entries[PC_RACE_CARS_MAX] (was org->entries->count) */
     if (selectEnemies != 0) {
+        champ_fill_entries(this, org, count);   /* PC: a resumed save's missing entrants */
         for (i = 1; i < count; i++)
             static_cast<CarEquipments &>(org->entries->cars[i]->info) = entries[i].car;   /* implicit: CarEquipments::operator= */
         org->resetEntryOrder();
@@ -311,7 +365,8 @@ void RaceChampionshipInformation::setupFirstSession(RaceOrganization *org)
 void RaceChampionshipInformation::setupNextSession(RaceOrganization *org)
 {
     int i;                                  /* one counter for all loops (retail's $s0) */
-    int count = org->entries->count;
+    int count = champ_race_cars(org);       /* PC: entries[PC_RACE_CARS_MAX] (was org->entries->count) */
+    champ_fill_entries(this, org, count);   /* PC: a resumed save's missing entrants */
     for (i = 1; i < count; i++)
         static_cast<CarEquipments &>(org->entries->cars[i]->info) = entries[i].car;   /* implicit: CarEquipments::operator= */
     org->resetEntryOrder();
@@ -334,9 +389,10 @@ void RaceChampionshipInformation::addPoints(RaceOrganization *org)
     RaceEntryCar *car = list->rankTop;
     for (int pos = 0; pos < count; pos++) {
         int number = car->number;
-        int points = db.getChampionshipPoint(pos);
+        int points = db.getChampionshipPoint(pos);  /* (PC: the 7th and lower: the 6th's) */
         car = car->rankNext;
-        entries[number].points += points;
+        if (number >= 0 && number < PC_RACE_CARS_MAX)   /* PC: entries[PC_RACE_CARS_MAX] */
+            entries[number].points += points;
     }
 }
 
@@ -388,7 +444,7 @@ void RaceChampionshipInformation::setChampionship(const char *code, int cont)
         globalRaceCode[len - 1]--;
         sessions = currentRaceCode[len - 3] - '0' - 1;
         sessions += (currentRaceCode[len - 4] - '0') * 10;
-        for (int i = CHAMPIONSHIP_ENTRIES - 1; i >= 0; i--)
+        for (int i = PC_RACE_CARS_MAX - 1; i >= 0; i--)     /* PC: every entry (was CHAMPIONSHIP_ENTRIES) */
             entries[i].points = 0;
     }
 }
@@ -418,7 +474,7 @@ void RaceChampionshipInformation::addEnemyPoints(RaceOrganization *org)
     RaceEntryCar *car = list->rankTop;
     for (int pos = 0; pos < count; pos++) {
         int number = car->number;
-        if (number != 0)
+        if (number != 0 && number >= 0 && number < PC_RACE_CARS_MAX)    /* PC: entries[PC_RACE_CARS_MAX] */
             entries[number].points += db.getChampionshipPoint(pos);
         car = car->rankNext;
     }
@@ -429,6 +485,9 @@ void RaceChampionshipInformation::addEnemyPoints(RaceOrganization *org)
 //   the save data (GameStatus::championship): active = 1, the current menu
 //   page (MenuStatus::getPage), both codes, the counters, the 8 cars and
 //   their points.  Caller: run_championship (T053).
+//   PC (ROADMAP 35): the entrants past the save's 8 (up to the last entry
+//   with a car) into its extension (ChampionshipSave::pcSetEntrant, T422;
+//   none for a championship of 8 cars or fewer).
 void RaceChampionshipInformation::suspend()
 {
     char page[0x40];                        /* sp+0x00 */
@@ -444,6 +503,13 @@ void RaceChampionshipInformation::suspend()
         save->setCar(&entries[i].car, i);
         save->setPoints(entries[i].points, i);
     }
+    /* PC: the entrants past 8 */
+    int entrants = PC_RACE_CARS_MAX;
+    while (entrants > CHAMPIONSHIP_ENTRIES && entries[entrants - 1].car.carCode == 0)
+        entrants--;
+    save->pcSetEntrants(entrants);
+    for (int i = CHAMPIONSHIP_ENTRIES; i < entrants; i++)
+        save->pcSetEntrant(i, &entries[i].car, entries[i].points);
 }
 
 // FUNC 0x0018EC48 RaceChampionshipInformation::clearSuspend
@@ -461,7 +527,9 @@ void RaceChampionshipInformation::clearSuspend()
 //   (MenuStatus::setEvent) and raceMode = 2 (the next race of a series);
 //   then the codes, counters, cars (CarEquipments::operator=) and points
 //   back, and the save is no longer active.  Caller: run_championship
-//   (T053).
+//   (T053).  PC (ROADMAP 35): the entrants past 8 from the save's extension
+//   (none in an older save: the race's cars past them get drawn opponents,
+//   setupFirstSession / setupNextSession).
 void RaceChampionshipInformation::resume()
 {
     char code[0x40];                        /* sp+0x00 */
@@ -481,6 +549,12 @@ void RaceChampionshipInformation::resume()
             entries[i].car = *save->getCar(i); /* implicit: CarEquipments::operator= (assignment) */
             entries[i].points = save->getPoints(i);
         }
+        /* PC: the entrants past 8 */
+        int entrants = save->pcGetEntrants();
+        if (entrants > PC_RACE_CARS_MAX)
+            entrants = PC_RACE_CARS_MAX;
+        for (int i = CHAMPIONSHIP_ENTRIES; i < entrants; i++)
+            entries[i].points = save->pcGetEntrant(i, &entries[i].car);
         save->active = 0;
     }
 }
@@ -488,11 +562,12 @@ void RaceChampionshipInformation::resume()
 // FUNC 0x0018EDF0 RaceChampionshipInformation::isPlayerLeading
 //   (u017: "1 if the championship was won".)  1 when the player's points
 //   are above those of every other entry (1..7, signed).  Caller:
-//   run_championship (T053).
+//   run_championship (T053).  (PC: every entry; those past the race's cars
+//   have no points.)
 int RaceChampionshipInformation::isPlayerLeading()
 {
     int playerPoints = entries[0].points;
-    for (int i = 1; i < CHAMPIONSHIP_ENTRIES; i++) {
+    for (int i = 1; i < PC_RACE_CARS_MAX; i++) {    /* PC: was CHAMPIONSHIP_ENTRIES */
         if (entries[i].points >= playerPoints)
             return 0;
     }

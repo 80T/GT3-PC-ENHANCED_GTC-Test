@@ -25,7 +25,8 @@
 
 /* The colour of the event board's messages (RaceEventDisplay's default,
  * ABGR). */
-#define FREE_RUN_MESSAGE_COLOR 0x802BCC49
+#include "game/app/pc_hud_color.h"              /* PC: pc_hud_color */
+#define FREE_RUN_MESSAGE_COLOR pc_hud_color(kHudEvents, 0x802BCC49)
 /* The enhanced engine (hud.md C23): RaceDisplay::replay of a live session
  * (T154's RD_LIVE). */
 #include "game/enhanced.h"                  /* ENH_HUD_FREE_RUN_LIVE_MESSAGES */

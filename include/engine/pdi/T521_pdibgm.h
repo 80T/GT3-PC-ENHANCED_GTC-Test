@@ -28,6 +28,21 @@ void pdibgm_update(void);                                   /* 0x0025CA78 per fr
 /* The stream position in seconds; *pos, *id (changes with the song) and
  * *ended (the song finished) are filled when not NULL. */
 f32  pdibgm_get_status(int *pos, int *id, int *ended);      /* 0x0025CA98 */
+/* PC (no original): whose music the stream plays.  The player's volume of
+ * it ([Audio] MenuBgm / RaceBgm / ReplayBgm, platform/settings.h) multiplies
+ * the volume pdibgm_set_volume sends; a change of it (the settings menu) is
+ * sent by the next pdibgm_update.  Set by the music's owners before they
+ * start it or set its volume: the menus (T262; the play list's preview,
+ * T085) and the race's music (RaceBGMPS2, T130: a race's or a replay's); a
+ * movie's sound (mpegif::feed) is PDIBGM_MUSIC_NONE, as it is. */
+enum { PDIBGM_MUSIC_NONE, PDIBGM_MUSIC_MENU, PDIBGM_MUSIC_RACE, PDIBGM_MUSIC_REPLAY };
+void pdibgm_pc_music(int music);
+/* PC (no original): pdibgm_start from `at' of the song's length (0 .. 1),
+ * its volume from 0 to full over `fadeIn' seconds in a straight line (the
+ * play list's preview of a song without an intro file: T466 ads_play).  A
+ * .wav, an .mp3 or a 16-bit PCM .ads; an ADPCM .ads plays from its start.
+ * Its loop comes back to the song's start. */
+void pdibgm_pc_start_from(int lsn, int sectors, int arg, int bufSize, const char *hostName, f32 at, f32 fadeIn);
 /* T521_static_fini 0x0025CB40 (.dtors) and T521_static_init 0x0025CB68 (.ctors) are
  * egcs's own static destructor / initialiser of the object (no source
  * functions: the objects are defined in the .cpp file). */

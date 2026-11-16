@@ -491,6 +491,12 @@ struct PacketStats {
     uint32_t verts = 0, tris = 0, batches = 0, flags = 0;
 };
 
+/* --exact: the positions as stored (before the draw's matrix) at full
+ * precision, and each draw's matrix as hex floats ("# mtx"): what decides
+ * whether two draws give the GPU bit-identical vertices (two copies of a
+ * triangle tie in depth only then) */
+static bool g_exact = false;
+
 static void writeObj(FILE *obj, FILE *mtl, const std::vector<DrawCall> &calls,
                      const std::vector<ModelSetInfo> &sets, std::map<uint64_t, Mesh> &cache,
                      uint32_t &vOut, uint32_t &tOut)
@@ -505,13 +511,23 @@ static void writeObj(FILE *obj, FILE *mtl, const std::vector<DrawCall> &calls,
         if (mesh.vertices.empty())
             continue;
         fprintf(obj, "g set%d_part%d_pk%d_%d\n", d.set, d.part, d.packet, callNo++);
+        if (g_exact) {
+            /* --exact: the draw's matrix, as hex floats (two draws give the
+             * GPU bit-identical vertices only with the same matrix and positions) */
+            fprintf(obj, "# mtx");
+            for (int i = 0; i < 16; i++)
+                fprintf(obj, " %a", d.mtx.m[i / 4][i % 4]);
+            fprintf(obj, "\n");
+        }
         for (const Vertex &v : mesh.vertices) {
             float p[3], q[3];
             /* the morph weight as the program blends: (1 - w) a + w b */
             for (int c = 0; c < 3; c++)
                 q[c] = v.pos[c] * (1.0f - d.morphWeight) + v.pos2[c] * d.morphWeight;
             xformPoint(d.mtx, q, p);
-            if (mesh.attribs & ATTR_COLOR)
+            if (g_exact)                    /* (the positions as stored: the GPU's input) */
+                fprintf(obj, "v %.9g %.9g %.9g\n", q[0], q[1], q[2]);
+            else if (mesh.attribs & ATTR_COLOR)
                 fprintf(obj, "v %.6f %.6f %.6f %.4f %.4f %.4f\n", p[0], p[1], p[2],
                         std::min(1.0f, v.rgba[0] / 128.0f), std::min(1.0f, v.rgba[1] / 128.0f),
                         std::min(1.0f, v.rgba[2] / 128.0f));
@@ -743,6 +759,7 @@ int main(int argc, char **argv)
         else if (a == "--morph" && i + 1 < argc) opt.morph = (float)atof(argv[++i]);
         else if (a == "--raw") opt.raw = true;
         else if (a == "--no-obj") opt.noObj = true;
+        else if (a == "--exact") g_exact = true;
         else if (a == "--set" && i + 1 < argc) onlySet = argv[++i];
         else if (a == "--part" && i + 1 < argc) opt.onlyPart = atoi(argv[++i]);
         else if (a == "--selftest") return selftest();

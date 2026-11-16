@@ -37,7 +37,10 @@ EGCS_SIZE(ChampionshipStanding, 0xC);
 /* vtable 0x00326198 (10 slots).  Size 0x9A8 (RaceChampionship: the next
  * member is at +0x25A44).  The destructor is implicit.  The enhanced engine:
  * ResultArcade grew by 0x20 (its disqualified cars), so the members below
- * are at their GT3 offset + 0x20 and the size is 0x9C8. */
+ * are at their GT3 offset + 0x20 and the size is 0x9C8.  PC (ROADMAP 35):
+ * ResultArcade 0xA34 and standings[PC_RACE_CARS_MAX]: egcs layout 0xBBC
+ * (the offsets below are GT3's); the board shows the top
+ * 6 of a bigger race, the player highlighted only among them. */
 class ResultChampionship : public ResultArcade {
 public:
     /* Inline (Lupo 2: linkonce); 0x001758B0 is T118's copy (no callers). */
@@ -64,11 +67,11 @@ public:
 
     /* state: 0 the race result, 1 -> 2 the points of the places, 3 -> 4 the
      * standings. */
-    ChampionshipStanding  standings[7];     /* 0x94C */
+    ChampionshipStanding  standings[PC_RACE_CARS_MAX]; /* 0x94C (PC: was [7]) */
     ChampionshipStanding *head;             /* 0x9A0 the first of the sorted standings */
     u32                   state;            /* 0x9A4 */
 };
-EGCS_SIZE(ResultChampionship, 0x9C8);
+EGCS_SIZE(ResultChampionship, 0xBBC);       /* (polymorphic: not checked; the enhanced engine 0x9C8) */
 
 
 #endif /* GAME_T118_RESULT_CHAMPIONSHIP_H */

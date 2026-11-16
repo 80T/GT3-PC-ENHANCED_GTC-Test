@@ -1,7 +1,7 @@
 /* T374_car_box.h - one car's collision box (translation unit T374, unit
  * u087), 0x001FAE38..0x001FBCE8.
  *
- * CarBox (0x4F0, T376_car_box_walls.h; u083 CarAux, u085 GridSlot) is an
+ * CarBox (0x4F0, PC 0x4B0, T376_car_box_walls.h; u083 CarAux, u085 GridSlot) is an
  * octagon in the car's frame: 8 corners (BoxVertex, counter-clockwise from
  * the front right; local x across the car, y along it, front +) and 8 edges
  * (BoxEdge, T375).  T374 builds it, moves its pose over the frame (pos at t,
@@ -68,7 +68,8 @@ EGCS_SIZE(CarBoxSave, 0x228);
 void car_box_init(CarBox *b, int index, RaceCourse *course, RaceCarState *car, f32 front,
                   f32 rear, f32 width, f32 chamferFront, f32 chamferRear, f32 mass,
                   f32 inertia);                                                 /* 0x001FAE38 */
-/* The other boxes and the pair reaches (radius sums and their squares). */
+/* The other boxes and the pair reaches (radius sums and their squares).
+ * PC: only the other boxes (the reaches are computed where used, T375). */
 void car_box_link(CarBox *b, CarBox *boxes, int n);                             /* 0x001FB0D8 */
 /* The frame's start: pose and velocity from the car's state, the frame
  * flags cleared, the corners from the last prediction (the first time:

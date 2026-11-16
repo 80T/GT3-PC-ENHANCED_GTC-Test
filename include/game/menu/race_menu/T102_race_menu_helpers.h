@@ -22,6 +22,7 @@
 #include "game/race/core/T128_race_lap_record.h"      /* RACE_TIME_INVALID */
 #include "game/save/T420_license_records.h"      /* LicenseRecords (LicenseStatus) */
 #include "engine/pdistd/T471_unit_arena.h"           /* _UnitArenaBase (BlockPool) */
+#include "game/race/race_cars.h"                /* PC: PC_RACE_CARS_MAX (ShortMenuArgs::all) */
 
 class RaceInformation;                      /* T124 (pointers only) */
 class RaceOrganization;                     /* T125 */
@@ -97,7 +98,8 @@ EGCS_SIZE(ShortMenuResultEntry, 0x18);
 /* (? name, u015) The in / out arguments of a short-menu session: a stack
  * object of the race modes (sp+0x000 in T052's); g_003514F0 (gp-0x6500,
  * used only by u015) points at it while the menu runs.  Not polymorphic.  Size 0x188 (0x190
- * with the enhanced engine's two flags at the end): the
+ * with the enhanced engine's two flags at the end; PC 0x498 with the list of
+ * every car, all / allCount, after them): the
  * race modes construct 6 result lines and 12 rank lines (u015 had 5, the
  * number of qm_rank_* texts).  The constructor is inline (the race modes
  * expand it): the two arrays, then the members (result and bestSpeed are
@@ -121,6 +123,7 @@ struct ShortMenuArgs {
         laps = -1;
         noLoadGhost = 0;                    /* the enhanced engine: GT3's buttons stay */
         noDemo = 0;
+        allCount = 0;                       /* PC (ROADMAP 35): no list of every car */
     }
 
     /* Inline accessors (? names, u017): T053's race modes set and read the
@@ -154,8 +157,15 @@ struct ShortMenuArgs {
     void setNoDemo(int v) { noDemo = v; }
     /* Every result line empty (pad14 is left).  T053's run_gtmode_race
      * expands it: the lines' address is loop.c's, not a GCSE copy of the
-     * constructor's array pointer as with the loop written out. */
-    void clearList() { for (int i = 0; i < 6; i++) list[i].clear(); }
+     * constructor's array pointer as with the loop written out.  PC (ROADMAP
+     * 35): the list of every car goes too (allCount 0: the short menu's
+     * overlay of it stays off). */
+    void clearList()
+    {
+        for (int i = 0; i < 6; i++)
+            list[i].clear();
+        allCount = 0;
+    }
 
     int  result;                            /* 0x00 the action chosen (QM_*); 1 when the session starts */
     int  noExit;                            /* 0x04 non-zero: "exit" and "save_game" hidden (e.g. the
@@ -191,8 +201,17 @@ struct ShortMenuArgs {
      * demonstration lap (the Pod race) can hide them. */
     int  noLoadGhost;                       /* 0x188 non-zero: "load_ghost" hidden */
     int  noDemo;                            /* 0x18C non-zero: "demonstration" hidden */
+    /* PC (ROADMAP 35): a race of up to PC_RACE_CARS_MAX cars.  list[] holds
+     * the first 6 lines (the page's 6 rows); the pre-race lists
+     * (result_list_by_order, result_list_from_entries) also give every car's
+     * line here, in the same order, and allCount = the race's cars.  While
+     * allCount > 6 the pre-race menu shows them in its own box over the
+     * page's rows and Up / Down scroll it (pc_race_list.h).  0: none (the
+     * race results, result_list_by_rank, keep the top 6; clearList). */
+    ShortMenuResultEntry all[PC_RACE_CARS_MAX]; /* 0x190 */
+    int  allCount;                          /* 0x490 */
 };
-EGCS_SIZE(ShortMenuArgs, 0x190);            /* (GT3 0x188) */
+EGCS_SIZE(ShortMenuArgs, 0x498);            /* (GT3 0x188; the enhanced engine 0x190) */
 
 /* (? name, u015) Which menu a session runs: static data of the race modes
  * (e.g. 0x0029D4FC), copied to the caller's stack.  Not polymorphic. */
@@ -258,13 +277,13 @@ int  race_get_entry_condition(GarageCar *car, RaceOrganization *org, int entry);
 void race_memcard(int mode, u64 race, u64 car, const char *raceName,
                   RaceOrganization *org);                           /* 0x0012EF40 */
 /* args->list in rank order: car, points, the time; `highlight': the
- * player's line marked. */
+ * player's line marked.  (PC: the top 6; allCount 0.) */
 void result_list_by_rank(RaceOrganization *org, ShortMenuArgs *args, int highlight); /* 0x0012F070 */
 /* args->list[order] of every entry (the time: car_best_lap); noTime: no
- * times. */
+ * times.  (PC: orders 0..5 in list, every one in all.) */
 void result_list_by_order(RaceOrganization *org, ShortMenuArgs *args, int noTime);   /* 0x0012F160 */
 /* args->list[i] from champ->getEntryByOrder(i) (car, points, highlight; no
- * time). */
+ * time).  (PC: 0..5 in list, every one in all.) */
 void result_list_from_entries(RaceOrganization *org, ShortMenuArgs *args,
                               RaceChampionshipInformation *champ);  /* 0x0012F290 */
 /* The 0x20-byte ranking code text of a record (RankingRecord::encode,

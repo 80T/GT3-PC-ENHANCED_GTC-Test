@@ -20,6 +20,21 @@
  * pack() sets the bit fields of an uninitialised word: the other bits are
  * whatever the register held (the original's quirk, kept).
  *
+ * PC (ROADMAP 35): the races of up to 32 cars (game/race/race_cars.h): the
+ * car is 5 bits, 0..4, clamped to 0..31 (EVENT_CAR_MAX), and the fields
+ * after it one bit higher:
+ *   lap time    (type 0xB):  lap 8..17 (bits 5..7 unused, as 4..7 were)
+ *   check point (type 0xC):  check point 5..8, lap 9..18
+ *   difference  (abstract):  a signed 27-bit value 5..31 (+-0x3FFFFFF);
+ *                            setTime / getTime at 0x7FFFFFE / 0x7FFFFFF
+ *                            (race_championship_internal.h: the HUD shows
+ *                            every time as before)
+ *   speed       (type 0x11): speed * 10 in 5..18
+ *   information (type 0x12): an information code 5..8
+ * Every poster goes through pack() (T154, T303, T315, T350 and the enhanced
+ * engine's build the event objects; nobody packs a word itself) and the
+ * only reader is unpack() (peek / take).
+ *
  * Data (u050's data pass): .rodata (0x0032DDA0..0x0032DF89) is "bad_alloc"
  * (<new>), the six vtables, then the type names in reverse definition
  * order: the events of game/race/display/T194_race_display_event.h (T154's three
@@ -37,6 +52,7 @@
 #include "game/race/core/T125_race_organization.h"    /* RaceOrganization (eventQueue) */
 #include "game/race/core/T128_race_lap_record.h"      /* RACE_TIME_INVALID */
 #include "game/race/core/race_championship_internal.h"                           /* the unit's constants */
+#include "game/race/race_cars.h"                /* PC: PC_RACE_CARS_MAX (the car field's width) */
 
 /* lo <= v <= hi (the original's clamp: < lo first, then > hi) */
 static inline int clampi(int v, int lo, int hi)
@@ -44,19 +60,23 @@ static inline int clampi(int v, int lo, int hi)
     return v < lo ? lo : (v > hi ? hi : v);
 }
 
-/* The event words, as bit fields (bit 0 first). */
+/* The event words, as bit fields (bit 0 first).  PC (ROADMAP 35): the car
+ * field is EVENT_CAR_BITS wide (GT3's 4), the fields after it move up. */
+enum { EVENT_CAR_BITS = 5 };                /* PC: cars 0..31 (was 4: 0..15) */
+static_assert((1 << EVENT_CAR_BITS) - 1 == EVENT_CAR_MAX, "PC: the car field holds EVENT_CAR_MAX");
+static_assert(EVENT_CAR_MAX + 1 >= PC_RACE_CARS_MAX, "PC: the car field holds every car of a race");
 union LapTimeBits {                         /* RaceDisplayLapTimeEvent */
     int word;
     struct {
-        u32 car : 4;
-        u32     : 4;
+        u32 car : EVENT_CAR_BITS;           /* PC: was 4 */
+        u32     : 8 - EVENT_CAR_BITS;       /* PC: was 4 (lap stays at bit 8) */
         u32 lap : 10;
     } f;
 };
 union CheckPointBits {                      /* RaceDisplayCheckPointEvent */
     int word;
     struct {
-        u32 car : 4;
+        u32 car : EVENT_CAR_BITS;           /* PC: was 4 */
         u32 checkPoint : 4;
         u32 lap : 10;
     } f;
@@ -64,24 +84,31 @@ union CheckPointBits {                      /* RaceDisplayCheckPointEvent */
 union DiffBits {                            /* RaceDisplayDiffEvent */
     int word;
     struct {
-        u32 car : 4;
-        s32 diff : 28;
+        u32 car : EVENT_CAR_BITS;           /* PC: was 4 */
+        s32 diff : 32 - EVENT_CAR_BITS;     /* PC: 27 bits, was 28 (EVENT_DIFF_MAX) */
     } f;
 };
 union SpeedBits {                           /* RaceDisplaySpeedEvent */
     int word;
     struct {
-        u32 car : 4;
+        u32 car : EVENT_CAR_BITS;           /* PC: was 4 */
         u32 speed : 14;                     /* tenths */
     } f;
 };
 union InformationBits {                     /* RaceDisplayInformationEvent */
     int word;
     struct {
-        u32 car : 4;
+        u32 car : EVENT_CAR_BITS;           /* PC: was 4 */
         u32 information : 4;
     } f;
 };
+/* PC: the words still fit 32 bits, the difference's 27 signed bits hold
+ * EVENT_DIFF_MAX */
+static_assert(sizeof(CheckPointBits) == 4 && sizeof(DiffBits) == 4 && sizeof(SpeedBits) == 4,
+              "PC: one word per event");
+static_assert(EVENT_DIFF_MAX == (1 << (31 - EVENT_CAR_BITS)) - 1, "PC: EVENT_DIFF_MAX fills the difference");
+static_assert(EVENT_TIME_SATURATED == 2 * EVENT_DIFF_MAX + 1 && EVENT_TIME_MAX == EVENT_TIME_SATURATED - 1,
+              "PC: the time limits follow the difference field");
 
 /* ======================================================================== */
 /* RaceDisplayEventBase                                                     */
@@ -157,7 +184,7 @@ RaceDisplayLapTimeEvent::RaceDisplayLapTimeEvent()
 
 // FUNC 0x00190388 RaceDisplayLapTimeEvent::pack
 //   (index: virtual_1.)  car in 0..3, lap in 8..17; bits 4..7 and 18..31
-//   uninitialised.
+//   uninitialised.  PC: car in 0..4 (0..31), bits 5..7 uninitialised.
 int RaceDisplayLapTimeEvent::pack() const
 {
     LapTimeBits bits;                       /* not initialised (quirk) */
@@ -192,7 +219,8 @@ RaceDisplayCheckPointEvent::RaceDisplayCheckPointEvent()
 
 // FUNC 0x00190440 RaceDisplayCheckPointEvent::pack
 //   (index: virtual_1.)  car in 0..3, the check point in 4..7, lap in
-//   8..17; bits 18..31 uninitialised.
+//   8..17; bits 18..31 uninitialised.  PC: car in 0..4 (0..31), the check
+//   point in 5..8, lap in 9..18; bits 19..31 uninitialised.
 int RaceDisplayCheckPointEvent::pack() const
 {
     CheckPointBits bits;                    /* not initialised (quirk) */
@@ -229,7 +257,8 @@ RaceDisplayDiffEvent::RaceDisplayDiffEvent()
 // FUNC 0x00190538 RaceDisplayDiffEvent::pack
 //   (index: virtual_1; also the slot of RaceDisplayGeneralTimeEvent /
 //   LapDiffEvent / TimeDiffEvent.)  car in 0..3, the value clamped to
-//   +-0x7FFFFFF in 4..31 (here the whole word is set).
+//   +-0x7FFFFFF in 4..31 (here the whole word is set).  PC: car in 0..4
+//   (0..31), the value clamped to +-0x3FFFFFF (EVENT_DIFF_MAX) in 5..31.
 int RaceDisplayDiffEvent::pack() const
 {
     DiffBits bits;                          /* not initialised (all bits set below) */
@@ -239,7 +268,7 @@ int RaceDisplayDiffEvent::pack() const
 }
 
 // FUNC 0x001905B0 RaceDisplayDiffEvent::unpack
-//   (index: virtual_2.)  The value sign-extended (sra 4).
+//   (index: virtual_2.)  The value sign-extended (sra 4; PC: sra 5).
 void RaceDisplayDiffEvent::unpack(int word)
 {
     DiffBits bits;
@@ -251,6 +280,7 @@ void RaceDisplayDiffEvent::unpack(int word)
 // FUNC 0x001905C8 RaceDisplayDiffEvent::setTime
 //   A time (unsigned), 0xFFFFFFF if above 0xFFFFFFE (the largest the word
 //   can carry).  Callers: dc_post_section_time / dc_post_lap_time (T303).
+//   PC: 0x7FFFFFF above 0x7FFFFFE (EVENT_TIME_*, the 27-bit field).
 void RaceDisplayDiffEvent::setTime(u32 t)
 {
     if (t > EVENT_TIME_MAX)
@@ -259,7 +289,8 @@ void RaceDisplayDiffEvent::setTime(u32 t)
 }
 
 // FUNC 0x001905E8 RaceDisplayDiffEvent::getTime
-//   The time; RACE_TIME_INVALID for a value above 0xFFFFFFE (unsigned).
+//   The time; RACE_TIME_INVALID for a value above 0xFFFFFFE (unsigned; PC:
+//   0x7FFFFFE).
 //   Callers: RaceDisplay::pollLapTimeEvents / pollCheckPointEvents (T154).
 u32 RaceDisplayDiffEvent::getTime()
 {
@@ -282,7 +313,8 @@ RaceDisplaySpeedEvent::RaceDisplaySpeedEvent()
 
 // FUNC 0x00190640 RaceDisplaySpeedEvent::pack
 //   (index: virtual_1.)  car in 0..3, (int)(speed * 10) (truncated)
-//   clamped to 0..9999 in 4..17; bits 18..31 uninitialised.
+//   clamped to 0..9999 in 4..17; bits 18..31 uninitialised.  PC: car in
+//   0..4 (0..31), the speed in 5..18, bits 19..31 uninitialised.
 int RaceDisplaySpeedEvent::pack() const
 {
     SpeedBits bits;                         /* not initialised (quirk) */
@@ -319,7 +351,8 @@ RaceDisplayInformationEvent::RaceDisplayInformationEvent()
 
 // FUNC 0x00190748 RaceDisplayInformationEvent::pack
 //   (index: virtual_1.)  car in 0..3, the low 4 bits of the information in
-//   4..7 (not clamped); bits 8..31 uninitialised.
+//   4..7 (not clamped); bits 8..31 uninitialised.  PC: car in 0..4
+//   (0..31), the information in 5..8, bits 9..31 uninitialised.
 int RaceDisplayInformationEvent::pack() const
 {
     InformationBits bits;                   /* not initialised (quirk) */

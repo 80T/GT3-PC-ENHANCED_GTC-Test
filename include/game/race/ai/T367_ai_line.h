@@ -47,7 +47,8 @@ int  ai_change_line(AIDriver *ai, int line, int now);                           
 /* The throttle before the start (count: DynamicsConductor::getCountDown, or
  * the run state's pitTimer, car_input_ai): from 13 on, revving between 3/4
  * and 15/16 of the rev limit (CarDynamics.gear.revLimit; faster for the
- * lower ranks); under 13, holding the rev limit. */
+ * lower ranks; PC: the rank at most 6, races of up to 32 cars); under 13,
+ * holding the rev limit. */
 void ai_rev_engine(AIDriver *ai, int count);                                    /* 0x001F8A00 */
 
 #endif /* GAME_T367_AI_LINE_H */

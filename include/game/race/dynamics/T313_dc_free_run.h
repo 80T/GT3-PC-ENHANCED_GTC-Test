@@ -105,8 +105,9 @@ public:
     virtual int  virtual_37();              /* [37] +0x134 0x001F1A18 */
     virtual int  isPitEnabled();            /* [38] +0x13C 0x001F1A20 */
 };
-/* The enhanced engine: DynamicsConductor's (GT3 0xE3AC). */
-EGCS_SIZE(DynamicsConductorFreeRun, 0xE58C);
+/* The enhanced engine: DynamicsConductor's (GT3 0xE3AC; PC: 0x3B14C, the
+ * conductor's per-car arrays PC_RACE_CARS_MAX long, game/race/race_cars.h). */
+EGCS_SIZE(DynamicsConductorFreeRun, 0x3B14C);
 
 /* The start of a recorded lap of input in: the head of its lap record
  * (RaceInput::lap's slot) gets the car's snapshot (saveSector), frac50, t

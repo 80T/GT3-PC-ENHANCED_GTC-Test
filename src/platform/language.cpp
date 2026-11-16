@@ -34,7 +34,7 @@ int of_code(const std::string &c)
 /* Taken once (the first call of current(), by game_init). */
 std::once_flag g_once;
 int g_current = kEnglishUS;
-std::string g_db[3], g_gcf;
+std::string g_db[3], g_param, g_gcf;
 
 /* A file of the language's region: Japanese "<base>.<ext>", English (US)
  * "<base>_us.<ext>", the European languages "<base>_eu.<ext>". */
@@ -51,6 +51,23 @@ void take()
      * build's (an earlier launcher's install: the US disc) */
     static const char *const kBases[3] = {"database/paramdb", "database/paramstr", "database/paramunistr"};
     static const char *const kKeys[3] = {"database", "strings", "unistrings"};
+    /* converted (paramdb<r>.sqlite3): the first of the three with its
+     * database or its files decides */
+    std::string disc = paths::install_info("database");
+    if (disc.size() > 3 && _stricmp(disc.c_str() + disc.size() - 3, ".db") == 0)
+        disc.resize(disc.size() - 3);
+    else
+        disc.clear();
+    for (const std::string &base : {region_file(g_current, kBases[0], ""), disc, std::string("database/paramdb_us")}) {
+        if (base.empty())
+            continue;
+        if (present(base + ".sqlite3")) {
+            g_param = base + ".sqlite3";
+            break;
+        }
+        if (present(base + ".db"))
+            break;
+    }
     for (int k = 0; k < 3; k++) {
         std::string f = region_file(g_current, kBases[k], ".db");
         if (!present(f)) {
@@ -61,12 +78,17 @@ void take()
     }
     g_gcf = "gameconf/product.gcf";
     if (g_current != kJapanese) {
+        /* (or its database, gameconf/product_xx.sqlite3: game/app/pc_product_config.h) */
         const std::string f = region_file(g_current, "gameconf/product", ".gcf");
-        if (present(f))
+        if (present(f) || present(f.substr(0, f.size() - 4) + ".sqlite3"))
             g_gcf = f;
     }
-    pclog::write("language: %s (%s), %s, %s, %s, %s", kNames[g_current], kCodes[g_current], g_db[0].c_str(),
-                 g_db[1].c_str(), g_db[2].c_str(), g_gcf.c_str());
+    if (!g_param.empty())
+        pclog::write("language: %s (%s), %s, %s", kNames[g_current], kCodes[g_current], g_param.c_str(),
+                     g_gcf.c_str());
+    else
+        pclog::write("language: %s (%s), %s, %s, %s, %s", kNames[g_current], kCodes[g_current], g_db[0].c_str(),
+                     g_db[1].c_str(), g_db[2].c_str(), g_gcf.c_str());
 }
 
 } // namespace
@@ -117,6 +139,12 @@ const char *car_database(int kind)
 {
     current();
     return kind >= 0 && kind < 3 ? g_db[kind].c_str() : g_db[0].c_str();
+}
+
+const char *param_database()
+{
+    current();
+    return g_param.c_str();
 }
 
 const char *product_config()

@@ -2,6 +2,7 @@
  * dispatch. */
 #include "game/car/physics/car_input_internal.h"
 #include "game/car/physics/T340_assist_control.h"
+#include "game/app/pc_car_tuning.h"                 /* PC: the grip multiplier */
 
 /* DynCarState.understeer: how far the yaw rate (with half the yaw
  * acceleration added while it grows) stays below the one the steering asks
@@ -30,6 +31,7 @@ void car_slip_estimate(RaceCarDynamics *car)
     grip = st->understeer;                  /* 0 */
     for (i = 0; i < 4; i++)
         grip += CarDynamics_getTyre(p, i, &st->wheel[i])->grip;
+    grip *= pc_car_tuning(car, PC_TUNE_GRIP);   /* PC: the grip the multiplier gives (game/app/pc_car_tuning.h) */
 
     {
         f32 steer = st->steer;

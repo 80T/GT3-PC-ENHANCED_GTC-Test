@@ -134,7 +134,7 @@ const Vec4 g_0032FEF8[6] = {                /* 0x0032FEF8 */
  * box planes. */
 Vec3        g_002C04A8 = { 0.0f, 1.0f, 0.0f };  /* 0x002C04A8 */
 GadgetShape g_002C04B8;                     /* 0x002C04B8 T179 copies the course's first object in */
-Vec4        g_002C0568[RB_MAX_CAR_BOXES][RB_BOX_PLANES];  /* 0x002C0568 */
+Vec4        g_002C0568[RB_MAX_CAR_BOXES][RB_BOX_PLANES];  /* 0x002C0568 (PC: RB_MAX_CAR_BOXES is PC_RACE_CARS_MAX, was 8) */
 
 /* .sdata 0x00352174..0x00352180 (zeros, after Gadget::step's guard and
  * wallImpulse's FLT_MAX): the statics of the inline Get / Set accessors. */

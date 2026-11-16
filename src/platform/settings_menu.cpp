@@ -1,12 +1,17 @@
 /* settings_menu.cpp - the in-game settings menu of GT3 PC (settings_menu.h). */
 #include "platform/settings_menu.h"
 #include "platform/audio.h"
+#include "platform/clutch_input.h"             /* PC (2026-11-09): the clutch mode's notice */
+#include "platform/cockpit_osd.h"              /* PC (2026-11-08): the cockpit camera's calibration */
 #include "platform/frame_monitor.h"
 #include "platform/gamepad.h"
 #include "platform/gpu.h"
+#include "platform/hud_colors.h"
 #include "platform/input_map.h"
 #include "platform/language.h"
+#include "platform/memcard.h"                  /* PC (2026-11-15): MEMORY CARDS */
 #include "platform/overlay.h"
+#include "platform/screenshot.h"               /* PC (2026-11-15): TAKE SCREENSHOT */
 #include "platform/settings.h"
 #include "platform/window.h"
 
@@ -14,6 +19,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <cmath>
 #include <cstdlib>
 #include <mutex>
@@ -33,7 +39,8 @@ int g_sel;
 
 /* A setting: a list of values (count, get, set, value), or a value of its
  * own (count 0: text, step, edges); or a category (count kCategory), the
- * items after it one level deeper its own. */
+ * items after it one level deeper its own.  A list setting may have items
+ * one level deeper too: shown while its value is not 0 (on). */
 constexpr int kCategory = -1;
 struct Item {
     int depth;                                  /* 0 the top level */
@@ -49,14 +56,18 @@ struct Item {
     void (*step)(int dir, int heldMs);
     int (*edges)();                             /* bit 0: a lower value exists, bit 1: a higher one */
     int hotkey = -1;                            /* the label followed by "(key)" (input_map::Hotkey) */
+    uint32_t (*swatch)() = nullptr;             /* a square of this colour left of the value */
+    /* PC (2026-11-09): a list setting's items one level deeper shown while
+     * this is not 0 (nullptr: while its value is not 0) */
+    int (*nest)() = nullptr;
 };
 
 int aa_get() { return (int)settings::anti_aliasing(); }
 void aa_set(int v) { settings::set_anti_aliasing((settings::AntiAliasing)v); }
 const char *aa_value(int v)
 {
-    static const char *const names[settings::kAntiAliasingCount] = {"OFF", "FXAA", "MSAA 2X", "MSAA 4X",
-                                                                    "MSAA 8X"};
+    static const char *const names[settings::kAntiAliasingCount] = {"OFF",     "FXAA",    "MSAA 2X", "MSAA 4X",
+                                                                    "MSAA 8X", "AGSS 2X", "AGSS 4X", "AGSS 8X"};
     return v >= 0 && v < settings::kAntiAliasingCount ? names[v] : "?";
 }
 
@@ -86,10 +97,203 @@ int lod_get() { return settings::lod_enabled() ? 1 : 0; }
 void lod_set(int v) { settings::set_lod_enabled(v != 0); }
 const char *lod_value(int v) { return v ? "NORMAL" : "ALWAYS BEST"; }
 
+/* PC: the road reflection's detail (settings::ReflectionDetail) */
+int refl_get() { return settings::reflection_detail() == settings::ReflectionDetail::full ? 1 : 0; }
+void refl_set(int v)
+{
+    settings::set_reflection_detail(v != 0 ? settings::ReflectionDetail::full : settings::ReflectionDetail::original);
+}
+const char *refl_value(int v) { return v ? "HIGH" : "NORMAL"; }
+/* PC (2026-11-14): the road reflection's resolution (settings::ReflectionResolution) */
+int refl_res_get() { return (int)settings::reflection_resolution(); }
+void refl_res_set(int v) { settings::set_reflection_resolution((settings::ReflectionResolution)v); }
+const char *refl_res_value(int v)
+{
+    static const char *const names[settings::kReflectionResolutionCount] = {"NORMAL", "HALF", "FULL"};
+    return v >= 0 && v < settings::kReflectionResolutionCount ? names[v] : "?";
+}
+
+/* PC (2026-11-05): the cars' reflections (settings::CarReflections) */
+int car_refl_get() { return (int)settings::car_reflections(); }
+void car_refl_set(int v) { settings::set_car_reflections((settings::CarReflections)v); }
+const char *car_refl_value(int v) { return v == 2 ? "OFF" : v == 1 ? "LOW" : "NORMAL"; }
+
+/* PC (2026-11-06): the cars' environment map's size (settings::EnvMapDetail) */
+int env_map_get() { return (int)settings::env_map_detail(); }
+void env_map_set(int v) { settings::set_env_map_detail((settings::EnvMapDetail)v); }
+const char *env_map_value(int v) { return v == 1 ? "NORMAL" : "HIGH"; }
+
+/* PC (2026-11-10): the anisotropic filtering (settings::anisotropic_filtering):
+ * off, 2x .. 16x as 0 .. 4 */
+int aniso_get()
+{
+    const int a = settings::anisotropic_filtering();
+    return a >= 16 ? 4 : a >= 8 ? 3 : a >= 4 ? 2 : a >= 2 ? 1 : 0;
+}
+void aniso_set(int v) { settings::set_anisotropic_filtering(v > 0 ? 1 << v : 1); }
+const char *aniso_value(int v)
+{
+    static const char *const names[settings::kAnisotropicCount] = {"OFF", "2X", "4X", "8X", "16X"};
+    return v >= 0 && v < settings::kAnisotropicCount ? names[v] : "OFF";
+}
+
+/* PC (2026-11-07): the replays' depth of field (settings::ReplayDepthOfField) */
+int replay_dof_get() { return (int)settings::replay_depth_of_field(); }
+void replay_dof_set(int v) { settings::set_replay_depth_of_field((settings::ReplayDepthOfField)v); }
+const char *replay_dof_value(int v) { return v == 2 ? "OFF" : v == 1 ? "REDUCED" : "NORMAL"; }
+
 /* The rear view by camera (settings::RearViewCamera) */
 template <int C> int rear_get() { return settings::rear_view((settings::RearViewCamera)C) ? 1 : 0; }
 template <int C> void rear_set(int v) { settings::set_rear_view((settings::RearViewCamera)C, v != 0); }
 const char *on_off_value(int v) { return v ? "ON" : "OFF"; }
+
+int extra_cameras_get() { return settings::extra_cameras() ? 1 : 0; }
+void extra_cameras_set(int v) { settings::set_extra_cameras(v != 0); }
+
+/* The chase camera's angle (settings::chase_angle): Left / Right by 1 degree
+ * (5 once held 1.5 s); Enter / Cross back to 0. */
+void chase_angle_text(char *out, size_t n) { snprintf(out, n, "%d", settings::chase_angle()); }
+void chase_angle_step(int dir, int heldMs)
+{
+    if (dir == 0) {
+        settings::set_chase_angle(0);
+        return;
+    }
+    settings::set_chase_angle(settings::chase_angle() + (dir > 0 ? 1 : -1) * (heldMs < 1500 ? 1 : 5));
+}
+int chase_angle_edges()
+{
+    const int a = settings::chase_angle();
+    return (a > settings::kChaseAngleMin ? 1 : 0) | (a < settings::kChaseAngleMax ? 2 : 0);
+}
+
+/* PC (2026-11-07): CAMERAS > COCKPIT CAMERA (settings::cockpit_camera) and
+ * its field of view (settings::cockpit_fov): Left / Right by 1 degree (5
+ * once held 1.5 s), Enter / Cross back to the default. */
+int cockpit_get() { return settings::cockpit_camera() ? 1 : 0; }
+void cockpit_set(int v) { settings::set_cockpit_camera(v != 0); }
+/* (PC 2026-11-15: COCKPIT MENU MODEL moved into the calibration - per car
+ * model, settings::cockpit_menu_model) */
+void cockpit_fov_text(char *out, size_t n) { snprintf(out, n, "%d", settings::cockpit_fov()); }
+void cockpit_fov_step(int dir, int heldMs)
+{
+    if (dir == 0) {
+        settings::set_cockpit_fov(settings::kCockpitFovDefault);
+        return;
+    }
+    settings::set_cockpit_fov(settings::cockpit_fov() + (dir > 0 ? 1 : -1) * (heldMs < 1500 ? 1 : 5));
+}
+int cockpit_fov_edges()
+{
+    const int f = settings::cockpit_fov();
+    return (f > settings::kCockpitFovMin ? 1 : 0) | (f < settings::kCockpitFovMax ? 2 : 0);
+}
+
+/* PC (2026-11-12): GRAPHICS > MENU WHEELS (settings::menu_wheels) and the
+ * speed from which the race wheels take over (settings::menu_wheels_speed):
+ * Left / Right by 1 km/h (10 once held 1.5 s), Enter / Cross back to the
+ * default; 0 shows ALWAYS. */
+int menu_wheels_get() { return settings::menu_wheels() ? 1 : 0; }
+void menu_wheels_set(int v) { settings::set_menu_wheels(v != 0); }
+void menu_wheels_speed_text(char *out, size_t n)
+{
+    const int kmh = settings::menu_wheels_speed();
+    if (kmh <= 0)
+        snprintf(out, n, "ALWAYS");
+    else
+        snprintf(out, n, "%d KM/H", kmh);
+}
+void menu_wheels_speed_step(int dir, int heldMs)
+{
+    if (dir == 0) {
+        settings::set_menu_wheels_speed(settings::kMenuWheelsSpeedDefault);
+        return;
+    }
+    settings::set_menu_wheels_speed(settings::menu_wheels_speed() + (dir > 0 ? 1 : -1) * (heldMs < 1500 ? 1 : 10));
+}
+int menu_wheels_speed_edges()
+{
+    const int k = settings::menu_wheels_speed();
+    return (k > settings::kMenuWheelsSpeedMin ? 1 : 0) | (k < settings::kMenuWheelsSpeedMax ? 2 : 0);
+}
+
+/* PC (2026-11-13): GRAPHICS > MENU TIRES (settings::menu_tires) */
+int menu_tires_get() { return settings::menu_tires() ? 1 : 0; }
+void menu_tires_set(int v) { settings::set_menu_tires(v != 0); }
+
+/* PC (2026-11-15): TAKE SCREENSHOT (platform/screenshot.h): Enter / Cross
+ * asks for one - the game's picture, which this menu is not in; the menu
+ * stays.  Left / Right nothing.  SAVING... while one is taken or written. */
+void shot_text(char *out, size_t n)
+{
+    snprintf(out, n, "%s", screenshot::pending() > 0 ? "SAVING..." : "ENTER");
+}
+void shot_step(int dir, int heldMs)
+{
+    if (dir == 0 && heldMs == 0)
+        screenshot::request();
+}
+
+/* PC (2026-11-08): CAMERAS > COCKPIT CAMERA > CALIBRATE COCKPIT CAMERA
+ * (platform/cockpit_osd.h): Enter / Cross starts the calibration mode and
+ * closes the menu (the panel at the top right takes over), or stops it;
+ * Left / Right nothing. */
+void calibrate_text(char *out, size_t n)
+{
+    /* (PC 2026-11-14: the mode is the calibration's, not the custom cameras' editor's) */
+    const bool on = cockpit_osd::active() && cockpit_osd::mode() == cockpit_osd::kModeCockpit;
+    snprintf(out, n, "%s", on ? "STOP" : "START");
+}
+void calibrate_step(int dir, int heldMs)
+{
+    if (dir != 0 || heldMs != 0)
+        return;
+    if (cockpit_osd::toggle())
+        g_shown = false;
+}
+
+/* PC (2026-11-14): CAMERAS > CUSTOM CAMERAS (platform/cockpit_osd.h, game/app/
+ * pc_customcam.h).  NEW CAMERA: EVERY CAR / THIS CAR and EDIT CAMERA: Enter /
+ * Cross starts the editor with that request and closes the menu (the panel at
+ * the top right takes over), or stops it; DELETE CAMERA: Enter twice within
+ * four seconds asks the race to delete the custom camera in view and closes
+ * the menu.  Left / Right nothing. */
+void custom_text(char *out, size_t n)
+{
+    const bool on = cockpit_osd::active() && cockpit_osd::mode() == cockpit_osd::kModeCustom;
+    snprintf(out, n, "%s", on ? "STOP" : "START");
+}
+template <int R> void custom_step(int dir, int heldMs)
+{
+    if (dir != 0 || heldMs != 0)
+        return;
+    if (cockpit_osd::toggle_custom(R))
+        g_shown = false;
+}
+ULONGLONG g_customDeleteAt;                     /* the first Enter on DELETE CAMERA (0: none) */
+constexpr ULONGLONG kCustomDeleteMs = 4000;
+void custom_delete_text(char *out, size_t n)
+{
+    const bool armed = g_customDeleteAt != 0 && GetTickCount64() - g_customDeleteAt < kCustomDeleteMs;
+    snprintf(out, n, "%s", armed ? "ENTER AGAIN" : "ENTER");
+}
+void custom_delete_step(int dir, int heldMs)
+{
+    if (dir != 0 || heldMs != 0)
+        return;
+    const ULONGLONG now = GetTickCount64();
+    if (g_customDeleteAt != 0 && now - g_customDeleteAt < kCustomDeleteMs) {
+        g_customDeleteAt = 0;
+        cockpit_osd::request(cockpit_osd::kRequestDelete);
+        g_shown = false;
+    } else {
+        g_customDeleteAt = now;
+    }
+}
+
+int smoke_get() { return (int)settings::smoke_opacity(); }
+void smoke_set(int v) { settings::set_smoke_opacity((settings::SmokeOpacity)v); }
+const char *smoke_value(int v) { return v == 2 ? "HALF" : v == 1 ? "REDUCED (75%)" : "NORMAL"; }
 
 int split_get() { return (int)settings::split_screen(); }
 void split_set(int v) { settings::set_split_screen((settings::SplitScreen)v); }
@@ -186,6 +390,46 @@ void replay_fov_step(int dir, int heldMs)
 }
 int replay_fov_edges() { return fov_edges_of(settings::replay_fov_percent()); }
 
+/* The HUD's colours (settings::hud_color): a category for each, its value and
+ * a square of it, with its red, green and blue (S: the channel's shift) in
+ * it: Left / Right by 1 (8 once held 1.5 s); Enter / Cross back to the
+ * game's. */
+template <int I, int S> int hud_ch() { return (int)((settings::hud_color(I) >> S) & 0xFF); }
+template <int I, int S> void hud_ch_set(int v)
+{
+    settings::set_hud_color(I, (settings::hud_color(I) & ~(0xFFu << S)) | ((uint32_t)v << S));
+}
+template <int I, int S> void hud_ch_text(char *out, size_t n) { snprintf(out, n, "%d", hud_ch<I, S>()); }
+template <int I, int S> void hud_ch_step(int dir, int heldMs)
+{
+    if (dir == 0) {
+        hud_ch_set<I, S>((int)((kHudColors[I].rgb >> S) & 0xFF));
+        return;
+    }
+    hud_ch_set<I, S>(std::max(0, std::min(255, hud_ch<I, S>() + dir * (heldMs < 1500 ? 1 : 8))));
+}
+template <int I, int S> int hud_ch_edges()
+{
+    const int v = hud_ch<I, S>();
+    return (v > 0 ? 1 : 0) | (v < 255 ? 2 : 0);
+}
+template <int I> void hud_color_text(char *out, size_t n) { snprintf(out, n, "%06X", settings::hud_color(I)); }
+template <int I> uint32_t hud_color_swatch()
+{
+    const uint32_t c = settings::hud_color(I);
+    return overlay::rgba((c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF, 255);
+}
+
+constexpr char kHudRedHelp[] = "ITS RED, 0 .. 255. ENTER: THE GAME'S.";
+constexpr char kHudGreenHelp[] = "ITS GREEN, 0 .. 255. ENTER: THE GAME'S.";
+constexpr char kHudBlueHelp[] = "ITS BLUE, 0 .. 255. ENTER: THE GAME'S.";
+#define HUD_CHANNEL(I, S, LABEL, HELP) \
+    {4, LABEL, HELP, 0, nullptr, nullptr, nullptr, hud_ch_text<I, S>, hud_ch_step<I, S>, hud_ch_edges<I, S>}
+#define HUD_COLOR(I, LABEL, HELP) \
+    {3, LABEL, HELP, kCategory, nullptr, nullptr, nullptr, hud_color_text<I>, nullptr, nullptr, -1, hud_color_swatch<I>}, \
+    HUD_CHANNEL(I, 16, "RED", kHudRedHelp), HUD_CHANNEL(I, 8, "GREEN", kHudGreenHelp), \
+    HUD_CHANNEL(I, 0, "BLUE", kHudBlueHelp)
+
 int monitor_get() { return (int)frame_monitor::mode(); }
 void monitor_set(int v) { frame_monitor::set_mode((frame_monitor::Mode)v); }
 const char *monitor_value(int v)
@@ -208,9 +452,18 @@ const char *screen_value(int v)
     return v >= 0 && v < 3 ? names[v] : "?";
 }
 
-int menu_aspect_get() { return settings::menu_stretch() ? 1 : 0; }
-void menu_aspect_set(int v) { settings::set_menu_stretch(v != 0); }
-const char *menu_aspect_value(int v) { return v ? "STRETCH" : "ORIGINAL (4:3)"; }
+/* (PC 2026-11-15: 16:9 between the two, settings::MenuAspect) */
+int menu_aspect_get() { return (int)settings::menu_aspect(); }
+void menu_aspect_set(int v) { settings::set_menu_aspect((settings::MenuAspect)v); }
+const char *menu_aspect_value(int v)
+{
+    static const char *const names[settings::kMenuAspectCount] = {"ORIGINAL (4:3)", "16:9", "STRETCH"};
+    return v >= 0 && v < settings::kMenuAspectCount ? names[v] : "?";
+}
+
+int movie_aspect_get() { return settings::movie_stretch() ? 1 : 0; }
+void movie_aspect_set(int v) { settings::set_movie_stretch(v != 0); }
+const char *movie_aspect_value(int v) { return v ? "STRETCH" : "ORIGINAL"; }
 
 int vsync_get() { return settings::vsync(); }
 void vsync_set(int v) { settings::set_vsync(v); }
@@ -403,14 +656,14 @@ int speed_unit_get() { return settings::speed_unit() + 1; }
 void speed_unit_set(int v) { settings::set_speed_unit(v - 1); }
 const char *speed_unit_value(int v)
 {
-    static const char *const names[1 + settings::kSpeedUnits] = {"AUTO (THE LANGUAGE'S)", "KM/H, KM", "MPH, MILES"};
+    static const char *const names[1 + settings::kSpeedUnits] = {"AUTO", "KM/H, KM", "MPH, MILES"};
     return v >= 0 && v <= settings::kSpeedUnits ? names[v] : "?";
 }
 int power_unit_get() { return settings::power_unit() + 1; }
 void power_unit_set(int v) { settings::set_power_unit(v - 1); }
 const char *power_unit_value(int v)
 {
-    static const char *const names[1 + settings::kPowerUnits] = {"AUTO (THE LANGUAGE'S)", "PS", "HP", "BHP", "CV",
+    static const char *const names[1 + settings::kPowerUnits] = {"AUTO", "PS", "HP", "BHP", "CV",
                                                                  "KW"};
     return v >= 0 && v <= settings::kPowerUnits ? names[v] : "?";
 }
@@ -418,37 +671,103 @@ int torque_unit_get() { return settings::torque_unit() + 1; }
 void torque_unit_set(int v) { settings::set_torque_unit(v - 1); }
 const char *torque_unit_value(int v)
 {
-    static const char *const names[1 + settings::kTorqueUnits] = {"AUTO (THE LANGUAGE'S)", "KGF.M", "FT.LB", "NM"};
+    static const char *const names[1 + settings::kTorqueUnits] = {"AUTO", "KGF.M", "FT.LB", "NM"};
     return v >= 0 && v <= settings::kTorqueUnits ? names[v] : "?";
 }
 
 /* The starting credits (settings::starting_credits): the version's own,
  * 15,000, 18,000; x 100 (yen) shown in a Japanese run, as the game pays them
  * (game/app/pc_new_game.h). */
-const int kCredits[] = {0, 15000, 18000};
-int credits_get()
+int credits_get() { return (int)settings::starting_credits_mode(); }
+void credits_set(int v)
 {
-    const int c = settings::starting_credits();
-    return c == 15000 ? 1 : c == 18000 ? 2 : 0;
+    settings::set_starting_credits_mode(
+        (settings::StartingCredits)(v >= 0 && v < settings::kStartingCreditsCount ? v : 0));
 }
-void credits_set(int v) { settings::set_starting_credits(kCredits[v >= 0 && v < 3 ? v : 0]); }
 const char *credits_value(int v)
 {
     const bool yen = language::current() == language::kJapanese;
     switch (v) {
     case 1:
-        return yen ? "1,500,000 YEN" : "15,000 CR.";
+        return yen ? "1,500,000" : "15,000";
     case 2:
-        return yen ? "1,800,000 YEN" : "18,000 CR.";
+        return yen ? "1,800,000" : "18,000";
+    case 3:
+        return "CUSTOM";                        /* PC (2026-11-14): its amount one level deeper */
     default:
-        return "VERSION'S OWN";
+        return "Default";
     }
+}
+/* PC (2026-11-14): STARTING CREDITS > CUSTOM AMOUNT (settings::
+ * starting_credits_custom), shown while CUSTOM is chosen: Left / Right by 100,
+ * growing while held (1,000 from 0.7 s, 10,000 from 2 s, 100,000 from 3.5 s,
+ * 1,000,000 from 5 s, 10,000,000 from 7 s), to the step's next multiple;
+ * Enter / Cross back to 18,000.  Shown x 100 (yen) in a Japanese run, as the
+ * two fixed amounts. */
+int credits_custom() { return settings::starting_credits_mode() == settings::StartingCredits::custom ? 1 : 0; }
+void credits_custom_text(char *out, size_t n)
+{
+    const long long v = (long long)settings::starting_credits_custom() *
+                        (language::current() == language::kJapanese ? 100 : 1);
+    /* (digits in threes) */
+    char digits[24];
+    snprintf(digits, sizeof(digits), "%lld", v);
+    const size_t len = strlen(digits);
+    size_t o = 0;
+    for (size_t i = 0; i < len && o + 2 < n; i++) {
+        if (i != 0 && (len - i) % 3 == 0)
+            out[o++] = ',';
+        out[o++] = digits[i];
+    }
+    if (n > 0)
+        out[o < n ? o : n - 1] = '\0';
+}
+void credits_custom_step(int dir, int heldMs)
+{
+    if (dir == 0) {
+        settings::set_starting_credits_custom(settings::kStartingCreditsCustomDefault);
+        return;
+    }
+    const long long step = heldMs < 700 ? 100 : heldMs < 2000 ? 1000 : heldMs < 3500 ? 10000
+                           : heldMs < 5000 ? 100000 : heldMs < 7000 ? 1000000 : 10000000;
+    const long long cur = settings::starting_credits_custom();
+    long long v = dir > 0 ? (cur / step + 1) * step : ((cur + step - 1) / step - 1) * step;
+    v = std::max((long long)settings::kStartingCreditsCustomMin,
+                 std::min((long long)settings::kStartingCreditsCustomMax, v));
+    settings::set_starting_credits_custom((int)v);
+}
+int credits_custom_edges()
+{
+    const int v = settings::starting_credits_custom();
+    return (v > settings::kStartingCreditsCustomMin ? 1 : 0) | (v < settings::kStartingCreditsCustomMax ? 2 : 0);
 }
 
 /* the output running (audio::describe), shown only */
 void audio_now_text(char *out, size_t n) { audio::describe(out, n); }
 void no_step(int, int) {}
 int no_edges() { return 0; }
+
+/* The volumes (settings::volume of V): Left / Right by 5 % (10 once held
+ * 1.5 s); Enter / Cross back to the default (100; the race and replay music
+ * 50). */
+template <settings::Volume V> void vol_text(char *out, size_t n) { snprintf(out, n, "%d%%", settings::volume(V)); }
+template <settings::Volume V> void vol_step(int dir, int heldMs)
+{
+    if (dir == 0) {
+        settings::set_volume(V, settings::volume_default(V));
+        return;
+    }
+    const int cur = settings::volume(V);
+    const int step = heldMs < 1500 ? 5 : 10;
+    settings::set_volume(V, dir > 0 ? (cur / step + 1) * step : ((cur + step - 1) / step - 1) * step);
+}
+template <settings::Volume V> int vol_edges()
+{
+    const int v = settings::volume(V);
+    return (v > 0 ? 1 : 0) | (v < 100 ? 2 : 0);
+}
+#define VOLUME(V) 0, nullptr, nullptr, nullptr, vol_text<settings::Volume::V>, vol_step<settings::Volume::V>, \
+                  vol_edges<settings::Volume::V>
 
 /* The dead zones (input_map::deadzone of profile P, dead zone I): Left /
  * Right by 1 % (5 once held 1.5 s); Enter / Cross back to 0. */
@@ -470,18 +789,420 @@ template <int P, int I> int dz_edges()
 }
 #define DEADZONE(P, I) 0, nullptr, nullptr, nullptr, dz_text<P, I>, dz_step<P, I>, dz_edges<P, I>
 
+/* The course scale (settings::course_scale of axis A): Left / Right by 5 %
+ * (25 once held 1.5 s) to the next multiple, X and Z over 0 to the other
+ * sign's 5 % (no scale is 0; negative: mirrored), Y no lower than 5 %
+ * (settings::course_scale_min; the setter holds it there); Enter / Cross
+ * back to 100. */
+template <int A> void course_text(char *out, size_t n)
+{
+    const int s = settings::course_scale(A);
+    snprintf(out, n, "%d%%%s", s, s < 0 ? " MIRRORED" : "");
+}
+template <int A> void course_step(int dir, int heldMs)
+{
+    if (dir == 0) {
+        settings::set_course_scale(A, 100);
+        return;
+    }
+    const int cur = settings::course_scale(A);
+    const int step = heldMs < 1500 ? 5 : 25;
+    const double q = (double)cur / step;
+    int next = (int)(dir > 0 ? std::floor(q) + 1.0 : std::ceil(q) - 1.0) * step;
+    if (next > -settings::kCourseScaleNearest && next < settings::kCourseScaleNearest)
+        next = dir > 0 ? settings::kCourseScaleNearest : -settings::kCourseScaleNearest;
+    settings::set_course_scale(A, next);
+}
+template <int A> int course_edges()
+{
+    const int s = settings::course_scale(A);
+    return (s > settings::course_scale_min(A) ? 1 : 0) | (s < settings::kCourseScaleMax ? 2 : 0);
+}
+#define COURSE_SCALE(A) 0, nullptr, nullptr, nullptr, course_text<A>, course_step<A>, course_edges<A>
+
+int prize_random_get() { return settings::prize_car_randomizer() ? 1 : 0; }
+void prize_random_set(int v) { settings::set_prize_car_randomizer(v != 0); }
+/* PC (2026-11-13): GAME > EXTRAS > UNRESTRICTED WHEELS */
+int free_wheels_get() { return settings::unrestricted_wheels() ? 1 : 0; }
+void free_wheels_set(int v) { settings::set_unrestricted_wheels(v != 0); }
+/* PC (2026-11-14): GAME > EXTRAS > BUY CARS NOT FOR SALE */
+int not_for_sale_get() { return settings::buy_not_for_sale() ? 1 : 0; }
+void not_for_sale_set(int v) { settings::set_buy_not_for_sale(v != 0); }
+/* PC (2026-11-14): CHALLENGE MODES (settings::challenge, game/app/pc_challenge.h) */
+template <settings::Challenge C> int challenge_get() { return settings::challenge(C) ? 1 : 0; }
+template <settings::Challenge C> void challenge_set(int v) { settings::set_challenge(C, v != 0); }
+
+/* PC (2026-11-15, user request: "F2 menu gets selectors for slot 1 and 2,
+ * options are populated from the engine's save folder"): MEMORY CARDS >
+ * SLOT 1 / 2 (memcard.h set_slot_folder) - NONE (no card), then the save
+ * folders (memcard::folders) but the other slot's; the name shown upper
+ * case, "(NOT FOUND)" when its folder is gone, "(AFTER THE SAVE)" while the
+ * card has a file open (the change waits for it) */
+template <int P> std::vector<std::string> card_choices()
+{
+    std::vector<std::string> c(1, std::string());
+    const std::string other = memcard::slot_folder(1 - P);
+    for (const std::string &f : memcard::folders())
+        if (_stricmp(f.c_str(), other.c_str()) != 0)
+            c.push_back(f);
+    return c;
+}
+/* -1: the slot's folder is not one of them (gone) */
+template <int P> int card_index(const std::vector<std::string> &c)
+{
+    const std::string cur = memcard::slot_folder(P);
+    for (size_t i = 0; i < c.size(); i++)
+        if (_stricmp(c[i].c_str(), cur.c_str()) == 0)
+            return (int)i;
+    return -1;
+}
+template <int P> void card_text(char *out, size_t n)
+{
+    std::string cur = memcard::slot_folder(P);
+    if (cur.empty()) {
+        snprintf(out, n, "%s", memcard::folders().empty() ? "NONE (NO SAVE FOLDERS)" : "NONE");
+        return;
+    }
+    for (char &c : cur)
+        c = (char)toupper((unsigned char)c);
+    if (!memcard::slot_folder_there(P))
+        snprintf(out, n, "%s (NOT FOUND)", cur.c_str());
+    else if (memcard::slot_waiting(P))
+        snprintf(out, n, "%s (AFTER THE SAVE)", cur.c_str());
+    else
+        snprintf(out, n, "%s", cur.c_str());
+}
+template <int P> void card_step(int dir, int heldMs)
+{
+    (void)heldMs;
+    const std::vector<std::string> c = card_choices<P>();
+    const int n = (int)c.size();
+    int i = card_index<P>(c);
+    if (dir == 0)
+        i = (i + 1) % n;                                /* the next one, wrapping */
+    else if (i < 0)
+        i = 0;
+    else
+        i = std::max(0, std::min(n - 1, i + dir));
+    memcard::set_slot_folder(P, c[(size_t)i]);
+}
+template <int P> int card_edges()
+{
+    const std::vector<std::string> c = card_choices<P>();
+    const int n = (int)c.size(), i = card_index<P>(c);
+    if (i < 0)
+        return 3;
+    return (i > 0 ? 1 : 0) | (i < n - 1 ? 2 : 0);
+}
+constexpr const char kCardHelp[] =
+    "THE SAVE FOLDER IN THIS SLOT: ONE OF THE ENGINE'S SAVES FOLDER.\n"
+    "NONE: NO CARD. CHANGING IT SWAPS THE CARD: THE GAME SEES THE NEW ONE\n"
+    "AT ONCE (ITS GAME DATA: LOAD IT IN THE GAME). ENTER: THE NEXT ONE.\n"
+    "THE LAUNCHER'S SAVES... WINDOW MAKES, RENAMES AND CLEARS THEM.";
+/* PC (2026-11-07): off / on / extended (settings::CourseRandomizer) */
+int course_random_get() { return (int)settings::course_randomizer_mode(); }
+void course_random_set(int v) { settings::set_course_randomizer((settings::CourseRandomizer)v); }
+const char *course_random_value(int v) { return v == 2 ? "EXTENDED" : v == 1 ? "ON" : "OFF"; }
+/* PC (2026-11-08): original / realistic (settings::RevCut) */
+int rev_cut_get() { return (int)settings::rev_cut(); }
+void rev_cut_set(int v) { settings::set_rev_cut((settings::RevCut)v); }
+const char *rev_cut_value(int v) { return v == 1 ? "REALISTIC" : "ORIGINAL"; }
+/* PC (2026-11-08): original / realistic (settings::ShiftBehavior); PC
+ * (2026-11-09) realistic + clutch, its H-SHIFTER item one level deeper
+ * (shift_clutch), and choosing it shows what the clutch is mapped to */
+int shift_get() { return (int)settings::shift_behavior(); }
+void clutch_notice();
+void shift_set(int v)
+{
+    settings::set_shift_behavior((settings::ShiftBehavior)v);
+    if (v == (int)settings::ShiftBehavior::clutch)
+        clutch_notice();
+}
+const char *shift_value(int v) { return v == 2 ? "REALISTIC + CLUTCH" : v == 1 ? "REALISTIC" : "ORIGINAL"; }
+int shift_clutch() { return settings::shift_behavior() == settings::ShiftBehavior::clutch ? 1 : 0; }
+int hshift_get() { return settings::h_shifter() ? 1 : 0; }
+void hshift_set(int v) { settings::set_h_shifter(v != 0); }
+
+/* The notice of the clutch mode: each controller's / wheel's clutch, or
+ * that none is mapped and where to map one (upper case: the menu's font) */
+void clutch_notice()
+{
+    char text[320] = "";
+    int lines = 0, n = 0;
+    for (int p = input_map::kController1; p <= input_map::kWheel2 && lines < 3; p++) {
+        char what[160];
+        clutch_input::clutch_text(p, what, sizeof(what));
+        if (what[0] == '\0')
+            continue;
+        n += snprintf(text + n, sizeof(text) - n, "%s%s: %s", lines == 0 ? "THE CLUTCH IS MAPPED TO\n" : "\n",
+                      input_map::profile_name(p), what);
+        lines++;
+    }
+    if (lines == 0)
+        snprintf(text, sizeof(text), "NOTHING IS MAPPED TO THE CLUTCH\nADD ONE IN THE LAUNCHER: CONTROLS, A CONTROLLER\n"
+                                     "OR A WHEEL, CLUTCH. UNTIL THEN THE GEARS\nSHIFT AS REALISTIC.");
+    for (char *c = text; *c != '\0'; c++)
+        *c = (char)toupper((unsigned char)*c);
+    notice(text, 7.0);
+}
+
+/* The cars of a race (settings::race_cars): Left / Right by 1 (4 once held
+ * 1.5 s); Enter / Cross back to 6. */
+void race_cars_text(char *out, size_t n) { snprintf(out, n, "%d", settings::race_cars()); }
+void race_cars_step(int dir, int heldMs)
+{
+    if (dir == 0) {
+        settings::set_race_cars(settings::kRaceCarsMin);
+        return;
+    }
+    settings::set_race_cars(settings::race_cars() + dir * (heldMs < 1500 ? 1 : 4));
+}
+int race_cars_edges()
+{
+    const int n = settings::race_cars();
+    return (n > settings::kRaceCarsMin ? 1 : 0) | (n < settings::kRaceCarsMax ? 2 : 0);
+}
+int race_cars_override_get() { return settings::race_cars_override() ? 1 : 0; }
+void race_cars_override_set(int v) { settings::set_race_cars_override(v != 0); }
+
+/* The car multipliers (settings::car_tune of T, the enemies' when E): Left /
+ * Right by 5 % (25 once held 1.5 s) to the next multiple; Enter / Cross
+ * back to 100. */
+template <settings::CarTune T, bool E> void tune_text(char *out, size_t n)
+{
+    snprintf(out, n, "%d%%", settings::car_tune(T, E));
+}
+template <settings::CarTune T, bool E> void tune_step(int dir, int heldMs)
+{
+    if (dir == 0) {
+        settings::set_car_tune(T, E, 100);
+        return;
+    }
+    const int cur = settings::car_tune(T, E);
+    const int step = heldMs < 1500 ? 5 : 25;
+    settings::set_car_tune(T, E, dir > 0 ? (cur / step + 1) * step : ((cur + step - 1) / step - 1) * step);
+}
+template <settings::CarTune T, bool E> int tune_edges()
+{
+    const int v = settings::car_tune(T, E);
+    return (v > settings::car_tune_min(T) ? 1 : 0) | (v < settings::kCarTuneMax ? 2 : 0);
+}
+#define CAR_TUNE(T, E) 0, nullptr, nullptr, nullptr, tune_text<settings::CarTune::T, E>, \
+                       tune_step<settings::CarTune::T, E>, tune_edges<settings::CarTune::T, E>
+
+/* The surfaces' raw values (settings::surface_tune of surface S, in
+ * hundredths; unset: the game's own, shown with "GAME'S"): Left / Right by
+ * 0.01 (0.10 once held 1.5 s, 1.00 once held 3 s) to the next multiple,
+ * from the game's value when unset; Enter / Cross back to the game's own. */
+template <int S, settings::SurfaceTune T> int surf_value()
+{
+    const int v = settings::surface_tune(S, T);
+    return v == settings::kSurfaceOwn ? settings::surface_tune_default(S, T) : v;
+}
+template <int S, settings::SurfaceTune T> void surf_text(char *out, size_t n)
+{
+    const bool own = settings::surface_tune(S, T) == settings::kSurfaceOwn;
+    snprintf(out, n, "%.2f%s", surf_value<S, T>() / 100.0, own ? " (GAME'S)" : "");
+}
+template <int S, settings::SurfaceTune T> void surf_step(int dir, int heldMs)
+{
+    if (dir == 0) {
+        settings::set_surface_tune(S, T, settings::kSurfaceOwn);
+        return;
+    }
+    const int cur = surf_value<S, T>();
+    const int step = heldMs < 1500 ? 1 : heldMs < 3000 ? 10 : 100;
+    const int next = dir > 0 ? (cur / step + 1) * step : ((cur + step - 1) / step - 1) * step;
+    settings::set_surface_tune(S, T, std::max(next, settings::surface_tune_min(T)));   /* (never the own's -1) */
+}
+template <int S, settings::SurfaceTune T> int surf_edges()
+{
+    const int v = surf_value<S, T>();
+    return (v > settings::surface_tune_min(T) ? 1 : 0) | (v < settings::surface_tune_max(T) ? 2 : 0);
+}
+#define SURFACE(S, T) 0, nullptr, nullptr, nullptr, surf_text<S, settings::SurfaceTune::T>, \
+                      surf_step<S, settings::SurfaceTune::T>, surf_edges<S, settings::SurfaceTune::T>
+/* where each surface is (settings::surface_key's order) */
+const char *const kSurfaceHelp[settings::kSurfaces] = {
+    "THE ROAD (THE DATABASE'S TA). ENTER: THE GAME'S.",
+    "THE KERBS (GU). ENTER: THE GAME'S.",
+    "THE GRASS (GR). ENTER: THE GAME'S.",
+    "THE SAND TRAPS (SA). ENTER: THE GAME'S.",
+    "THE GRAVEL TRAPS: LAGUNA SECA (GV). ENTER: THE GAME'S.",
+    "THE RALLY COURSES' DIRT (DT). ENTER: THE GAME'S.",
+    "A ROAD SURFACE OF ROME, COTE D'AZUR, GRAND VALLEY,\nDEEP FOREST AND THE TEST CIRCLES (THE DATABASE'S SF).\nENTER: THE GAME'S.",
+    "A SURFACE OF SMOKEY MOUNTAIN SOUTH (THE DATABASE'S WD).\nENTER: THE GAME'S.",
+    "A ROAD SURFACE OF TOKYO R246 AND ROUTE 5 DRY\n(THE DATABASE'S HT). ENTER: THE GAME'S.",
+    "THE WET ROAD: ROUTE 5 WET, THE WET CIRCLES (WR).\nENTER: THE GAME'S.",
+    "THE WET KERBS (WH). ENTER: THE GAME'S.",
+    "HT WET: ROUTE 5 WET (WG). ENTER: THE GAME'S.",
+};
+
+int replay_logo_get() { return settings::replay_logo() ? 1 : 0; }
+void replay_logo_set(int v) { settings::set_replay_logo(v != 0); }
+
+/* DEBUG: the launcher's Debug tab's new-game and unlock switches */
+int fill_garage_get() { return settings::debug_fill_garage() ? 1 : 0; }
+void fill_garage_set(int v) { settings::set_debug_fill_garage(v != 0); }
+int fill_money_get() { return settings::debug_fill_money() ? 1 : 0; }
+void fill_money_set(int v) { settings::set_debug_fill_money(v != 0); }
+int unlock_arcade_get() { return settings::debug_unlock_arcade() ? 1 : 0; }
+void unlock_arcade_set(int v) { settings::set_debug_unlock_arcade(v != 0); }
+int unlock_licenses_get() { return settings::debug_unlock_licenses() ? 1 : 0; }
+void unlock_licenses_set(int v) { settings::set_debug_unlock_licenses(v != 0); }
+
+/* DEBUG > COURSE FORCER: on / off, the course nested in it (the game's
+ * choices, settings::course_choice; the label shown upper case, with its
+ * start places when fewer than a 6-car race needs) */
+int forced_index();
+int forcer_get() { return settings::course_forcer() ? 1 : 0; }
+void forcer_set(int v)
+{
+    settings::set_course_forcer(v != 0);
+    /* on without a course of the list: the list's first */
+    if (v != 0 && forced_index() < 0 && settings::course_choice_count() > 0)
+        settings::set_forced_course(settings::course_choice(0).label);
+}
+int forced_index()
+{
+    char cur[64];
+    settings::forced_course(cur, sizeof(cur));
+    const int n = settings::course_choice_count();
+    for (int i = 0; i < n; i++)
+        if (_stricmp(settings::course_choice(i).label, cur) == 0)
+            return i;
+    return -1;
+}
+void forced_text(char *out, size_t n)
+{
+    char cur[64];
+    settings::forced_course(cur, sizeof(cur));
+    if (cur[0] == '\0') {
+        snprintf(out, n, "%s", settings::course_choice_count() > 0 ? "NONE" : "NOT KNOWN YET");
+        return;
+    }
+    for (char *p = cur; *p != '\0'; p++)
+        *p = (char)toupper((unsigned char)*p);
+    const int i = forced_index();
+    const int places = i >= 0 ? settings::course_choice(i).places : -1;
+    if (i < 0 && settings::course_choice_count() > 0)
+        snprintf(out, n, "%s ?", cur);             /* not a course of this data */
+    else if (places >= 0 && places < 6)
+        snprintf(out, n, "%s (%d CAR%s)", cur, places, places == 1 ? "" : "S");
+    else
+        snprintf(out, n, "%s", cur);
+}
+void forced_step(int dir, int heldMs)
+{
+    (void)heldMs;
+    const int n = settings::course_choice_count();
+    if (n == 0)
+        return;
+    int i = forced_index();
+    if (dir == 0)
+        i = (i + 1) % n;                            /* the next one, wrapping */
+    else if (i < 0)
+        i = 0;
+    else
+        i = std::max(0, std::min(n - 1, i + dir));
+    settings::set_forced_course(settings::course_choice(i).label);
+}
+int forced_edges()
+{
+    const int n = settings::course_choice_count(), i = forced_index();
+    if (n == 0)
+        return 0;
+    if (i < 0)
+        return 3;
+    return (i > 0 ? 1 : 0) | (i < n - 1 ? 2 : 0);
+}
+
+/* DEBUG > LAP FORCER: on / off, the laps nested in it (1 a step, 5 once
+ * held; Enter the next, wrapping) */
+int lap_forcer_get() { return settings::lap_forcer() ? 1 : 0; }
+void lap_forcer_set(int v) { settings::set_lap_forcer(v != 0); }
+void laps_text(char *out, size_t n)
+{
+    const int laps = settings::forced_laps();
+    snprintf(out, n, "%d LAP%s", laps, laps == 1 ? "" : "S");
+}
+void laps_step(int dir, int heldMs)
+{
+    const int cur = settings::forced_laps();
+    if (dir == 0) {
+        settings::set_forced_laps(cur >= settings::kForcedLapsMax ? settings::kForcedLapsMin : cur + 1);
+        return;
+    }
+    settings::set_forced_laps(cur + dir * (heldMs < 1500 ? 1 : 5));
+}
+int laps_edges()
+{
+    const int laps = settings::forced_laps();
+    return (laps > settings::kForcedLapsMin ? 1 : 0) | (laps < settings::kForcedLapsMax ? 2 : 0);
+}
+
+/* DEBUG > RACE TIME FORCER: on / off, the minutes nested in it (1 a step,
+ * 10 once held; Enter the next, wrapping) */
+int race_time_forcer_get() { return settings::race_time_forcer() ? 1 : 0; }
+void race_time_forcer_set(int v) { settings::set_race_time_forcer(v != 0); }
+void race_time_text(char *out, size_t n)
+{
+    const int minutes = settings::forced_race_time();
+    if (minutes >= 60)
+        snprintf(out, n, "%d MIN (%d:%02d H)", minutes, minutes / 60, minutes % 60);
+    else
+        snprintf(out, n, "%d MIN", minutes);
+}
+void race_time_step(int dir, int heldMs)
+{
+    const int cur = settings::forced_race_time();
+    if (dir == 0) {
+        settings::set_forced_race_time(cur >= settings::kForcedRaceTimeMax ? settings::kForcedRaceTimeMin : cur + 1);
+        return;
+    }
+    settings::set_forced_race_time(cur + dir * (heldMs < 1500 ? 1 : 10));
+}
+int race_time_edges()
+{
+    const int minutes = settings::forced_race_time();
+    return (minutes > settings::kForcedRaceTimeMin ? 1 : 0) | (minutes < settings::kForcedRaceTimeMax ? 2 : 0);
+}
+
+/* PC (2026-11-07): DEBUG > COURSE MODE FORCER (settings::CourseMode): what
+ * ends every race entered */
+int course_mode_get() { return (int)settings::course_mode_forcer(); }
+void course_mode_set(int v) { settings::set_course_mode_forcer((settings::CourseMode)v); }
+const char *course_mode_value(int v)
+{
+    static const char *const names[settings::kCourseModeCount] = {"OFF", "FINISH LINE", "0-400 M", "0-1000 M",
+                                                                   "MAX SPEED (6845 M)"};
+    return v >= 0 && v < settings::kCourseModeCount ? names[v] : "?";
+}
+
+/* PC (2026-11-12): DEBUG > MENU RACE MODEL and its LEVEL OF DETAIL (0 AUTO,
+ * then the levels 0 .. kMenuRaceModelLodMax) */
+int menu_race_model_get() { return settings::menu_race_model() ? 1 : 0; }
+void menu_race_model_set(int v) { settings::set_menu_race_model(v != 0); }
+int menu_race_lod_get() { return settings::menu_race_model_lod() + 1; }
+void menu_race_lod_set(int v) { settings::set_menu_race_model_lod(v - 1); }
+const char *menu_race_lod_value(int v)
+{
+    static const char *const names[settings::kMenuRaceModelLodMax + 2] = {"AUTO", "0 (FINEST)", "1", "2 (COARSEST)"};
+    return v >= 0 && v < settings::kMenuRaceModelLodMax + 2 ? names[v] : "?";
+}
+
 /* What player N plays with while both the controller and the wheel are
  * connected (input_map::plays_with_controller): 0 the controller, 1 the
  * wheel. */
 template <int N> int device_get() { return input_map::plays_with_controller(N) ? 0 : 1; }
 template <int N> void device_set(int v) { input_map::set_plays_with_controller(N, v == 0); }
 const char *device_value(int v) { return v ? "WHEEL" : "CONTROLLER"; }
-const char kDeviceHelp[] = "WHAT THE PLAYER PLAYS WITH WHILE BOTH ARE\nCONNECTED; WITH ONE CONNECTED, THAT ONE.";
+const char kDeviceHelp[] = "THE DEVICE IN USE WHILE BOTH A CONTROLLER AND A WHEEL ARE CONNECTED.";
 
-const char kStickHelp[] = "HOW FAR THE STICK MOVES BEFORE IT COUNTS,\nOF ITS TRAVEL. ENTER: 0%.";
-const char kTriggerHelp[] = "HOW FAR THE TRIGGERS GO BEFORE THEY COUNT,\nOF THEIR TRAVEL. ENTER: 0%.";
-const char kSteerHelp[] = "HOW FAR THE WHEEL TURNS BEFORE IT STEERS,\nOF ITS TRAVEL EACH WAY. ENTER: 0%.";
-const char kPedalHelp[] = "HOW FAR THE PEDAL GOES BEFORE IT COUNTS,\nOF ITS TRAVEL. ENTER: 0%.";
+const char kStickHelp[] = "HOW FAR THE STICK MOVES BEFORE IT COUNTS.\nENTER: 0%.";
+const char kTriggerHelp[] = "HOW FAR THE TRIGGERS MOVE BEFORE THEY COUNT.\nENTER: 0%.";
+const char kSteerHelp[] = "HOW FAR THE WHEEL TURNS BEFORE IT STEERS.\nENTER: 0%.";
+const char kPedalHelp[] = "HOW FAR THE PEDAL GOES BEFORE IT COUNTS.\nENTER: 0%.";
 
 /* (help: any number of lines, '\n' between; the panel takes the most lines
  * and the longest line of them all) */
@@ -489,9 +1210,11 @@ const Item kItems[] = {
     {0, "DISPLAY", "SCREEN MODE, MENU ASPECT, VERTICAL SYNC, FRAME RATE\nAND FRAME TIMES.", kCategory},
     {1, "SCREEN MODE", "WINDOWED: A RESIZABLE WINDOW.\nBORDERLESS: A WINDOW COVERING THE MONITOR.\nFULLSCREEN: EXCLUSIVE, THE MONITOR'S DISPLAY MODE.",
      3, screen_get, screen_set, screen_value},
-    {1, "MENU ASPECT", "ORIGINAL: THE MENUS AT 4:3, BARS AT THE SIDES.\nSTRETCH: THE MENUS FILL THE WINDOW; THEIR CAR\nMODELS AND TEXTS KEEP THEIR SHAPE.",
-     2, menu_aspect_get, menu_aspect_set, menu_aspect_value},
-    {1, "VERTICAL SYNC", "OFF: NO VSYNC.\n1-3: VSYNC ON, NUMBER OF BUFFERED FRAMES.", 4,
+    {1, "MENU ASPECT", "",
+     settings::kMenuAspectCount, menu_aspect_get, menu_aspect_set, menu_aspect_value},
+    {1, "MOVIE ASPECT", "",
+     2, movie_aspect_get, movie_aspect_set, movie_aspect_value},
+    {1, "VERTICAL SYNC", "OFF: NO VSYNC.\n1-3: VSYNC ON, NUMBER OF BUFFERED FRAMES.\n1 FRAME PROVIDES THE BEST FRAME PACING\nIF YOUR MACHINE CAN MAINTAIN FRAME RATE.", 4,
      vsync_get, vsync_set, vsync_value},
     {1, "FRAME RATE CAP", "THE FRAMES AT MOST THIS OFTEN (A FRAME TIME CAP);\nOFF: AS FAST AS THEY ARE DRAWN.", 0, nullptr,
      nullptr, nullptr, rate_text, rate_step, rate_edges},
@@ -500,42 +1223,97 @@ const Item kItems[] = {
     {1, "FRAME TIME MONITOR", "THE FRAME TIMES OVER THE TOP LEFT CORNER.\nDETAILED: WITH THE FRAME TIME'S BREAKDOWN.\nVERBOSE: ALSO THE GPU'S TIME BY SECTION.",
      frame_monitor::kModes, monitor_get, monitor_set, monitor_value, nullptr, nullptr, nullptr,
      input_map::kHotFrameMonitor},
-    {0, "GRAPHICS", "RESOLUTION, ANTI-ALIASING, DETAIL, FIELD OF VIEW AND REAR VIEW.", kCategory},
+    {0, "GRAPHICS", "RESOLUTION, ANTI-ALIASING, DETAIL.\nSMOKE OPACITY. REAR VIEW.", kCategory},
     {1, "RESOLUTION SCALE", "THE GAME'S RESOLUTION, OF THE WINDOW'S.\nABOVE 100%: SCALED DOWN TO THE WINDOW\n(SUPERSAMPLING AA); MORE GPU. ENTER: 100%.",
      0, nullptr, nullptr, nullptr, scale_text, scale_step, scale_edges},
-    {1, "ANTI-ALIASING", "FXAA: THE RACE VIEWS' 3D, BEFORE THE HUD.\nMSAA: EVERY PICTURE, MENUS TOO; MORE GPU.",
+    {1, "ANTI-ALIASING", "FXAA: THE RACE VIEWS' 3D, BEFORE THE HUD.\nMSAA: EVERY PICTURE, MENUS TOO; MORE GPU.\nAGSS: MSAA WITH THE 3D SHADED AT EVERY SAMPLE (SUPERSAMPLING):\nTEXTURE EDGES (TREES, FENCES) AND SHIMMER TOO; MUCH MORE GPU.",
      settings::kAntiAliasingCount, aa_get, aa_set, aa_value},
+    /* PC (2026-11-10): settings::anisotropic_filtering */
+    {1, "ANISOTROPIC FILTERING", "SHARPER TEXTURES ON SURFACES SEEN AT AN ANGLE (THE ROAD).\nTHE TRANSPARENT PARTS OF TEXTURES ADD NO COLOR (NO HIDDEN COLORS SHOWING).",
+     settings::kAnisotropicCount, aniso_get, aniso_set, aniso_value},
     {1, "LEVELS OF DETAIL", "BEST: CARS, COURSES, AND SPLIT-SCREEN ALWAYS AT FULL DETAIL.", 2,
      lod_get, lod_set, lod_value},
+    {1, "ROAD REFLECTION", "HIGH IMPACT ON FRAME RATE WITH MANY CARS.", 2,
+     refl_get, refl_set, refl_value},
+    /* PC (2026-11-14): the road reflection's buffer finer (settings::ReflectionResolution) */
+    {1, "ROAD REFLECTION RESOLUTION", "THE REFLECTIONS ON ROUTE 5, ROUTE 11 AND THE TEST CIRCLES.\nNORMAL: THE PS2'S (64 X 128 FOR THE WHOLE SCREEN).\nHALF: HALF THE SCREEN'S RESOLUTION. FULL: THE SCREEN'S. SHARPER; MORE GPU.",
+     settings::kReflectionResolutionCount, refl_res_get, refl_res_set, refl_res_value},
+    {1, "CAR REFLECTIONS", "HIGH IMPACT ON FRAME RATE WITH MANY CARS.",
+     settings::kCarReflectionsCount, car_refl_get, car_refl_set, car_refl_value},
+    {1, "ENV MAP DETAIL", "CAR REFLECTIONS QUALITY",
+     settings::kEnvMapDetailCount, env_map_get, env_map_set, env_map_value},
+    {1, "REPLAY DEPTH OF FIELD", "",
+     settings::kReplayDepthOfFieldCount, replay_dof_get, replay_dof_set, replay_dof_value},
     {1, "RENDER DISTANCE", "HOW FAR THE COURSE AND THE CARS ARE DRAWN,\nOF THE ORIGINAL GAME'S DISTANCE.", kDistanceCount,
      distance_get, distance_set, distance_value},
-    {1, "FIELD OF VIEW", "THE DRIVING VIEWS' ANGLE, OF EACH CAMERA'S OWN.\nNOT THE MIRROR. ENTER: 100%.", 0,
-     nullptr, nullptr, nullptr, fov_text, fov_step, fov_edges},
-    {1, "  REPLAY FIELD OF VIEW", "THE REPLAY CAMERAS' ANGLE, OF EACH CAMERA'S OWN\n(THE ATTRACT MODE'S DEMOS TOO). ENTER: 100%.",
-     0, nullptr, nullptr, nullptr, replay_fov_text, replay_fov_step, replay_fov_edges},
+    {1, "SMOKE OPACITY", "THE TIRE SMOKE AND DUST.\nREDUCED: 75% OF THEIR OPACITY. HALF: 50%.",
+     settings::kSmokeOpacityCount, smoke_get, smoke_set, smoke_value},
+    /* PC (2026-11-12): the menu (showroom) wheel models on the race cars */
+    {1, "MENU WHEELS", "SHOWROOM WHEEL MODELS IN RACES",
+     2, menu_wheels_get, menu_wheels_set, on_off_value},
+    {2, "RACE WHEELS FROM", "WHEEL MODEL SWITCH THRESHOLD",
+     0, nullptr, nullptr, nullptr, menu_wheels_speed_text, menu_wheels_speed_step, menu_wheels_speed_edges},
+    /* PC (2026-11-13): the menu (showroom) tyres on the race cars */
+    {1, "MENU TIRES", "SHOWROOM TIRE MODELS IN RACES",
+     2, menu_tires_get, menu_tires_set, on_off_value},
+    /* PC (2026-11-15, user request: "Move Rear view settings into graphics
+     * category"; was CAMERAS') */
     {1, "REAR VIEW", "THE REAR-VIEW MIRROR, BY CAMERA.\nHIGH IMPACT ON FRAME RATE.", kCategory},
     {2, "BUMPER CAM", "THE REAR-VIEW MIRROR IN THE BUMPER CAMERA.\nHIGH IMPACT ON FRAME RATE.", 2, rear_get<0>,
      rear_set<0>, on_off_value},
     {2, "CHASE CAM", "THE REAR-VIEW MIRROR IN THE CHASE CAMERA.\nHIGH IMPACT ON FRAME RATE.", 2, rear_get<1>,
      rear_set<1>, on_off_value},
-    {0, "HUD", "THE RACE HUD'S WIDTH, SIZE AND METERS.", kCategory},
-    {1, "RACE HUD MAX WIDTH", "ADJUST SIDE-ANCHORED HUD ELEMENTS.", kHudRatioCount, hud_get,
-     hud_set, hud_value},
-    {1, "HUD SAFE ZONE", "THE RACE HUD SCALED DOWN TO FIT THIS MUCH\nOF THE SCREEN. 100%: THE WHOLE SCREEN. ENTER: 100%.",
-     0, nullptr, nullptr, nullptr, safe_text, safe_step, safe_edges},
-    {1, "SINGLE PLAYER HUD", "A SINGLE PLAYER'S METERS.", 2, single_hud_get, single_hud_set, hud_analog_value},
+    /* PC (2026-11-07): the cameras in a category of their own (user request) */
+    {0, "CAMERAS", "FIELD OF VIEW, EXTRA CAMERAS,\nTHE CHASE CAMERA'S ANGLE, THE COCKPIT CAMERA.\nCUSTOM CAMERAS.", kCategory},
+    {1, "FIELD OF VIEW", "THE DRIVING VIEWS' ANGLE, OF EACH CAMERA'S OWN.\nNOT THE MIRROR. ENTER: 100%.", 0,
+     nullptr, nullptr, nullptr, fov_text, fov_step, fov_edges},
+    {1, "  REPLAY FIELD OF VIEW", "THE REPLAY CAMERAS' ANGLE, OF EACH CAMERA'S OWN\n(THE ATTRACT MODE'S DEMOS TOO). ENTER: 100%.",
+     0, nullptr, nullptr, nullptr, replay_fov_text, replay_fov_step, replay_fov_edges},
+    /* (PC 2026-11-15: REAR VIEW moved to GRAPHICS, user request) */
+    {1, "REPLAY CAMERAS", "CYCLE THROUGH REPLAY CAMERAS IN RACES (MIRRORS, NOSE, ROOF, TAIL, WHEELS...).",
+     2, extra_cameras_get, extra_cameras_set, on_off_value},
+    {1, "CHASE CAM ANGLE", "CHASE CAMERA'S HEIGHT ADJUSTMENT.\nABOVE 0 LOOKS DOWN ON THE CAR. ENTER: 0.", 0,
+     nullptr, nullptr, nullptr, chase_angle_text, chase_angle_step, chase_angle_edges},
+    {1, "COCKPIT CAMERA", "THE COCKPIT VIEW FROM THE DRIVER'S HEAD, THE HEAD HIDDEN.\nTHE CHASE CAMERA'S CONTROLS LOOK ROUND.\nTHE VIEW BUTTON REACHES IT, EXTRA CAMERAS OR NOT.",
+     2, cockpit_get, cockpit_set, on_off_value},
+    {2, "COCKPIT FIELD OF VIEW", "THE COCKPIT CAMERA'S VERTICAL ANGLE IN DEGREES.\nENTER: 90.", 0,
+     nullptr, nullptr, nullptr, cockpit_fov_text, cockpit_fov_step, cockpit_fov_edges},
+    /* PC (2026-11-08): the calibration mode (cockpit_osd.h); PC (2026-11-15):
+     * the menu model (was COCKPIT MENU MODEL here, for every car) its row */
+    {2, "CALIBRATE COCKPIT CAMERA", "IN A RACE, IN THE COCKPIT VIEW: THE D-PAD, THE ARROW KEYS\nOR THE CAMERA CONTROLS MOVE THE CAMERA AND TILT IT, ONE\nAXIS AT A TIME; SAVED FOR THIS CAR MODEL.\nITS MENU MODEL ROW: THE CAR DRAWN WITH ITS SHOWROOM MODEL.\nENTER: START (THE MENU CLOSES, A PANEL SHOWS THE KEYS).",
+     0, nullptr, nullptr, nullptr, calibrate_text, calibrate_step, no_edges},
+    /* PC (2026-11-14): the user's own cameras (cockpit_osd.h, game/app/pc_customcam.h) */
+    {1, "CUSTOM CAMERAS", "YOUR OWN CAMERAS, ON THE VIEW BUTTON AFTER THE COCKPIT:\nFOR EVERY CAR, OR FOR ONE CAR MODEL.\nMADE AND EDITED IN A RACE. SAVED IN GT3PC.INI.", kCategory},
+    {2, "NEW CAMERA: EVERY CAR", "IN A RACE: A NEW CAMERA FOR EVERY CAR, STARTED AS A COPY\nOF THE VIEW SHOWN. ITS EDITOR: POSITION WITHOUT LIMITS,\nPAN, TILT, ANGLE, FIELD OF VIEW, RIGIDITY.\nENTER: START (THE MENU CLOSES, A PANEL SHOWS THE KEYS).",
+     0, nullptr, nullptr, nullptr, custom_text, custom_step<cockpit_osd::kRequestNewGlobal>, no_edges},
+    {2, "NEW CAMERA: THIS CAR", "IN A RACE: A NEW CAMERA FOR THE MODEL OF THE CAR IN VIEW\nALONE, STARTED AS A COPY OF THE VIEW SHOWN.\nENTER: START (THE MENU CLOSES, A PANEL SHOWS THE KEYS).",
+     0, nullptr, nullptr, nullptr, custom_text, custom_step<cockpit_osd::kRequestNewCar>, no_edges},
+    {2, "EDIT CAMERA", "IN A RACE, IN A CUSTOM CAMERA'S VIEW: THE D-PAD, THE ARROW\nKEYS OR THE CAMERA CONTROLS CHANGE IT, ONE ROW AT A TIME.\nENTER: START (THE MENU CLOSES, A PANEL SHOWS THE KEYS).",
+     0, nullptr, nullptr, nullptr, custom_text, custom_step<cockpit_osd::kRequestEdit>, no_edges},
+    {2, "DELETE CAMERA", "IN A RACE: DELETES THE CUSTOM CAMERA IN VIEW.\nENTER TWICE.",
+     0, nullptr, nullptr, nullptr, custom_delete_text, custom_delete_step, no_edges},
     {0, "SPLIT SCREEN", "THE 2-PLAYER SPLIT SCREEN.", kCategory},
     {1, "SPLIT SCREEN", "HORIZONTAL: ONE VIEW ABOVE THE OTHER.\nVERTICAL: SIDE BY SIDE.\nTWO MONITORS: PLAYER 2 ON A SECOND MONITOR.\nFROM THE NEXT RACE OR REPLAY.",
      settings::kSplitScreenCount, split_get, split_set, split_value},
-    {1, "SPLIT SCREEN HUD", "THE SPLIT SCREEN'S METERS.", 2, split_hud_get, split_hud_set, hud_digital_value},
-    {0, "AUDIO", "THE SOUND OUTPUT.", kCategory},
+    {0, "AUDIO", "THE SOUND OUTPUT AND THE VOLUMES.", kCategory},
+    /* (PC 2026-11-15, user request: "Volume goes above the output settings") */
+    {1, "VOLUME", "THE MUSIC'S AND THE SOUND EFFECTS' LEVELS.\nTHE GAME'S OWN OPTIONS STILL TURN EACH ON OR OFF.",
+     kCategory},
+    {2, "MENU MUSIC", "THE MENUS' MUSIC. 100%: THE MUSIC FILES AS THEY ARE.\nENTER: 100%.", VOLUME(menuBgm)},
+    {2, "RACE MUSIC", "A RACE'S MUSIC: THE SONGS AND THE JINGLES.\n100%: THE MUSIC FILES AS THEY ARE. ENTER: 50%.",
+     VOLUME(raceBgm)},
+    {2, "REPLAY MUSIC", "A REPLAY'S MUSIC (THE DEMOS' TOO).\n100%: THE MUSIC FILES AS THEY ARE. ENTER: 50%.",
+     VOLUME(replayBgm)},
+    {2, "MENU SOUND EFFECTS", "THE MENUS' SOUNDS: CURSOR, DECIDE, CANCEL.\nENTER: 100%.", VOLUME(menuSe)},
+    {2, "RACE SOUND EFFECTS", "A RACE'S CARS AND COURSE. ENTER: 100%.", VOLUME(raceSe)},
+    {2, "REPLAY SOUND EFFECTS", "A REPLAY'S CARS AND COURSE. ENTER: 100%.", VOLUME(replaySe)},
     {1, "AUDIO OUTPUT", "KS: DIRECT-TO-DRIVER AUDIO, BEST LATENCY.\nOTHER PROGRAMS MAY NOT HAVE AUDIO\nIF YOUR AUDIO DEVICE IS NOT SHAREABLE.\nWASAPI: NORMAL WINDOWS WASAPI, WORSE AUDIO LATENCY\nAUTO: TRIES KS, ELSE WASAPI.",
      settings::kAudioOutputCount, audio_out_get, audio_out_set, audio_out_value},
     {1, "AUDIO BUFFER", "SHORTER: LESS LATENCY.\n AUTOMATICALLY ADJUSTS IF A CRACKLE IS DETECTED.",
      0, nullptr, nullptr, nullptr, buffer_text, buffer_step, buffer_edges},
     {1, "  RUNNING", "THE OUTPUT IN USE AND ITS LATENCY\n(OUTPUT + SCHEDULING)", 0, nullptr, nullptr, nullptr,
      audio_now_text, no_step, no_edges},
-    {0, "GAME", "THE GAME'S LANGUAGE, UNITS AND A NEW GAME'S MONEY.", kCategory},
+    {0, "GAME", "THE GAME'S LANGUAGE, UNITS AND A NEW GAME'S MONEY.\nTHE RACE HUD.", kCategory},
     {1, "LANGUAGE", "THE MENUS, TEXTS, CAR NAMES AND UNITS.\nAUTO: THE INSTALLED DISC'S OWN.\nTAKES EFFECT AT THE NEXT START.",
      0, nullptr, nullptr, nullptr, language_text, language_step, language_edges},
     {1, "SPEED UNIT", "SPEEDS AND DISTANCES.\nAUTO: THE LANGUAGE'S OWN (US ENGLISH MPH, THE OTHERS KM/H).\nA RACE'S SPEEDOMETER DIAL: FROM THE NEXT RACE.",
@@ -544,9 +1322,121 @@ const Item kItems[] = {
      1 + settings::kPowerUnits, power_unit_get, power_unit_set, power_unit_value},
     {1, "TORQUE UNIT", "ENGINE TORQUE.\nAUTO: THE LANGUAGE'S OWN (US ENGLISH FT.LB, THE OTHERS KGF.M).",
      1 + settings::kTorqueUnits, torque_unit_get, torque_unit_set, torque_unit_value},
-    {1, "STARTING CREDITS", "THE MONEY A NEW GAME STARTS WITH (JAPANESE: x100, YEN).\nVERSION'S OWN: USA / EUROPE 18,000, JAPAN 1,500,000 YEN.\nFROM THE NEXT NEW GAME.",
-     3, credits_get, credits_set, credits_value},
-    {0, "CONTROLS", "EACH PLAYER'S DEVICE AND DEAD ZONES.\nTHE MAPPINGS: THE LAUNCHER'S CONTROLS TAB.", kCategory},
+    {1, "STARTING CREDITS", "THE MONEY A NEW GAME STARTS WITH (JAPANESE: x100, YEN).\nVERSION'S OWN: USA / EUROPE 18,000, JAPAN 1,500,000 YEN.\nFROM THE NEXT NEW GAME.\nCUSTOM: YOUR OWN AMOUNT.",
+     settings::kStartingCreditsCount, credits_get, credits_set, credits_value, nullptr, nullptr, nullptr, -1, nullptr,
+     credits_custom},
+    /* PC (2026-11-14): with CUSTOM (settings::starting_credits_custom) */
+    {2, "CUSTOM AMOUNT", "THE MONEY A NEW GAME STARTS WITH: 0 .. 999,999,999.\nHOLD LEFT / RIGHT FOR BIGGER STEPS. ENTER: 18,000.\nTHE LAUNCHER'S GAME TAB TAKES A TYPED AMOUNT.",
+     0, nullptr, nullptr, nullptr, credits_custom_text, credits_custom_step, credits_custom_edges},
+    {1, "HUD", "THE RACE HUD'S WIDTH, SIZE AND METERS. THE REPLAY LOGO.\nITS COLORS.", kCategory},
+    {2, "RACE HUD MAX WIDTH", "ADJUST SIDE-ANCHORED HUD ELEMENTS.", kHudRatioCount, hud_get,
+     hud_set, hud_value},
+    {2, "HUD SAFE ZONE", "THE RACE HUD SCALED DOWN TO FIT THIS MUCH\nOF THE SCREEN. 100%: THE WHOLE SCREEN. ENTER: 100%.",
+     0, nullptr, nullptr, nullptr, safe_text, safe_step, safe_edges},
+    {2, "SINGLE PLAYER HUD", "A SINGLE PLAYER'S METERS.", 2, single_hud_get, single_hud_set, hud_analog_value},
+    {2, "SPLIT SCREEN HUD", "THE SPLIT SCREEN'S METERS.", 2, split_hud_get, split_hud_set, hud_digital_value},
+    {2, "REPLAY LOGO", "THE GT LOGO OVER THE BOTTOM RIGHT CORNER\nOF THE REPLAYS AND THE DEMOS.", 2, replay_logo_get,
+     replay_logo_set, on_off_value},
+    {2, "COLORS", "THE RACE HUD'S COLORS, EACH BY ITS RED, GREEN AND BLUE.\nON AN IMAGE THEY TINT IT. THE LAUNCHER HAS THEM TOO.", kCategory},
+    HUD_COLOR(kHudText, "TEXT", "THE LAPS, THE RANK, THE GEAR, THE SPEED, THE TIMES."),
+    HUD_COLOR(kHudMessages, "MESSAGES", "THE TITLE, THE CAR'S NAME, THE START AND FINISH."),
+    HUD_COLOR(kHudWarnings, "WARNINGS", "WRONG WAY, REVERSE, THE SUGGESTED GEAR, WORN TIRES."),
+    HUD_COLOR(kHudEvents, "EVENT BOARD", "THE EVENT BOARD'S MESSAGES."),
+    HUD_COLOR(kHudGapAhead, "GAP AHEAD", "A GAP ON THE EVENT BOARD, AHEAD."),
+    HUD_COLOR(kHudGapBehind, "GAP BEHIND", "A GAP ON THE EVENT BOARD, BEHIND."),
+    HUD_COLOR(kHudOdometer, "ODOMETER", "THE ODOMETER AND THE TRIP METER."),
+    HUD_COLOR(kHudMeterDial, "METER DIAL", "TINTS THE METERS' DIAL IMAGES."),
+    HUD_COLOR(kHudMeterMarks, "METER MARKS", "THE MARKS ROUND THE DIALS."),
+    HUD_COLOR(kHudMeterRed, "METER RED ZONE", "THE MARKS OF THE RED ZONE."),
+    HUD_COLOR(kHudNeedle, "NEEDLE", "THE METERS' NEEDLES."),
+    HUD_COLOR(kHudRevBar, "REV BAR", "TINTS THE DIGITAL METERS' REV BAR IMAGE."),
+    HUD_COLOR(kHudShiftLamp, "SHIFT LAMP", "THE SHIFT LAMP, LIT."),
+    HUD_COLOR(kHudVscLamp, "VSC LAMP", "THE VSC LAMP, LIT."),
+    HUD_COLOR(kHudTcsLamp, "TCS LAMP", "THE TCS LAMP, LIT."),
+    HUD_COLOR(kHudBrakeLamps, "BRAKE AND OIL LAMPS", "THE HANDBRAKE AND OIL LAMPS, LIT."),
+    HUD_COLOR(kHudThrottleBar, "THROTTLE BAR", "THE THROTTLE'S BAR."),
+    HUD_COLOR(kHudBrakeBar, "BRAKE BAR", "THE BRAKE'S BAR."),
+    HUD_COLOR(kHudMapShown, "MAP: CAR SHOWN", "THE CAR SHOWN, ON THE MINI MAP."),
+    HUD_COLOR(kHudMapOthers, "MAP: OTHER CARS", "THE OTHER CARS, ON THE MINI MAP."),
+    HUD_COLOR(kHudPanels, "BACK PANELS", "THE TRANSLUCENT PANELS BEHIND THE HUD, THE UNLIT LAMPS."),
+    {1, "EXTRAS","THE COURSES SCALED: THEIR MODELS, ROAD, CAMERAS...\nTHE CARS KEEP THEIR SIZE.\nRANDOM PRIZE CARS. RANDOM COURSES. CAR MULTIPLIERS.\nSURFACE GRIP AND RESISTANCE. THE REV CUT BEHAVIOR. THE GEAR SHIFT BEHAVIOR.", kCategory},
+    {2, "COURSE SCALE X", "THE COURSES ALONG THE WORLD'S X (ACROSS).\nENTER: 100%. FROM THE NEXT COURSE LOADED.\n-1000% .. 1000%; NEGATIVE: MIRRORED.",
+     COURSE_SCALE(0)},
+    {2, "COURSE SCALE Y", "THE COURSES' HEIGHT (THE WORLD'S Y).\nENTER: 100%. FROM THE NEXT COURSE LOADED.\n5% .. 1000%",
+     COURSE_SCALE(1)},
+    {2, "COURSE SCALE Z", "THE COURSES ALONG THE WORLD'S Z (ACROSS).\nENTER: 100%. FROM THE NEXT COURSE LOADED.\n-1000% .. 1000%; NEGATIVE: MIRRORED.",
+     COURSE_SCALE(2)},
+    {2, "PRIZE CAR RANDOMIZER", "THE PRIZE CARS ARE DRAWN FROM ALL CARS IN THE GAME'S DATABASE.",
+     2, prize_random_get, prize_random_set, on_off_value},
+    {2, "COURSE RANDOMIZER", "GT MODE'S CAREER EVENTS WILL HAVE RANDOM COURSES.\nTHE LAPS GET SCALED BY THE LAP LENGTHS.\nEXTENDED: ANY COURSE OF THE DATABASE, WHATEVER ITS SURFACE.",
+     settings::kCourseRandomizerCount, course_random_get, course_random_set, course_random_value},
+    /* PC (2026-11-13): aftermarket wheels for every car */
+    {2, "UNRESTRICTED WHEELS", " EVERY CAR CAN ENTER THE WHEEL SHOP AND THE GARAGE'S WHEEL CHANGE",
+     2, free_wheels_get, free_wheels_set, on_off_value},
+    /* PC (2026-11-14): the cars the dealers show as not for sale */
+    {2, "BUY CARS NOT FOR SALE", "CARS NOT FOR SALE IN SHOWROOMS CAN BE BOUGHT",
+     2, not_for_sale_get, not_for_sale_set, on_off_value},
+    {2, "CARS IN A RACE", "THE AMOUNT OF CARS IN A RACE.\n IF A RACE HAS A LIMIT, IT WILL NEED TO BE OVERRIDDEN WITH THE SETTING BELOW.",
+     0, nullptr, nullptr, nullptr, race_cars_text, race_cars_step, race_cars_edges},
+    {2, "  OVERRIDE RACE LIMITS", "RALLY AND WET COURSES CAN HAVE MORE CARS TOO.",
+     2, race_cars_override_get, race_cars_override_set, on_off_value},
+    /* PC (2026-11-08): the rev cut behavior (settings::RevCut) */
+    {2, "REV CUT BEHAVIOR", "ORIGINAL: THE FUEL IS CUT AT THE REDLINE UNTIL THE REVS DROP 500 RPM.\nREALISTIC: A SHORT CUT OF A TIME, SHORTER THE HIGHER THE REVS.\nFROM THE NEXT RACE ENTERED.",
+     settings::kRevCutCount, rev_cut_get, rev_cut_set, rev_cut_value},
+    /* PC (2026-11-08): the gear shift behavior (settings::ShiftBehavior) */
+    {2, "GEAR SHIFT BEHAVIOR", "ORIGINAL: A SHIFT WAITS FOR THE REVS TO REACH THE NEW GEAR'S.\nREALISTIC: THE CLUTCH IS OUT FOR A TIME (THE GEARBOX PART, THE FLYWHEEL\nAND ENGINE BRAKE), THEN SNAPS IN WHEREVER THE REVS ARE. GEAR TYPE 0.\nDOWNSHIFTS: BLIP THE THROTTLE, ELSE THE ENGINE BRAKES THE WHEELS.\nREALISTIC + CLUTCH: A MANUAL GEARBOX IS WORKED BY YOUR CLUTCH (85% IS OUT).\nFROM THE NEXT RACE ENTERED.",
+     settings::kShiftBehaviorCount, shift_get, shift_set, shift_value, nullptr, nullptr, nullptr, -1, nullptr,
+     shift_clutch},
+    /* PC (2026-11-09): with the clutch mode (settings::h_shifter) */
+    {3, "H-SHIFTER", "THE GEARS FROM YOUR H-SHIFTER'S GATES (THE LAUNCHER: CONTROLS,\nH-SHIFTER 1 / 2); NEUTRAL FREES THE CLUTCH. A GEAR TAKEN WITHOUT\nTHE CLUTCH PAST 85% GRINDS.\nFROM THE NEXT RACE ENTERED.",
+     2, hshift_get, hshift_set, on_off_value},
+    {2, "CAR MULTIPLIERS", "THE CARS' TIRE WEAR, POWER AND GRIP.", kCategory},
+    {3, "TIRE WEAR (PLAYER)", "HOW FAST THE TIRES WEAR, WHERE THE RACE HAS TIRE WEAR.\n0%: NO WEAR. ENTER: 100%.", CAR_TUNE(tireWear, false)},
+    {3, "TIRE WEAR (ENEMIES)", "HOW FAST THE TIRES WEAR, WHERE THE RACE HAS TIRE WEAR.\n0%: NO WEAR. ENTER: 100%.", CAR_TUNE(tireWear, true)},
+    {3, "POWER (PLAYER)", "THE ENGINE'S POWER AT EVERY RPM. ENTER: 100%.", CAR_TUNE(power, false)},
+    {3, "POWER (ENEMIES)", "THE ENGINE'S POWER AT EVERY RPM. ENTER: 100%.", CAR_TUNE(power, true)},
+    {3, "GRIP (PLAYER)", "THE TIRES' GRIP. ENTER: 100%.", CAR_TUNE(grip, false)},
+    {3, "GRIP (ENEMIES)", "THE TIRES' GRIP; THE COMPUTER DRIVES THE CORNERS\nAT THE GRIP IT HAS. ENTER: 100%.", CAR_TUNE(grip, true)},
+    {2, "SURFACE GRIP", "THE TIRES' GRIP ON EACH SURFACE (X THE TIRE'S GRIP; 0.01 .. 10.00).\nTHE GAME'S: ROAD 1.00, GRASS / SAND / GRAVEL 0.60, DIRT 0.80.\nEVERY CAR. FROM THE NEXT RACE ENTERED.", kCategory},
+    {3, "TARMAC", kSurfaceHelp[0], SURFACE(0, grip)},
+    {3, "KERBS", kSurfaceHelp[1], SURFACE(1, grip)},
+    {3, "GRASS", kSurfaceHelp[2], SURFACE(2, grip)},
+    {3, "SAND", kSurfaceHelp[3], SURFACE(3, grip)},
+    {3, "GRAVEL", kSurfaceHelp[4], SURFACE(4, grip)},
+    {3, "DIRT", kSurfaceHelp[5], SURFACE(5, grip)},
+    {3, "SF", kSurfaceHelp[6], SURFACE(6, grip)},
+    {3, "WD", kSurfaceHelp[7], SURFACE(7, grip)},
+    {3, "HT", kSurfaceHelp[8], SURFACE(8, grip)},
+    {3, "WET TARMAC", kSurfaceHelp[9], SURFACE(9, grip)},
+    {3, "WET KERBS", kSurfaceHelp[10], SURFACE(10, grip)},
+    {3, "WET HT", kSurfaceHelp[11], SURFACE(11, grip)},
+    {2, "SURFACE RESISTANCE", "WHAT SLOWS THE CARS ON EACH SURFACE (ROLLING RESISTANCE,\n0.00 .. 327.67). THE GAME'S: ROAD 0.10, GRASS 0.20, GRAVEL 0.30,\nDIRT 0.20, SAND 25.50. EVERY CAR. FROM THE NEXT RACE ENTERED.", kCategory},
+    {3, "TARMAC", kSurfaceHelp[0], SURFACE(0, resistance)},
+    {3, "KERBS", kSurfaceHelp[1], SURFACE(1, resistance)},
+    {3, "GRASS", kSurfaceHelp[2], SURFACE(2, resistance)},
+    {3, "SAND", kSurfaceHelp[3], SURFACE(3, resistance)},
+    {3, "GRAVEL", kSurfaceHelp[4], SURFACE(4, resistance)},
+    {3, "DIRT", kSurfaceHelp[5], SURFACE(5, resistance)},
+    {3, "SF", kSurfaceHelp[6], SURFACE(6, resistance)},
+    {3, "WD", kSurfaceHelp[7], SURFACE(7, resistance)},
+    {3, "HT", kSurfaceHelp[8], SURFACE(8, resistance)},
+    {3, "WET TARMAC", kSurfaceHelp[9], SURFACE(9, resistance)},
+    {3, "WET KERBS", kSurfaceHelp[10], SURFACE(10, resistance)},
+    {3, "WET HT", kSurfaceHelp[11], SURFACE(11, resistance)},
+    /* PC (2026-11-14): the challenge modes (user: "F2 menu: A new Challenge modes category") */
+    {0, "CHALLENGE MODES", "ADDITIONAL GAME RULES", kCategory},
+    {1, "MONEY DECAY", "EACH DAY PASSED TAKES CREDITS: DAYS 2-9 (DAY - 1) X 50,\nFROM DAY 10 (DAY - 9) X 500, AT MOST 200,000 A DAY.\nA LICENSE EARNED PAUSES DECAY FOR 10 DAYS (DOES NOT STACK).\nFROM THE NEXT DAY PASSED.",
+     2, challenge_get<settings::Challenge::moneyDecay>, challenge_set<settings::Challenge::moneyDecay>, on_off_value},
+    {1, "CAR DECAY", "YOUR CARS' POWER 0.25% LESS FOR EACH DAY PASSED, DOWN TO 5%,\nFROM THE NEXT RACE ENTERED.\nNOT ACTIVE DURING LICENSE TESTS.",
+     2, challenge_get<settings::Challenge::carDecay>, challenge_set<settings::Challenge::carDecay>, on_off_value},
+    {1, "COURSE SHRINKAGE", "COURSES GET 0.2% SMALLER ON EACH AXIS FOR EACH DAY PASSED,\nDOWN TO 25%.\nFROM THE NEXT RACE ENTERED.",
+     2, challenge_get<settings::Challenge::courseShrinkage>, challenge_set<settings::Challenge::courseShrinkage>,
+     on_off_value},
+    /* PC (2026-11-15): the save folder in each memory card slot */
+    {0, "MEMORY CARDS", "THE SAVE FOLDER IN EACH MEMORY CARD SLOT.", kCategory},
+    {1, "SLOT 1", kCardHelp, 0, nullptr, nullptr, nullptr, card_text<0>, card_step<0>, card_edges<0>},
+    {1, "SLOT 2", kCardHelp, 0, nullptr, nullptr, nullptr, card_text<1>, card_step<1>, card_edges<1>},
+    {0, "CONTROLS","EACH PLAYER'S DEVICE AND DEAD ZONES.\nTHE MAPPINGS: THE LAUNCHER'S CONTROLS TAB.", kCategory},
     {1, "PLAYER 1", "PLAYER 1'S DEVICE, CONTROLLER AND WHEEL.", kCategory},
     {2, "DEVICE", kDeviceHelp, 2, device_get<0>, device_set<0>, device_value},
     {2, "CONTROLLER", "PLAYER 1'S CONTROLLER (PORT 1).", kCategory},
@@ -557,6 +1447,8 @@ const Item kItems[] = {
     {3, "STEERING DEAD ZONE", kSteerHelp, DEADZONE(input_map::kWheel1, 0)},
     {3, "GAS PEDAL DEAD ZONE", kPedalHelp, DEADZONE(input_map::kWheel1, 1)},
     {3, "BRAKE PEDAL DEAD ZONE", kPedalHelp, DEADZONE(input_map::kWheel1, 2)},
+    /* PC (2026-11-10): the clutch pedal's (input_map::kWheelClutchDeadzone) */
+    {3, "CLUTCH PEDAL DEAD ZONE", kPedalHelp, DEADZONE(input_map::kWheel1, input_map::kWheelClutchDeadzone)},
     {1, "PLAYER 2", "PLAYER 2'S DEVICE, CONTROLLER AND WHEEL.", kCategory},
     {2, "DEVICE", kDeviceHelp, 2, device_get<1>, device_set<1>, device_value},
     {2, "CONTROLLER", "PLAYER 2'S CONTROLLER (PORT 2).", kCategory},
@@ -567,9 +1459,47 @@ const Item kItems[] = {
     {3, "STEERING DEAD ZONE", kSteerHelp, DEADZONE(input_map::kWheel2, 0)},
     {3, "GAS PEDAL DEAD ZONE", kPedalHelp, DEADZONE(input_map::kWheel2, 1)},
     {3, "BRAKE PEDAL DEAD ZONE", kPedalHelp, DEADZONE(input_map::kWheel2, 2)},
+    {3, "CLUTCH PEDAL DEAD ZONE", kPedalHelp, DEADZONE(input_map::kWheel2, input_map::kWheelClutchDeadzone)},
+    {0, "DEBUG", "TESTING AIDS AND DEVELOPER CHEATS", kCategory},
+    {1, "FILL GARAGE", "NEW GAME: GET ONE OF EVERY CAR IN THE DATABASE\nIN EVERY COLOR.",
+     2, fill_garage_get, fill_garage_set, on_off_value},
+    {1, "FILL MONEY", "NEW GAME: GET CR. 100,000,000",
+     2, fill_money_get, fill_money_set, on_off_value},
+    {1, "UNLOCK ARCADE TRACKS", "EVERY COURSE IN ALL MODES OF ARCADE MODE\n ARE AVAILABLE TO RACE.",
+     2, unlock_arcade_get, unlock_arcade_set, on_off_value},
+    {1, "UNLOCK ALL LICENSES", "NEW GAME: GET BRONZE ON ALL LICENSES",
+     2, unlock_licenses_get, unlock_licenses_set, on_off_value},
+    {1, "COURSE FORCER", "FORCES THE GAME TO LOAD ANY COURSE FOUND IN THE GAME FILES\n WHEN ENTERING ANY RACE.",
+     2, forcer_get, forcer_set, on_off_value},
+    {2, "COURSE", "THE COURSE, BY ITS FILE NAME: ANY FILE OF THE COURSE FOLDER.\n(N CARS): ITS START PLACES; MORE CARS START ALONG ITS RACING LINE.\nENTER: THE NEXT ONE.",
+     0, nullptr, nullptr, nullptr, forced_text, forced_step, forced_edges},
+    {1, "LAP FORCER", "OVERRIDES THE AMOUNT OF LAPS OF A RACE",
+     2, lap_forcer_get, lap_forcer_set, on_off_value},
+    {2, "LAPS", "# OF LAPS",
+     0, nullptr, nullptr, nullptr, laps_text, laps_step, laps_edges},
+    {1, "RACE TIME FORCER", "OVERRIDES THE TIME LIMIT OF A RACE",
+     2, race_time_forcer_get, race_time_forcer_set, on_off_value},
+    {2, "MINUTES", "THE TIME OF EVERY TIMED RACE.",
+     0, nullptr, nullptr, nullptr, race_time_text, race_time_step, race_time_edges},
+    {1, "COURSE MODE FORCER", "WHAT ENDS EVERY RACE ENTERED. FINISH LINE: THE COURSE'S OWN\nFINISH LINE, WHERE THE LICENSE TESTS END (NONE: ITS LAPS).\n0-400 M, 0-1000 M, MAX SPEED: A LINE THAT FAR ALONG THE LAP\nAND NO LAP COUNT, AS THE MACHINE TESTS.",
+     settings::kCourseModeCount, course_mode_get, course_mode_set, course_mode_value},
+    /* PC (2026-11-12): the menus' cars with their race models */
+    {1, "MENU RACE MODEL", "THE MENUS' CARS DRAWN WITH THEIR RACE MODELS (BODY AND WHEELS),\nNOT THEIR SHOWROOM ONES. A CAR ON SHOW LOADS AGAIN.\nTHE PRIZE CARS: FROM THE NEXT PRIZE.",
+     2, menu_race_model_get, menu_race_model_set, on_off_value},
+    {2, "LEVEL OF DETAIL", "THE RACE MODEL'S LEVEL OF DETAIL, FORCED. 0: THE FINEST.\nAUTO: AS THE GAME PICKS (GRAPHICS > LEVELS OF DETAIL).",
+     settings::kMenuRaceModelLodMax + 2, menu_race_lod_get, menu_race_lod_set, menu_race_lod_value},
+    /* PC (2026-11-15): a screenshot (platform/screenshot.h), the last top-level row: F2, Up, Enter */
+    {0, "TAKE SCREENSHOT", "THE GAME'S PICTURE AT ITS OWN RESOLUTION, WITHOUT THIS MENU,\nAS A PNG IN THE SCREENSHOTS FOLDER (BESIDE GT3PC.INI).",
+     0, nullptr, nullptr, nullptr, shot_text, shot_step, no_edges, input_map::kHotScreenshot},
 };
 constexpr int kItemCount = (int)(sizeof(kItems) / sizeof(kItems[0]));
 #undef DEADZONE
+#undef VOLUME
+#undef COURSE_SCALE
+#undef CAR_TUNE
+#undef SURFACE
+#undef HUD_COLOR
+#undef HUD_CHANNEL
 
 /* ---- the tree -------------------------------------------------------- */
 
@@ -585,12 +1515,18 @@ int parent(int i)
     return -1;
 }
 
-/* Every category above item i is open. */
+/* Every category above item i is open, and every setting above it (an
+ * on / off with the items one level deeper nested in it: COURSE FORCER >
+ * COURSE) is on. */
 bool visible(int i)
 {
-    for (int p = parent(i); p >= 0; p = parent(p))
-        if (!g_open[p])
+    for (int p = parent(i); p >= 0; p = parent(p)) {
+        const Item &it = kItems[p];
+        if (it.count == kCategory ? !g_open[p]
+            : it.nest != nullptr  ? it.nest() == 0     /* PC (2026-11-09) */
+                                  : it.get == nullptr || it.get() == 0)
             return false;
+    }
     return true;
 }
 
@@ -645,7 +1581,9 @@ void change(int d, int heldMs)
 int item_value(const Item &it, char *out, size_t n)
 {
     if (it.count == kCategory) {
-        if (n > 0)
+        if (it.text != nullptr)
+            it.text(out, n);
+        else if (n > 0)
             out[0] = '\0';
         return 0;
     }
@@ -768,14 +1706,17 @@ int g_scroll;
 /* (%s: the settings menu's hotkey, F2) */
 const char kHint1[] = "UP/DOWN CHOOSE   LEFT/RIGHT CHANGE   %s%sESC CLOSE";
 const char kHint2[] = "A GROUP: RIGHT OPENS IT, LEFT CLOSES IT";
-const char kHint3[] = "PAD: D-PAD, CROSS NEXT VALUE, CIRCLE CLOSE, GUIDE %s";
+/* (%s: the controller's names of its south, east and Guide buttons - CROSS,
+ * CIRCLE, GUIDE; A, B, XBOX... - gamepad::button_names; the hotkey) */
+const char kHint3[] = "PAD: D-PAD, %s NEXT VALUE, %s CLOSE, %s %s";
 
 void build(int bw, int bh)
 {
     char key[32], hint1[96], hint3[96];
     input_map::hotkey_text(input_map::kHotSettingsMenu, key, sizeof(key));
     snprintf(hint1, sizeof(hint1), kHint1, key, key[0] != '\0' ? "/" : "");
-    snprintf(hint3, sizeof(hint3), kHint3, key[0] != '\0' ? key : "CLOSE");
+    const gamepad::ButtonNames names = gamepad::button_names();   /* PC (2026-11-07) */
+    snprintf(hint3, sizeof(hint3), kHint3, names.south, names.east, names.guide, key[0] != '\0' ? key : "CLOSE");
     int helpRows, helpCols;
     help_extent(&helpRows, &helpCols);
     const int cols = std::max({52, helpCols, (int)strlen(hint1), (int)strlen(hint3)});
@@ -829,7 +1770,10 @@ void build(int bw, int bh)
             snprintf(v, sizeof(v), "%s %s %s", (edges & 1) ? "<" : " ", value, (edges & 2) ? ">" : " ");
         else
             snprintf(v, sizeof(v), "%s", value);
-        overlay::text(x1 - overlay::text_width(v, s), y, s, v, kValue);
+        const float vx = x1 - overlay::text_width(v, s);
+        overlay::text(vx, y, s, v, kValue);
+        if (it.swatch != nullptr)
+            overlay::rect(vx - 2.0f * cw, y, 1.5f * cw, 8.0f * s, it.swatch());
         y += lineH;
     }
     if (n > kListRows) {
@@ -974,6 +1918,10 @@ void present(ID3D11RenderTargetView *bb)
     overlay::size(&bw, &bh);
     build(bw, bh);
     overlay::end(bb);
+    /* PC (2026-11-09): a notice over the menu too (a setting's: the clutch
+     * mode's mapping) */
+    if (g_noticeOn.load(std::memory_order_relaxed))
+        draw_notice(bb);
 }
 
 void notice(const char *text, double seconds)

@@ -25,6 +25,7 @@
 #include <new>
 #include "game/race/display/race_display_parts_internal.h"
 #include "game/app/pc_aspect.h"                 /* PC: pc_hud_shift */
+#include "game/app/pc_image_pack.h"             /* PC (2026-11-08): pc_image_draw_size */
 
 /* ======================================================================== */
 /* RaceDisplayFader: the "gt_logo_mini" watermark                           */
@@ -459,7 +460,7 @@ void RaceTimeDisplay::draw()
 {
     char text[16];
 
-    g_002F1968.setColor(color);
+    g_002F1968.setColor(RACE_COLOR_TEXT);   /* PC: as set now (was color, the constructor's) */
     g_002F1968.setAlign(FONT_ALIGN_RIGHT);
     g_002F1968.select("sw_16");
     race_format_time(text, time);
@@ -477,13 +478,16 @@ void RaceTimeDisplay::draw()
         race_draw_image(mark, RACE_ALIGN_RIGHT, RACE_ALIGN_CENTER,
                         (right - (f32)(int)labelRight) + (f32)w, (f32)(y + h));
         /* the mark's width, ((clamp >> 14) & 0x3FF) + 1 as a u64 (the
-         * unsigned conversion through __floatdisf) */
-        labelRight += (f32)(((mark->tex->clamp >> 14) & 0x3FF) + 1); /* implicit: __floatdisf (u64 to float) */
+         * unsigned conversion through __floatdisf).  PC (2026-11-08): its
+         * draw width (game/app/pc_image_pack.h), as race_draw_image draws it */
+        int markW, markH;
+        pc_image_draw_size(mark, &markW, &markH);
+        labelRight += (f32)markW;
     }
     g_002F1968.select("sw_12");
     if (labelWidth == 0.0f)
         labelWidth = text_string_width(&g_002F1968, label) * invScale;
-    g_002F1968.setColor(color);
+    g_002F1968.setColor(RACE_COLOR_TEXT);   /* PC: as above */
     g_002F1968.setPos3((right - labelRight) - labelWidth, posY, 0.0f);
     g_002F1968.putString(label);
     g_002F1968.setAlign(FONT_ALIGN_LEFT);
@@ -852,7 +856,7 @@ RaceEventDisplay::RaceEventDisplay()
 {
     /* implicit: RaceMessageDisplay (constructor of each message) */
     reset();
-    color = RACE_COLOR_GREEN;
+    color = RACE_COLOR_EVENT;
     setFont("sw_16");
 }
 
@@ -995,16 +999,16 @@ void RaceIndicators::draw()
     int posX = race_align_pos(x, w, alignX);
     g_002F1968.setPos3(posX, race_align_pos(y, h, alignY), 0);
     bool lit = blink > 0;
-    g_002F1968.setColor((vsc == LAMP_ON || (vsc == LAMP_BLINK && lit)) ? RACE_COLOR_GREEN : RACE_COLOR_UNLIT);
+    g_002F1968.setColor((vsc == LAMP_ON || (vsc == LAMP_BLINK && lit)) ? RACE_COLOR_VSC : RACE_COLOR_UNLIT);
     g_002F1968.putChar('!');
     g_002F1968.putChar(' ');
     g_002F1968.setColor((tcs == LAMP_ON || (tcs == LAMP_BLINK && lit)) ? RACE_COLOR_YELLOW : RACE_COLOR_UNLIT);
     g_002F1968.putChar('"');
     g_002F1968.putChar(' ');
-    g_002F1968.setColor((handbrake != 0) ? RACE_COLOR_RED : RACE_COLOR_UNLIT);
+    g_002F1968.setColor((handbrake != 0) ? RACE_COLOR_LAMP_RED : RACE_COLOR_UNLIT);
     g_002F1968.putChar('#');
     g_002F1968.putChar(' ');
-    g_002F1968.setColor((oil != 0) ? RACE_COLOR_RED : RACE_COLOR_UNLIT);
+    g_002F1968.setColor((oil != 0) ? RACE_COLOR_LAMP_RED : RACE_COLOR_UNLIT);
     g_002F1968.putChar('$');
 }
 
@@ -1136,8 +1140,8 @@ void RaceABMonitor::update()
 
 /* The enhanced engine: Lupo 2's look (hud.md C5).  The bars' colours and
  * the dark wells. */
-#define AB_COLOR_BRAKE  RACE_COLOR_RED      /* 0x800000F0 */
-#define AB_COLOR_ACCEL  RACE_COLOR_GREEN    /* 0x802BCC49 */
+#define AB_COLOR_BRAKE  RACE_COLOR_BRAKE    /* 0x800000F0 */
+#define AB_COLOR_ACCEL  RACE_COLOR_THROTTLE /* 0x802BCC49 */
 #define AB_SIGN_W       22                  /* a sign's height is (w - 4) * 16 / 22 */
 #define AB_SIGN_H       16
 
@@ -1232,9 +1236,10 @@ void RaceABMonitor::draw()
     g_002F1968.flush();
     if (accelImage == 0)
         accelImage = race_display_find_image("accel_gage");
-    u64 clamp = accelImage->tex->clamp;
-    int gaugeW = (int)(((clamp >> 14) & 0x3FF) + 1);
-    int gaugeH = (int)(((clamp >> 34) & 0x3FF) + 1);
+    /* PC (2026-11-08): the gauge's draw size, not its texture's (game/app/
+     * pc_image_pack.h; was CLAMP MAXU / MAXV + 1) */
+    int gaugeW, gaugeH;
+    pc_image_draw_size(accelImage, &gaugeW, &gaugeH);
     f32 fullH = (f32)gaugeH;
 
     /* each bar's locals in a block of their own (retail allocates them
@@ -1246,7 +1251,7 @@ void RaceABMonitor::draw()
         int barTop = baseY - gaugeH;
         int fillH = (int)(fullH * accel);
         race_fill_rect(barX, barTop, gaugeW, gaugeH);
-        pgl_color(RACE_COLOR_GREEN);
+        pgl_color(RACE_COLOR_THROTTLE);
         race_fill_rect(barX, baseY - fillH, gaugeW, fillH);
         pgl_color(RACE_COLOR_WHITE);
         race_draw_image(accelImage, RACE_ALIGN_LEFT, RACE_ALIGN_TOP, (f32)barX, (f32)barTop);
@@ -1260,7 +1265,7 @@ void RaceABMonitor::draw()
         int barTop = baseY - gaugeH;
         int fillH = (int)(fullH * brake);
         race_fill_rect(barX, barTop, gaugeW, gaugeH);
-        pgl_color(RACE_COLOR_RED);
+        pgl_color(RACE_COLOR_BRAKE);
         race_fill_rect(barX, baseY - fillH, gaugeW, fillH);
         pgl_color(RACE_COLOR_WHITE);
         race_draw_image(brakeImage, RACE_ALIGN_LEFT, RACE_ALIGN_TOP, (f32)barX, (f32)barTop);
@@ -1378,9 +1383,12 @@ void RaceSteeringDisplay::drawEnhanced()
     pgl_color(RACE_COLOR_WHEEL);
     pgl_push_matrix();
     {
-        u64 clamp = sign->tex->clamp;
-        f32 texW = (f32)(int)(((clamp >> 14) & 0x3FF) + 1);
-        f32 texH = (f32)(int)(((clamp >> 34) & 0x3FF) + 1);
+        /* PC (2026-11-08): the sign's draw size (game/app/pc_image_pack.h),
+         * which race_draw_image draws it at */
+        int drawW, drawH;
+        pc_image_draw_size(sign, &drawW, &drawH);
+        f32 texW = (f32)drawW;
+        f32 texH = (f32)drawH;
         f32 sx = (f32)w / texW;
         f32 sy = (f32)h / texH;
         vu0_scale(sx + sx, sy + sy, 1.0f);
@@ -1509,7 +1517,7 @@ void RaceSpeedDisplay::draw()
 {
     char text[32];
 
-    g_002F1968.setColor(color);
+    g_002F1968.setColor(RACE_COLOR_TEXT);   /* PC: as set now (was color, the constructor's) */
     g_002F1968.setAlign(FONT_ALIGN_RIGHT);
     f32 right = (f32)race_align_pos(x, 0, alignX);
     f32 posY = (f32)y;
@@ -1701,10 +1709,15 @@ void RaceReplayModeDisplay::draw()
     if (r2 == 0)
         r2 = race_display_find_image("replay_mode_r2");
     f32 rowY = (f32)posY;
+    /* PC (2026-11-08): each image's draw width (game/app/pc_image_pack.h;
+     * was CLAMP MAXU + 1 in 64 bits, truncated), as race_draw_image draws it */
+    int drawW, drawH;
     race_draw_image(l2, alignX, RACE_ALIGN_TOP, (f32)posX, rowY);
-    posX += ((l2->tex->clamp >> 14) & 0x3FF) + 1;          /* in 64 bits, truncated */
+    pc_image_draw_size(l2, &drawW, &drawH);
+    posX += drawW;
     race_draw_image(modeImage, alignX, RACE_ALIGN_TOP, (f32)posX, rowY);
-    posX += ((modeImage->tex->clamp >> 14) & 0x3FF) + 1;
+    pc_image_draw_size(modeImage, &drawW, &drawH);
+    posX += drawW;
     race_draw_image(r2, alignX, RACE_ALIGN_TOP, (f32)posX, rowY);
 }
 

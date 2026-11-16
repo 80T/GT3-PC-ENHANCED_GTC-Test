@@ -72,7 +72,8 @@ private:
 };
 
 /* The first audio stream, decoded to 16-bit PCM at its own rate (1 or 2
- * channels: more are mixed down to 2). */
+ * channels: more are mixed down to 2).  Any file Media Foundation reads:
+ * an .mp4's AAC, PC: an .mp3 BGM (T521 pdibgm). */
 class Mp4AudioReader {
 public:
     Mp4AudioReader() = default;
@@ -80,12 +81,19 @@ public:
     Mp4AudioReader(const Mp4AudioReader &) = delete;
     Mp4AudioReader &operator=(const Mp4AudioReader &) = delete;
 
-    /* false (logged) when the file has no audio that decodes. */
+    /* false (logged) when the file has no audio that decodes.  wchar_t: any
+     * file's name; char: the ANSI code page's. */
     bool open(const char *path);
+    bool open(const wchar_t *path);
     void close();
     /* Appends the next decoded frames (interleaved, channels() each) to out:
      * false at the end or on an error. */
     bool next(std::vector<int16_t> &out);
+    /* From the start again (a looping BGM). */
+    bool rewind();
+    /* PC: from time t (100 ns) on, to the frame: what the source seeks to
+     * before it is dropped (a BGM's preview from partway, T521 pdibgm). */
+    bool seek(int64_t t);
 
     int rate() const { return rate_; }
     int channels() const { return channels_ > 2 ? 2 : channels_; }
@@ -93,6 +101,7 @@ public:
 private:
     IMFSourceReader *reader_ = nullptr;
     int rate_ = 0, channels_ = 0;
+    int64_t skipTo_ = -1;                   /* seek's time: the frames before it dropped (-1: none) */
 };
 
 } // namespace gt3media

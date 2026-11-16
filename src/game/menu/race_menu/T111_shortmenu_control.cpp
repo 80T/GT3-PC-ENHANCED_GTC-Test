@@ -41,6 +41,7 @@
 #include "game/race/core/T414_race_random.h"          /* raceRandomSkip */
 #include "engine/pgl/G001_flare.h"                /* gfx_vsync */
 #include "libc.h"                           /* strcmp */
+#include "game/menu/race_menu/pc_race_list.h"           /* PC: pc_race_list_input (the list of every car) */
 #include "game/menu/race_menu/shortmenu_internal.h"                           /* g_003514F0, g_00314848 */
 
 namespace gt2k_menu {
@@ -209,7 +210,9 @@ void ShortmenuControl::end()
  * the race behind the menu stops (raceActive = 0 through the inline
  * getRender(): retail computes this + 0x290 into $s1 before the loop, and
  * the loop test is duplicated in front of it) and the render thread draws
- * nothing. */
+ * nothing.  PC (ROADMAP 35): after the page's input, Up / Down scroll the
+ * pre-race page's list of every car of a race of more than 6 (the pages do
+ * not use them; pc_race_list.h). */
 // FUNC 0x0012C770 gt2k_menu::ShortmenuControl::mainLoop
 void ShortmenuControl::mainLoop()
 {
@@ -221,6 +224,7 @@ void ShortmenuControl::mainLoop()
     }
     while (pm.exited == 0) {
         pm.update();
+        pc_race_list_input(&control1, pm.popupLevel);  /* PC: the list of every car */
         waitFrame();
         raceRandomSkip(1);
     }

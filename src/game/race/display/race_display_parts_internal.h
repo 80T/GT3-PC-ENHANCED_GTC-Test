@@ -69,17 +69,24 @@ extern const RaceLine g_0032E878[1];        /* 0x0032E878 */
 /* ------------------------------------------------------------------------ */
 /* Colours (GS RGBA: 0xAABBGGRR, alpha 0x80 = opaque)                       */
 /* ------------------------------------------------------------------------ */
-#define RACE_COLOR_TEXT     0x801880D0u     /* orange (208, 128, 24): the default text colour */
-#define RACE_COLOR_RED      0x800000F0u     /* red (240, 0, 0): reverse gear, brake / oil lamps, warnings */
-#define RACE_COLOR_BRIGHT_RED 0x800000FFu   /* red (255, 0, 0): the lit shift lamp */
-#define RACE_COLOR_GREEN    0x802BCC49u     /* green (73, 204, 43): the VSC lamp, the event board, the throttle */
-#define RACE_COLOR_YELLOW   0x8014B8FFu     /* yellow (255, 184, 20): the TCS lamp */
+/* PC: those the settings can change go through pc_hud_color, so the shared
+ * red and green are split by what they colour. */
+#include "game/app/pc_hud_color.h"
+#define RACE_COLOR_TEXT     pc_hud_color(kHudText, 0x801880D0u)      /* orange (208, 128, 24): the default text colour */
+#define RACE_COLOR_RED      pc_hud_color(kHudWarnings, 0x800000F0u)  /* red (240, 0, 0): reverse gear, warnings */
+#define RACE_COLOR_LAMP_RED pc_hud_color(kHudBrakeLamps, 0x800000F0u)  /* the same: the brake / oil lamps */
+#define RACE_COLOR_BRAKE    pc_hud_color(kHudBrakeBar, 0x800000F0u)  /* the same: the brake bar */
+#define RACE_COLOR_BRIGHT_RED pc_hud_color(kHudShiftLamp, 0x800000FFu)  /* red (255, 0, 0): the lit shift lamp */
+#define RACE_COLOR_VSC      pc_hud_color(kHudVscLamp, 0x802BCC49u)   /* green (73, 204, 43): the VSC lamp */
+#define RACE_COLOR_EVENT    pc_hud_color(kHudEvents, 0x802BCC49u)    /* the same: the event board */
+#define RACE_COLOR_THROTTLE pc_hud_color(kHudThrottleBar, 0x802BCC49u)  /* the same: the throttle */
+#define RACE_COLOR_YELLOW   pc_hud_color(kHudTcsLamp, 0x8014B8FFu)   /* yellow (255, 184, 20): the TCS lamp */
 #define RACE_COLOR_GREY     0x80D0D0D0u     /* light grey: messages, the steering marker */
 #define RACE_COLOR_DARK     0x80202020u     /* dark grey: empty gauges */
 #define RACE_COLOR_WHITE    0x80FFFFFFu     /* opaque white: images unmodulated */
 #define RACE_COLOR_BLACK    0x80000000u     /* opaque black: unlit lamps */
-#define RACE_COLOR_ODOMETER 0x80C0C062u     /* teal (98, 192, 192) */
-#define RACE_COLOR_UNLIT    0x40000000u     /* translucent black: unlit lamps, back panels */
+#define RACE_COLOR_ODOMETER pc_hud_color(kHudOdometer, 0x80C0C062u)  /* teal (98, 192, 192) */
+#define RACE_COLOR_UNLIT    pc_hud_color(kHudPanels, 0x40000000u)    /* translucent black: unlit lamps, back panels */
 #define RACE_COLOR_SHADOW   0x60000000u     /* the rank's drop shadow */
 #define RACE_COLOR_GHOST    0x30000000u     /* the gear's unlit 7-segment cells */
 
@@ -88,9 +95,9 @@ extern const RaceLine g_0032E878[1];        /* 0x0032E878 */
 /* A message's default colour: Lupo 2's is a darker grey (L2 0x00195604,
  * hud.md C12). */
 #if ENH_HUD_TEXT_LOOK
-#define RACE_COLOR_MESSAGE  0x80C0C0C0u
+#define RACE_COLOR_MESSAGE  pc_hud_color(kHudMessages, 0x80C0C0C0u)
 #else
-#define RACE_COLOR_MESSAGE  RACE_COLOR_GREY
+#define RACE_COLOR_MESSAGE  pc_hud_color(kHudMessages, RACE_COLOR_GREY)
 #endif
 /* Lupo 2's colours (hud.md C1, C5, C6). */
 #define RACE_COLOR_PANEL_GREY 0x80C0C0C0u   /* the steering ticks (L2 0x00196BCC) */

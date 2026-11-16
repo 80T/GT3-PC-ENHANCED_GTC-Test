@@ -17,7 +17,28 @@
 #include "pc_ee.h"                          /* PC: ee_f2u, the EE's float -> unsigned conversion */
 #include "libc.h"                           /* PC: printf, memcpy */
 #include "game/save/pc_save_ext.h"          /* PC: the entries past 64, the keyed list */
+#include "game/app/pc_bgm_list.h"           /* PC: pc_bgm_song_there */
+#include <chrono>                           /* PC: nextThere */
 #include <vector>                           /* PC: MusicRebuild */
+
+/* PC: a song's code: nameToCode of its name as the disc's .ads.  The
+ * launcher converts the .ads to .wav (docs/sound.md 2.4); a .wav keeps the
+ * code its .ads had, so the play lists saved before (and the PS2's) still
+ * find their songs, and a song added as a .wav or .mp3 has a code of its
+ * name. */
+static u64 song_code(const char *name)
+{
+    char ads[256];
+    const size_t n = strlen(name);
+    if (n >= 4 && n < sizeof(ads) && name[n - 4] == '.' &&
+        (((name[n - 3] | 0x20) == 'w' && (name[n - 2] | 0x20) == 'a' && (name[n - 1] | 0x20) == 'v') ||
+         ((name[n - 3] | 0x20) == 'm' && (name[n - 2] | 0x20) == 'p' && name[n - 1] == '3'))) {
+        memcpy(ads, name, n - 4);
+        memcpy(ads + n - 4, ".ads", 5);
+        return nameToCode(ads);
+    }
+    return nameToCode(name);
+}
 
 // FUNC 0x0021AB08 findMusicInfo
 //   The song of BGM group 0x14 whose name has code *code, its number in
@@ -28,7 +49,7 @@ MusicInfo *findMusicInfo(const u64 *code, u32 *index)
 {
     BgmTrackList songs = bgm_get_tracks(MUSIC_BGM_GROUP);  /* sp+0x0; 0x0022B750 */
     for (u32 i = 0; i < songs.count; i++) {
-        if (*code == nameToCode(songs.tracks[i].name)) {
+        if (*code == song_code(songs.tracks[i].name)) {     /* PC: song_code (was nameToCode) */
             if (index != NULL)
                 *index = i;
             return &songs.tracks[i];
@@ -66,7 +87,7 @@ void MusicPlayList::init()
     count = 0;
     for (i = 0; i < songs.count; i++) {
         entry = entryAt(count);                 /* PC: past 64 on the heap (was &entries[count]) */
-        entry->code = nameToCode(songs.tracks[i].name);
+        entry->code = song_code(songs.tracks[i].name);      /* PC: song_code (was nameToCode) */
         count++;
     }
     setRandom(1);
@@ -158,7 +179,7 @@ static void music_rebuild_begin(MusicRebuild *r, MusicPlayList *list)
     r->songs.resize(songs.count);
     r->used.assign(songs.count, 0);
     for (u32 i = 0; i < songs.count; i++)
-        r->songs[i] = nameToCode(songs.tracks[i].name);
+        r->songs[i] = song_code(songs.tracks[i].name);
     r->placed = 0;
     r->changed = 0;
 }
@@ -415,4 +436,50 @@ MusicEntry *MusicPlayList::next()
     }
     position = pos;
     return found;
+}
+
+/* PC: next(), going past the songs whose files are not there (a song's full
+ * path, pc_bgm_list.h, on a drive unplugged): a whole round of them, or a
+ * second of looking (a network folder not answering), gives NULL, a race
+ * without music.  The missing file's own way, ads_play's sound effect 4
+ * with `ended' still set, would ask for the next song from play's update at
+ * once, a beep each, without end when none is there. */
+MusicEntry *MusicPlayList::nextThere()
+{
+    const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    MusicEntry *found = NULL;
+    u32 skipped = 0;
+
+    while (skipped < count) {
+        MusicEntry *entry = next();
+        if (entry == NULL)
+            break;
+        if (pc_bgm_song_there(findMusicInfo(&entry->code, NULL)->name)) {
+            found = entry;
+            break;
+        }
+        skipped++;
+        if (std::chrono::steady_clock::now() - start > std::chrono::seconds(1))
+            break;
+    }
+    if (skipped != 0)
+        printf("PC: %u race songs skipped: their files are not there\n", skipped);
+    return found;
+}
+
+/* PC: the entry of track `index' of BGM group 0x14 (findMusicInfo's other
+ * way; the race's song changer, game/app/pc_race_songs.h), NULL when no
+ * entry has its code. */
+MusicEntry *MusicPlayList::entryOfTrack(u32 index)
+{
+    BgmTrackList songs = bgm_get_tracks(MUSIC_BGM_GROUP);
+    if (index >= songs.count)
+        return NULL;
+    const u64 code = song_code(songs.tracks[index].name);
+    for (u32 i = 0; i < count; i++) {
+        MusicEntry *e = entryAt(i);
+        if (e->code == code)
+            return e;
+    }
+    return NULL;
 }

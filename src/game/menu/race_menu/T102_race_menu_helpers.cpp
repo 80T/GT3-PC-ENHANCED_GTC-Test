@@ -482,7 +482,9 @@ void race_memcard(int mode, u64 race, u64 car, const char *raceName, RaceOrganiz
  * RACE_TIME_INVALID before)
  * and, when `highlight', the player's line (entry 0) marked; without
  * `highlight' the mark stays 0 from the constructor.  One line per entry
- * (the list holds 6). */
+ * (the list holds 6).  PC (ROADMAP 35): the race's result shows the top 6
+ * of a bigger race (the lines past list[5] are not written); no list of
+ * every car (allCount 0: the short menu's overlay stays off). */
 // FUNC 0x0012F070 result_list_by_rank
 void result_list_by_rank(RaceOrganization *org, ShortMenuArgs *args, int highlight)
 {
@@ -490,7 +492,10 @@ void result_list_by_rank(RaceOrganization *org, ShortMenuArgs *args, int highlig
     RaceEntryCar *car = org->entries->rankTop;
     ShortMenuResultEntry line;              /* sp+0x00 (its constructor calls clear) */
     /* implicit: clear (the inline constructor calls it out of line) */
+    args->allCount = 0;                     /* PC: the results keep the top 6 */
     for (int i = 0; i < org->entries->count; i++) {
+        if (i >= 6)                         /* PC: list[6]: the first 6 places */
+            break;
         line.car = car->info.carCode;
         if (car->state->st.finished != 0)
             line.time = car->state->st.lapStartTime;
@@ -516,13 +521,19 @@ void result_list_by_rank(RaceOrganization *org, ShortMenuArgs *args, int highlig
  * 1 for the entries copy), so the copy takes $a0 and costs two moves.
  * Tried: no car local, the reload for car_best_lap, an inline wrapper for
  * it, the time as a ?:, a temporary, both branch senses, the order load
- * after the car code; the reference compiler gives the same. */
+ * after the car code; the reference compiler gives the same.
+ * PC (ROADMAP 35): a race of up to PC_RACE_CARS_MAX cars: list[] takes the
+ * orders 0..5 (retail wrote list[order] for every order: past list[5] with
+ * more than 6 cars), every line also goes to all[order], and allCount = the
+ * cars (the pre-race menu's list of every car, pc_race_list.h). */
 // FUNC 0x0012F160 result_list_by_order
 void result_list_by_order(RaceOrganization *org, ShortMenuArgs *args, int noTime)
 {
     ShortMenuResultEntry line;              /* sp+0x00 (its constructor calls clear) */
     /* implicit: clear (the inline constructor calls it out of line) */
 
+    int cars = org->entries->count;         /* PC: the list of every car */
+    args->allCount = cars < PC_RACE_CARS_MAX ? cars : PC_RACE_CARS_MAX;
     for (int i = 0; i < org->entries->count; i++) {
         RaceEntryCar *car = org->entries->cars[i];
         int order = car->order;
@@ -536,7 +547,10 @@ void result_list_by_order(RaceOrganization *org, ShortMenuArgs *args, int noTime
             line.highlight = 1;
         else
             line.highlight = 0;
-        args->list[order] = line;
+        if (order >= 0 && order < 6)        /* PC: list[6] (retail: list[order] unchecked) */
+            args->list[order] = line;
+        if (order >= 0 && order < PC_RACE_CARS_MAX)     /* PC: every car */
+            args->all[order] = line;
     }
 }
 
@@ -546,7 +560,10 @@ void result_list_by_order(RaceOrganization *org, ShortMenuArgs *args, int noTime
  * sp+0x220) is assigned to `standing' (ChampionshipEntry's implicit
  * assignment: CarEquipments::operator=, then the three words) and destroyed
  * (~CarEquipments, flags 2) each time; `standing' is built by
- * CarEquipments() and destroyed the same way at the end. */
+ * CarEquipments() and destroyed the same way at the end.
+ * PC (ROADMAP 35): list[] takes the first 6 (retail wrote list[i] for every
+ * entry), every line also goes to all[i], allCount = the cars (the
+ * championship menu's list of every car, pc_race_list.h). */
 // FUNC 0x0012F290 result_list_from_entries
 void result_list_from_entries(RaceOrganization *org, ShortMenuArgs *args,
                               RaceChampionshipInformation *champ)
@@ -556,13 +573,18 @@ void result_list_from_entries(RaceOrganization *org, ShortMenuArgs *args,
     /* implicit: CarEquipments, ~CarEquipments, operator= (member of ChampionshipEntry: constructor, the temporary's and standing's destructor, the assignment) */
     ChampionshipEntry standing;             /* sp+0x020 CarEquipments::CarEquipments */
 
+    int cars = org->entries->count;         /* PC: the list of every car */
+    args->allCount = cars < PC_RACE_CARS_MAX ? cars : PC_RACE_CARS_MAX;
     for (int i = 0; i < org->entries->count; i++) {
         /* CarEquipments::operator=, the words; the temporary's ~CarEquipments */
         standing = champ->getEntryByOrder(i);
         line.car = standing.car.carCode;
         line.points = standing.points;
         line.highlight = standing.highlight;
-        args->list[i] = line;
+        if (i < 6)                          /* PC: list[6] */
+            args->list[i] = line;
+        if (i < PC_RACE_CARS_MAX)           /* PC: every car */
+            args->all[i] = line;
     }
 }
 

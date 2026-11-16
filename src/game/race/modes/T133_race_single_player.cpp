@@ -52,6 +52,7 @@
 #include "game/data/T482_car_equipments.h"       /* CarEquipments */
 #include "game/data/T484_race_database.h"        /* RaceDataBase (getCourse, setCourse, getCourseKind) */
 #include "game/race/modes/race_modes_internal.h"                           /* the unit's constants */
+#include "game/app/pc_race_cars.h"          /* PC: pc_race_info_end (the records after more than 8 cars) */
 
 /* ======================================================================== */
 /* RaceSinglePlayerInformation                                              */
@@ -288,7 +289,9 @@ RaceInput *RaceSinglePlayer::virtual_26(int id)
 //   (Manager::load, all its slots); the end pointer it returns is dropped.
 void RaceSinglePlayer::virtual_13(RaceInfoBlock *blk)
 {
-    input.rec.load((const u32 *)((u8 *)blk + RACE_INFO_BLOCK_SIZE), 1);
+    /* PC: past the slots of a race of more than 8 cars (pc_race_info_end:
+     * blk + RACE_INFO_BLOCK_SIZE up to 8, game/app/pc_race_cars.h) */
+    input.rec.load((const u32 *)pc_race_info_end(blk), 1);
 }
 
 // FUNC 0x00181DF8 RaceSinglePlayer::virtual_14

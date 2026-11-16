@@ -46,6 +46,7 @@
 #include "game/sound/T464_bgm.h"                  /* bgm_stop */
 #include "engine/pdistd/T532_heap.h"                 /* memalign, free */
 #include "game/menu/gtmode/trophy_internal.h"
+#include "game/app/pc_challenge.h"              /* PC (2026-11-14): the money decay's licence pause */
 
 using namespace gt2k_menu;
 
@@ -249,6 +250,7 @@ int license_get_screen(u32 licence)
         getGameStatus()->setLargeTrophy(0x20);
         break;
     }
+    pc_challenge_licence_earned((int)licence);  /* PC (2026-11-14): the money decay's pause (game/app/pc_challenge.h) */
     menu_heap_pop();
     free(heap);
     return 1;

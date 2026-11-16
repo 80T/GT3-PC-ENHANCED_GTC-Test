@@ -7,7 +7,9 @@
  *         database/paramdb_us.db (the parameter tables, read into a
  *         64-byte-aligned buffer), database/paramstr_us.db and
  *         database/paramunistr_us.db (string tables; PC: the run's
- *         language's, platform/language.h car_database).  The parameter file is
+ *         language's, platform/language.h car_database, or the three built
+ *         from its database/paramdb<r>.sqlite3, game/app/pc_param_db.h).
+ *         The parameter file is
  *         a header with an index of tables; each table is a DataBlock:
  *         fixed-size records sorted by their 64-bit code (searched by
  *         bisection).  A code is the rotate-left-7 hash of a name

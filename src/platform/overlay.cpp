@@ -11,7 +11,11 @@
 namespace overlay {
 namespace {
 
-constexpr int kMaxVertices = 6 * 16384;
+/* PC (2026-11-07): 65536 rectangles a frame (was 16384: the verbose frame
+ * monitor's three panels - some 2,300 characters of up to ten rectangles
+ * each and the graphs' 600 bars - ran out of them, and its last counts were
+ * not drawn: user report).  A rectangle past the budget is dropped. */
+constexpr int kMaxVertices = 6 * 65536;
 
 bool g_ready, g_failed;
 ID3D11VertexShader *g_vs;
@@ -93,7 +97,7 @@ bool init()
 
 /* ---- a 5 x 7 font (rows top down, bit 4 the left column) */
 
-const char kGlyphChars[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ.:-/%()=<>+,'!?;_";
+const char kGlyphChars[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ.:-/%()=<>+,'!?;_&#[]\"*";
 const uint8_t kGlyphs[][7] = {
     {0x0E, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0E},     /* 0 */
     {0x04, 0x0C, 0x04, 0x04, 0x04, 0x04, 0x0E},     /* 1 */
@@ -148,12 +152,28 @@ const uint8_t kGlyphs[][7] = {
     {0x0E, 0x11, 0x01, 0x02, 0x04, 0x00, 0x04},     /* ? */
     {0x00, 0x0C, 0x0C, 0x00, 0x0C, 0x04, 0x08},     /* ; */
     {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1F},     /* _ */
+    /* PC: the song changer's titles (platform/song_osd.h) */
+    {0x0C, 0x12, 0x14, 0x08, 0x15, 0x12, 0x0D},     /* & */
+    {0x0A, 0x0A, 0x1F, 0x0A, 0x1F, 0x0A, 0x0A},     /* # */
+    {0x0E, 0x08, 0x08, 0x08, 0x08, 0x08, 0x0E},     /* [ */
+    {0x0E, 0x02, 0x02, 0x02, 0x02, 0x02, 0x0E},     /* ] */
+    {0x0A, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00},     /* " */
+    {0x00, 0x04, 0x15, 0x0E, 0x15, 0x04, 0x00},     /* * */
 };
 static_assert(sizeof(kGlyphs) / sizeof(kGlyphs[0]) == sizeof(kGlyphChars) - 1, "one glyph per character");
 
 } // namespace
 
 bool begin()
+{
+    int w = 0, h = 0;
+    gpu::backbuffer_size(&w, &h);
+    return begin_sized(w, h);
+}
+
+/* PC (2026-11-08): a panel on a target of this size (another screen's back
+ * buffer: the cockpit camera's calibration panel on player 2's monitor). */
+bool begin_sized(int w, int h)
 {
     if (g_failed)
         return false;
@@ -165,7 +185,8 @@ bool begin()
         }
         g_ready = true;
     }
-    gpu::backbuffer_size(&g_bw, &g_bh);
+    g_bw = w;
+    g_bh = h;
     if (g_bw <= 0 || g_bh <= 0)
         return false;
     D3D11_MAPPED_SUBRESOURCE m;

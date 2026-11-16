@@ -1,5 +1,6 @@
-/* T165 - ParticleManager: 128 particles (sparks, wheel debris) in a pool
- * with an active and a free list.  0x0019E6F0..0x0019F898.
+/* T165 - ParticleManager: 128 particles (sparks, wheel debris; PC: 512,
+ * PARTICLE_POOL_SIZE) in a pool with an active and a free list.
+ * 0x0019E6F0..0x0019F898.
  *
  * A particle moves with drag (-size^2 * drag * v|v| / mass), gravity and
  * an occasional lift early in its life, bounces off its ground plane, and
@@ -28,7 +29,9 @@
                                                vu0_* calls, strip_batch_*, strip_draw, PGL_* */
 #include "engine/media/G002_mpeg_frameq.h"          /* cosf, sinf */
 
-#define PARTICLE_POOL_SIZE      128
+/* PC (ROADMAP 35): 512, was 128 - the sparks and debris of a race of up to
+ * 32 cars (a full pool makes no new particle: alloc gives NULL) */
+#define PARTICLE_POOL_SIZE      512
 #define PARTICLE_TRAIL          0x0001      /* Particle::flags: screen[] holds last frame's position */
 #define PARTICLE_SPARK_COLOR    0xFF229EFFu /* emitSparks (stored, never read) */
 
@@ -311,7 +314,8 @@ void Particle::resetTrail()
 
 // FUNC 0x0019EEF8 ParticleManager::ParticleManager
 //   Caller: RacePS2Base's constructor (0x0017D070).  The vptr, the pool
-//   (operator new[](0x2A00), each next = 0: Particle's inline constructor),
+//   (operator new[](0x2A00; PC: 0xA800, 512), each next = 0: Particle's
+//   inline constructor),
 //   the texture "race/particle.img" read whole (unpacked) and relocated,
 //   the lists (clear).
 ParticleManager::ParticleManager()

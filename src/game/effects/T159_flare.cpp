@@ -58,7 +58,12 @@ static_assert(offsetof(FlareClass, glareImg) - offsetof(FlareClass, unk_000) == 
 /* A lamp with |sizeA - sizeB| below this is round, else elongated
  * (gp-0x7C28 / gp-0x7C24 = 0x3C23D70A). */
 #define FLARE_ROUND_EPS 0.01f
-#define FLARE_MAX_ENTRIES FLARE_LIST_MAX    /* lights[] / sources[] (PC: was 100) */
+#define FLARE_MAX_ENTRIES FLARE_LIST_MAX    /* lights[] / sources[] (PC: was 100; 1023, ROADMAP 35) */
+/* PC: every query of a frame (each lamp, each source, the sun) has a texel
+ * of the result strip */
+static_assert(2 * FLARE_LIST_MAX + 1 <= 0x40 * FLARE_RESULT_ROWS, "PC: the flare queries fit the result strip");
+static_assert(sizeof(((FlareClass *)0)->resultsBuf) >= 0x40 * 4 * FLARE_RESULT_ROWS + 0x3F,
+              "PC: resultsBuf holds the strip, 64-byte aligned");
 #define FLARE_TWO_PI 6.2831855f             /* gp-0x7C20 (0x40C90FDB) */
 
 /* VU0 macro mode (the current matrix lives in vf28..vf31: the x, y, z
@@ -305,7 +310,8 @@ FlareClass::~FlareClass()
 
 // FUNC 0x0019B358 FlareClass::begin
 //   Callers: RacePS2Base::drawView / virtual_47.  The VRAM of
-//   the occlusion result strip (64 x 8, PSMCT32) and of the reduction work
+//   the occlusion result strip (64 x 8, PSMCT32; PC: 64 x FLARE_RESULT_ROWS,
+//   one GS page, for the 1023 + 1023 lamps and sources) and of the reduction work
 //   buffer (64 x 64), flare_init for the screen buffer (aspect 0.911, 1.214
 //   on the wide screen; the models' textures glareImg / modelTex2), the lists
 //   emptied, the projection matrix kept (pgl_get_matrix in matrix mode
@@ -318,7 +324,7 @@ void FlareClass::begin(GSBuffer &screen)
     /* implicit: allocVram (GSBuffer's inline allocVram(psm, w, h), twice:
      * retail keeps the buffer's address in a register for the three
      * stores, the inline member's this) */
-    occBuf.allocVram(0, 0x40, 8);
+    occBuf.allocVram(0, 0x40, FLARE_RESULT_ROWS);   /* PC: FLARE_RESULT_ROWS rows, was 8 (T159_flare.h) */
     aspect = 0.911f;
     workBuf.allocVram(0, 0x40, 0x40);
 #if ENH_RENDER_FLARE_NO_FOG
@@ -332,7 +338,7 @@ void FlareClass::begin(GSBuffer &screen)
     screenVram = screen.addr;
     screenW = screen.width;
     flare_init(flare_work(this), aspect, screenVram, screenW, screen.displayHeight(), occBuf.addr,
-               8, workBuf.addr, 0x40, 0x40, glareImg, modelTex2);
+               FLARE_RESULT_ROWS, workBuf.addr, 0x40, 0x40, glareImg, modelTex2);  /* PC: was 8 */
     sunVisible = 0;
     nLights = 0;
     nSources = 0;

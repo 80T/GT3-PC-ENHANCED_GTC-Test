@@ -69,7 +69,10 @@
 #include "engine/io/T503_vol_thread.h"           /* file_read_blocking, vol_device_object */
 #include "engine/io/T509_serialize.h"            /* serialize_create / destroy, Serialize::Base::restore */
 #include "platform/language.h"                  /* PC: language::current (a loaded game's country) */
+#include "platform/system_menu.h"               /* PC: new_game_run (Restart as new game) */
 #include "game/app/pc_new_game.h"               /* PC: pc_loaded_game (the debug unlocks) */
+#include "game/app/pc_race_cars.h"              /* PC: the replay data of more than 8 cars */
+#include "game/app/pc_challenge.h"              /* PC (2026-11-14): the challenge modes' scenes */
 #include "game/race/core/T150_serialize_replay_data.h"    /* g_00351F40 "ReplayData" */
 
 /* .sdata: the attract demo played last (-1 at start), after T157's "". */
@@ -118,8 +121,10 @@ int gt3_main(int argc, char **argv)
     /* A loaded game: its country; a championship it left running goes on.
      * PC: the run's language instead (platform/language.h): the databases
      * read at the start are its, and the setting chooses it (the save's
-     * country is the language it was saved in) */
-    if (F_0014AE00(gt2k_menu::MEMCARD_AUTOLOAD, 0, 0, NULL, NULL, 0, 0, 0, NULL) != 0) {
+     * country is the language it was saved in).
+     * PC: none in a run started by the Esc menu's Restart as new game */
+    if (!system_menu::new_game_run() &&
+        F_0014AE00(gt2k_menu::MEMCARD_AUTOLOAD, 0, 0, NULL, NULL, 0, 0, 0, NULL) != 0) {
         set_country(language::current());
         pc_loaded_game(getGameStatus());    /* PC: the debug unlocks (game/app/pc_new_game.h) */
         if (getGameStatus()->getChampionshipSave()->active != 0)
@@ -127,7 +132,9 @@ int gt3_main(int argc, char **argv)
     }
 
     for (;;) {
+        pc_challenge_scene(PC_SCENE_GT_MENUS);  /* PC (2026-11-14): the challenge panel (game/app/pc_challenge.h) */
         if (gtmode_main() == 0) {
+            pc_challenge_scene(PC_SCENE_OTHER); /* PC (2026-11-14): the demos, the opening movie */
 #if ENH_MENU_ATTRACT_REPLAYS
             /* Lupo 2 (L2 main 0x001000D0 -> 0x00100998; menus_a.md 4): one
              * attract demo each time the menus time out, then the menus
@@ -145,6 +152,9 @@ int gt3_main(int argc, char **argv)
         }
 
         gfx_vsync(2);
+        /* PC (2026-11-14): a GT mode race, its menus' screens, or neither (the
+         * challenge modes act in the first, show in both) */
+        pc_challenge_scene(pc_challenge_scene_of_mode(getGameStatus()->getMenuStatus()->nextMode));
         switch (getGameStatus()->getMenuStatus()->nextMode) {
         case MAIN_MODE_NONE:
             break;
@@ -216,6 +226,7 @@ int gt3_main(int argc, char **argv)
 // FUNC 0x00100488 main_championship
 void main_championship(int cont)
 {
+    PcChallengeRace pcScene;                /* PC (2026-11-14): a GT mode race (also after a load, cont 1) */
     getGameStatus()->getMenuStatus()->runMode = RUN_MODE_GTMODE;
     run_championship(cont);
 }
@@ -327,7 +338,8 @@ static inline void *align64(void *p)
 // FUNC 0x00100838 play_saved_replay
 void play_saved_replay(int which)
 {
-    u8 raw[0x41980];                        /* fp+0x10 */
+    u8 raw[PC_REPLAY_DATA_SIZE + 0x40];     /* fp+0x10 (PC: was 0x41980; the slots of more than 8
+                                               cars, game/app/pc_race_cars.h) */
 
     bgm_stop();
     race_begin(CONTROL_RECORD_SIZE, CONTROL_RECORDS);
@@ -344,7 +356,9 @@ void play_saved_replay(int which)
         /* The race's static type is RacePS2Base (__dynamic_cast's source
          * type __tf11RacePS2Base); T149 returns a RaceBase *. */
         RacePS2Base *race = static_cast<RacePS2Base *>(info.createRace(work, workSize));
-        const u32 *records = (const u32 *)(data + 0x191C);   /* after the block (RaceInfoBlock::size) */
+        /* after the block (RaceInfoBlock::size); PC: and the slots of the
+         * cars past 8 (pc_race_info_end; + 0x191C up to 8) */
+        const u32 *records = (const u32 *)pc_race_info_end(blk);
         /* The dynamic_cast tests race for NULL itself. */
         if (AutomobileControlRecord::Manager::hasSlots(records) == 1 &&
             dynamic_cast<RaceSolitaire *>(race) != NULL)
@@ -450,7 +464,7 @@ enum { ATTRACT_REPLAY_KIND = 1000 };
  * nothing (Lupo 2 does not test it).  Frame as play_saved_replay's. */
 static void run_replay_demo(const char *file)
 {
-    u8 raw[0x41980];
+    u8 raw[PC_REPLAY_DATA_SIZE + 0x40];     /* (PC: play_saved_replay's) */
     FileLoc loc;
 
     if (file == NULL || file_resolve(file, &loc, &vol_device_object) != 0 || !(loc.flags & 1)) {
@@ -487,7 +501,7 @@ static void run_replay_demo(const char *file)
         RaceReplayInformation info(blk);
         RaceOrganization *org = race_organization_create(&info);
         RacePS2Base *race = static_cast<RacePS2Base *>(info.createRace(work, workSize));
-        const u32 *records = (const u32 *)(data + 0x191C);
+        const u32 *records = (const u32 *)pc_race_info_end(blk);   /* PC: as play_saved_replay's */
         if (AutomobileControlRecord::Manager::hasSlots(records) == 1 &&
             dynamic_cast<RaceSolitaire *>(race) != NULL)
             static_cast<RaceSolitaire *>(race)->virtual_59(0, blk);

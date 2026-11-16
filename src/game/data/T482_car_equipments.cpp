@@ -604,6 +604,7 @@ void CarEquipments::specGear(CarSpec *spec, const TransmissionRecord *rec)
     spec->gearCount = rec->gears;
     spec->autoGear = 0;
     spec->gearboxType = gearbox_type_of(getDataBlock(CARDB_GEAR), rec);  /* Lupo 2 (L2 0x00241BC0) */
+    spec->gearKind = rec->kind;             /* PC (2026-11-08): the gear part's category (game/app/pc_shift.h) */
 }
 
 /* Quirk: the front rebound values are interpolated from the front bound

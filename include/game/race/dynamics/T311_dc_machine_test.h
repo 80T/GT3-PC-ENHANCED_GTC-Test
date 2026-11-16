@@ -51,8 +51,9 @@ public:
     virtual int  getGateCount();              /* [32] +0x10C 0x001F06C0 the lines: kind 1 -> 1, 2 -> 2, 0 / 3 -> 3 */
     virtual f32  getGatePosition(int gate);      /* [33] +0x114 0x001F0780 the lines before the finish, else -1 */
 };
-/* The enhanced engine: DynamicsConductor's (GT3 0xE3AC). */
-EGCS_SIZE(DynamicsConductorMachineTest, 0xE58C);
+/* The enhanced engine: DynamicsConductor's (GT3 0xE3AC; PC: 0x3B14C, the
+ * conductor's per-car arrays PC_RACE_CARS_MAX long, game/race/race_cars.h). */
+EGCS_SIZE(DynamicsConductorMachineTest, 0x3B14C);
 
 /* The lines of the test, m: {400, 1000, 6845, -1}.  Defined in T311
  * (retail's .data: not const). */

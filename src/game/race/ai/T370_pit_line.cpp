@@ -11,7 +11,15 @@
 #include "game/race/ai/enemy_lines_internal.h"
 
 /* The node of slot `slot': count - (slot + 4); 0 without line 4.
- * Callers: DynamicsConductor::pitSlotNode, pit_slot_pose. */
+ * Callers: DynamicsConductor::pitSlotNode, pit_slot_pose.
+ * PC: the pit lane's boxes are nodes 3 .. count - 4 (count - 6 of them;
+ * nodes 0..2 and the last 3 are its gates, car_update_pit, T350): the
+ * courses' lines have 12 nodes (6 boxes, ~15 m apart) or 13 (7).  A slot
+ * past the boxes (a car index from 6 / 7 on, races of up to 32 cars:
+ * game/race/race_cars.h) takes the boxes again from the first, slot %
+ * boxes; retail gave slots 6, 7 the entry gates' nodes 2, 1 and slots past
+ * count - 4 negative nodes.  The slots of a box are unchanged; a line of
+ * fewer than 7 nodes keeps retail's count - (slot + 4). */
 // FUNC 0x001F9D90 pit_slot_node
 int pit_slot_node(CourseLines *cl, int slot)
 {
@@ -19,6 +27,12 @@ int pit_slot_node(CourseLines *cl, int slot)
 
     if (pit == NULL)
         return 0;
+    {
+        int boxes = pit->count - 6;         /* PC: nodes 3 .. count - 4 (above) */
+
+        if (boxes > 0 && slot >= boxes)
+            slot %= boxes;
+    }
     int back = slot + 4;            /* (in place, fold makes it (count - 4) - slot) */
     return pit->count - back;
 }

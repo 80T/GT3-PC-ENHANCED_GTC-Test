@@ -11,6 +11,7 @@
 #include "game/sound/T464_bgm.h"                  /* bgm_stop */
 #include "game/sound/T469_sound_effects.h"        /* se_play, SE_PAN_CENTRE, SE_PRIO_PROGRAM */
 #include "game/common/T494_text_utils.h"           /* str_equal, str_has_prefix */
+#include "game/app/pc_volume.h"                   /* PC: pc_menu_se_volume */
 
 /* PageManager's constructor (0x001B6250): no music yet. */
 // FUNC 0x001C4D78 MenuSound::MenuSound
@@ -98,10 +99,13 @@ int MenuSound::selectMusic(const char *page)
 
 /* Plays menu sound effect se, centred, if the menu sound effects option is
  * on (1 cancel, 3 cursor, 4 refused, 5 decide, 10 left / right as used by
- * the pages). */
+ * the pages).  PC: at the player's volume of them (1.0 at 100 %), applied
+ * after the volume's clamp (PC 2026-11-11, pc_volume.h: as the race's). */
 // FUNC 0x001C4F80 menu_play_se
 void menu_play_se(int se)
 {
-    if (getGameStatus()->getGameOptions()->menuSe != 0)
+    if (getGameStatus()->getGameOptions()->menuSe != 0) {
+        PcSeLevelScope pcLevel(pc_menu_se_volume());
         se_play(se, SE_PAN_CENTRE, SE_PRIO_PROGRAM, 1.0f);
+    }
 }

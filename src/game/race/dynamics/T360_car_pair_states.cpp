@@ -165,11 +165,13 @@ int CarPairStates::strongest(int car, int *other)
 /* No callers.  Bit j for every car j in a state with `car' (either way);
  * flags bit 0: state 1 counts too, bit 1: also the cars on another lap.
  * The flag tests are in the loop: loop.c hoists flags & 2, then flags & 1,
- * to the preheader and spills them (sp+4, sp+8), as retail. */
-int CarPairStates::activeMask(int car, u16 flags)
+ * to the preheader and spills them (sp+4, sp+8), as retail.
+ * PC: the mask u32 (was int): with PC_RACE_CARS_MAX (32) cars, 1 << 31 of a
+ * signed int overflowed (game/race/race_cars.h). */
+u32 CarPairStates::activeMask(int car, u16 flags)
 {
     int n = dc->carCount;
-    int mask = 0;
+    u32 mask = 0;
     int j;
 
     for (j = 0; j < n; j++) {
@@ -194,7 +196,7 @@ int CarPairStates::activeMask(int car, u16 flags)
         }
         if (mine == PAIR_NONE && theirs == PAIR_NONE)
             continue;
-        mask |= 1 << j;
+        mask |= (u32)1 << j;                /* PC: unsigned (above) */
     }
     return mask;
 }

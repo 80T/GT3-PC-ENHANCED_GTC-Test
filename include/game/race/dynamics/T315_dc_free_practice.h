@@ -61,7 +61,9 @@ public:
     virtual void virtual_21(int a);         /* [21] +0x0B4 0x001F20B0 */
     virtual void getEachEntrantInfo_(int car, int *tyreFlag, int *transMode, int *driver, int *noController); /* [23] +0x0C4 0x001F2050 getEntrantInfoRace */
     /* Car 0: 6, 0, 0; car n: 5, -(n x 200 + 300), 120.  Sets no result
-     * ($v0 is left 6 or the start argument). */
+     * ($v0 is left 6 or the start argument).  PC: when the cars do not
+     * fit the lap that way, cars 6.. spread evenly between car 5 and the
+     * lap's end (races of up to 32 cars). */
     virtual int  getSpecialStart(int car, int *startType, int *startArg, int *speedKmh); /* [24] +0x0CC 0x001F2070 */
     virtual u32  CurrentLapTime(RaceCarState *car); /* [28] +0x0EC 0x001F2678 lapTimeIfStarted(car) */
     virtual int  virtual_29();              /* [29] +0x0F4 0x001F2148 0: no laps */
@@ -69,8 +71,9 @@ public:
     virtual void chargePenaltyBySurface(RaceCarState *car, int left, int right); /* [39] +0x144 0x001F2638 empty */
     virtual int  EveryTimePitStop();        /* [41] +0x154 0x001F2640 1 */
 };
-/* The enhanced engine: DynamicsConductor's (GT3 0xE3AC). */
-EGCS_SIZE(DynamicsConductorFreePractice, 0xE58C);
+/* The enhanced engine: DynamicsConductor's (GT3 0xE3AC; PC: 0x3B14C, the
+ * conductor's per-car arrays PC_RACE_CARS_MAX long, game/race/race_cars.h). */
+EGCS_SIZE(DynamicsConductorFreePractice, 0x3B14C);
 
 /* The copy of T154's RaceDisplayTimeDiffEvent typeinfo function (T303 has
  * one too; see T303_race_time_events.h). */

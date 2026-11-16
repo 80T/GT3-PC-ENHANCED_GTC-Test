@@ -20,6 +20,9 @@ constexpr uint32_t rgba(uint32_t r, uint32_t g, uint32_t b, uint32_t a)
 /* Starts a panel's drawing (the D3D objects made on the first use); false
  * when there is nothing to draw on (then no end). */
 bool begin();
+/* PC (2026-11-08): the same for a target of w x h pixels (another screen's
+ * back buffer, gpu::screen_backbuffer: end() then draws on that). */
+bool begin_sized(int w, int h);
 /* The back buffer's size (during a panel's drawing). */
 void size(int *w, int *h);
 void rect(float x, float y, float w, float h, uint32_t color);

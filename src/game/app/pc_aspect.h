@@ -83,6 +83,18 @@ f32 pc_menu_kx(void);
 f32 pc_menu_ky(void);
 void pc_menu_squeeze_projection(void);
 
+/* The movies' shape ([Display] MovieAspect, docs/movies.md "Shape").
+ * pc_aspect_movie_frame: a frame that is a full-screen movie alone
+ * (MovieRender): its 640 x 448 picture shown over the window, whatever
+ * MenuAspect is, so that the movie has the whole window.  pc_movie_fit: the
+ * movie's rectangle w x h (GS pixels of the picture, drawn about its centre)
+ * brought to `aspect', the shape of what is shown (> 0: an MP4's picture; <=
+ * 0: a PSS, 4:3 when full-screen, else its box's shape as it is), as the
+ * picture is shown now.  1 when it changed it: what is left of the rectangle
+ * is the caller's to fill.  MovieAspect=stretch: never. */
+void pc_aspect_movie_frame(void);
+int pc_movie_fit(f32 aspect, f32 *w, f32 *h);
+
 /* A race HUD inside a stretched menu (the data logger's replay window:
  * RaceSolitaire::virtual_45 draws its two race displays at the frame's two
  * sides).  From pc_hud_menu to pc_hud_menu_end, a race display's HUD draw in

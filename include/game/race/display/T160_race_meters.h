@@ -189,6 +189,7 @@ public:
     VifModel     *dialPacket;                   /* 0x70 the scale packet (TStripBuilder::finish; model_draw) */
     void *dialBuf[2];                           /* 0x74 16-byte aligned, inside dialData */
     u8    dialData[0x3000];                     /* 0x7C */
+    u32   pcBuiltColor[2];                      /* PC: scaleColor as set in the packet (game/app/pc_hud_color.h) */
 };
 EGCS_SIZE(RaceRoundMeter, 0x307C);
 

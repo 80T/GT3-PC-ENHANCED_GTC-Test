@@ -51,6 +51,19 @@ int  gt3m_video_next(Gt3mVideo *v, int *width, int *height);
 /* PC: the last frame out was an MP4's (its halves full pictures, not a
  * PSS's two fields: MenuBgMovie::upload, fieldOffset). */
 int  gt3m_movie_progressive(void);
+/* PC: the shape of the movie's pictures as shown (width x pixel aspect /
+ * height) when it is an MP4's; 0 for a PSS, whose shape is the place it was
+ * made for (MpegImage::virtual_2). */
+double gt3m_movie_aspect(void);
+/* PC: a queued frame the GPU decoded (mp4_gpu.h: no pixels, its pictures are
+ * textures).  show: tells the renderer to draw its half (0 upper, 1 lower)
+ * from now on, 1; 0 for a frame of pixels.  taken: the game holds this frame
+ * now, the pictures before it are free.  The draw: TEX0 with TBP0
+ * GT3M_MOVIE_TBP, TBW 0, PSMCT32, a GT3M_MOVIE_SIDE-texel square. */
+#define GT3M_MOVIE_TBP  0x3FFF
+#define GT3M_MOVIE_SIDE 1024
+int  gt3m_movie_gpu_show(const void *frame, int half);
+void gt3m_movie_gpu_taken(const void *frame);
 /* PC: the frames a second of the stream the last frame out came from (its
  * sequence header's frame rate: 29.97 / 30 the US and Japanese movies, 25
  * the PAL ones; an MP4's 29.97: its frames are two pictures 1 / 59.94 s

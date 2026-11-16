@@ -446,10 +446,12 @@ void mpegif::feed()
     int streamMode = 0;
     int fromMemory = usePreload;            /* s7 */
 
-    if (withSound == 0)
+    if (withSound == 0) {
         streamMode = 1;                     /* 3: video only */
-    else
+    } else {
+        pdibgm_pc_music(PDIBGM_MUSIC_NONE); /* PC: a movie's sound, as it is (no player's volume) */
         pdibgm_set_volume(1.0f);
+    }
     streamMode |= 2;
     dec = mpeg_player_create(width, height, prioHigh, prioDecode);
     g_frames_stopped = 0;

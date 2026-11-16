@@ -192,6 +192,40 @@ u32 usbWheelSteerButtons(int x, int deadZone)
     return buttons;
 }
 
+/* PC (2026-11-10, user: with the wheel, the tuning menu's sliders' "L3 maps
+ * correctly but R3 doesn't do anything"): the 0xC294 wheel's raw word
+ * (usbC294Buttons) as a PS pad's (PADRAW_*) for the menus
+ * (MenuControl::emulatePressure, T214) and the time trial's SELECT (the
+ * ghost, RaceSolitaire::virtual_28, T139).  Retail's menus read any device's
+ * raw word as a pad's, so the wheel's buttons came out as others: L3 (4) as
+ * L1, R3 (0x20) as circle, L1 (1) as L2, L2 (2) as R2, R2 (0x10) as
+ * triangle, triangle (0x400) as R3, the hat's up / down / right as cross /
+ * square / L3 (the rest as bits the menus do not read).  Here each is its
+ * own, but for the wheel's L3 / R3, which are the menus' L1 / R1 (the
+ * sliders' ten steps, the garage's long jumps): its L1 / R1 paddles are
+ * already the menus' up / down (translate: 1 / 8), and a direction held
+ * keeps the shoulder buttons out (MenuControl::updateKeys). */
+u32 usbC294MenuRaw(u32 raw)
+{
+    static const struct {
+        u32 wheel, pad;
+    } kMenuRaw[] = {
+        {C294RAW_CROSS, PADRAW_CROSS},       {C294RAW_SQUARE, PADRAW_SQUARE},
+        {C294RAW_CIRCLE, PADRAW_CIRCLE},     {C294RAW_TRIANGLE, PADRAW_TRIANGLE},
+        {C294RAW_L2, PADRAW_L2},             {C294RAW_R2, PADRAW_R2},
+        {C294RAW_L3, PADRAW_L1},             {C294RAW_R3, PADRAW_R1},
+        {C294RAW_SELECT, PADRAW_SELECT},     {C294RAW_START, PADRAW_START},
+        {WHEEL_HAT_UP, PADRAW_UP},           {WHEEL_HAT_DOWN, PADRAW_DOWN},
+        {WHEEL_HAT_LEFT, PADRAW_LEFT},       {WHEEL_HAT_RIGHT, PADRAW_RIGHT},
+    };
+    u32 pad = 0;
+    for (const auto &m : kMenuRaw) {
+        if (raw & m.wheel)
+            pad |= m.pad;
+    }
+    return pad;
+}
+
 /* Callers: PadManager::init (device 0 / 1), IEEE1394Port::init (0). */
 // FUNC 0x002307F0 USBSteeringPort::init
 void USBSteeringPort::init(int usbPort)

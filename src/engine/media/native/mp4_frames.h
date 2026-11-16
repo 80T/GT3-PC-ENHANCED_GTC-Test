@@ -1,5 +1,6 @@
 /* mp4_frames.h - an MP4 movie's frames for the G002 player's queue (GT3
- * PC; docs/movies.md "MP4 movies").
+ * PC; docs/movies.md "MP4 movies"): the CPU's way, when the GPU's (mp4_gpu.h)
+ * cannot play it - the picture brought down to the PS2's slot.
  *
  * A native thread of its own (not a game thread: the decoding, 5 .. 20 ms a
  * 1080p picture, must not hold the game's threads) decodes the movie
@@ -10,10 +11,9 @@
  * frame n's time above, half a frame (1 / 59.94 s) later below - up to
  * 59.94 pictures a second.  Each picture is the source picture shown at its
  * time (a 59.94 / 60 fps movie gives every one, a 30 fps one each twice, a
- * 24 fps one some three times), scaled into the slot (the stream's width x
- * height) with its aspect kept (the slot shown at 4:3 for 640 x 448: the
- * PS2's pixels; black bars where the aspects differ; an area average down,
- * linear up).  The frame, width x 2 height, is in the queue's layout: 16 x
+ * 24 fps one some three times), scaled over the slot (the stream's width x
+ * height; an area average down, linear up), its shape left to the draw
+ * (pc_movie_fit).  The frame, width x 2 height, is in the queue's layout: 16 x
  * 16 blocks of RGBA (alpha 0x80) in columns of blocks, as the IPU's CSC
  * wrote them.  A movie that does not decode gives black frames (logged), so
  * its stream still runs to its end. */
@@ -41,6 +41,9 @@ public:
     bool take(int index, uint8_t *dst);
 
     const std::string &path() const { return path_; }
+    /* The picture's shape as shown: width x pixel aspect / height; 0 until
+     * the movie is open. */
+    double aspect() const;
 
 private:
     struct Impl;

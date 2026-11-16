@@ -16,6 +16,7 @@
 #include "engine/pdistd/T534_sprintf.h"              /* sprintf */
 #include "game/data/messages/T186_msg_race_display.h"     /* g_002C43E8, RACEDISPLAY_RANK_1ST */
 #include "game/app/pc_aspect.h"                 /* PC: pc_hud_shift (the alignments) */
+#include "game/app/pc_image_pack.h"             /* PC (2026-11-08): pc_image_draw_size */
 
 /* A vertex of the 2D prim buffer (T154's RaceDisplayVertex): x, y, z = 0. */
 struct RaceDrawVertex {
@@ -53,8 +54,13 @@ void race_draw_image(Tex1Image *tex, int alignX, int alignY, f32 x, f32 y)
         u64 clamp = tex->tex->clamp;
         int texW = (int)(((clamp >> 14) & 0x3FF) + 1);
         int texH = (int)(((clamp >> 34) & 0x3FF) + 1);
-        f32 w = (f32)texW;
-        f32 h = (f32)texH;
+        /* PC (2026-11-08): drawn at the image's draw size, whatever its
+         * texture's (game/app/pc_image_pack.h: a picture of another size
+         * leaves the HUD as it was); the UVs keep the texture's */
+        int drawW, drawH;
+        pc_image_draw_size(tex, &drawW, &drawH);
+        f32 w = (f32)drawW;
+        f32 h = (f32)drawH;
         f32 left = race_align_posf(x, w, alignX);
         f32 top = race_align_posf(y, h, alignY);
         f32 right = left + w;
@@ -77,11 +83,11 @@ void race_draw_image(Tex1Image *tex, int alignX, int alignY, f32 x, f32 y)
         pageW = 1;
         while (pageW < TEX_PAGE_MAX + 1 && pageW < texW)
             pageW <<= 1;
-        u = w / (f32)pageW;
+        u = (f32)texW / (f32)pageW;         /* PC: the texture's (was w: the same before) */
         pageH = 1;
         while (pageH < TEX_PAGE_MAX + 1 && pageH < texH)
             pageH <<= 1;
-        v = h / (f32)pageH;
+        v = (f32)texH / (f32)pageH;         /* PC */
         quad->uv[0].u = 0.0f;
         quad->uv[0].v = 0.0f;
         quad->uv[1].u = u;
@@ -368,14 +374,44 @@ static const char *g_0049C3B0[12] = {       /* 0x0049C3B0 */
     g_002C43E8[RACEDISPLAY_RANK_1ST + 11],
 };
 
+/* PC (the races of more cars, game/app/pc_race_cars.h): rank's name past
+ * 12 made from the language's own names: its number, then the suffix of
+ * the name of the rank with the same ending (English, where "1st" ends in
+ * "st": 21st, 22nd, 23rd, 13th...), else of "4th"'s ("4éme", "4.", "4º":
+ * 13éme, 13., 13º).  The suffix is what follows the name's digits; the
+ * font has every digit (1..12 use them all).  A ring of buffers: the name
+ * lives until a few later calls. */
+static const char *pc_rank_name(int rank)
+{
+    static char ring[4][24];
+    static int next;
+    const char *one = g_0049C3B0[0];
+    while (*one >= '0' && *one <= '9')
+        one++;
+    const bool english = (one[0] == 's' || one[0] == 'S') && (one[1] == 't' || one[1] == 'T');
+    int like = 4;                           /* the name whose suffix it takes */
+    if (english && (rank % 100 < 11 || rank % 100 > 13) && rank % 10 >= 1 && rank % 10 <= 3)
+        like = rank % 10;
+    const char *suffix = g_0049C3B0[like - 1];
+    while (*suffix >= '0' && *suffix <= '9')
+        suffix++;
+    char *out = ring[next];
+    next = (next + 1) & 3;
+    snprintf(out, sizeof(ring[0]), "%d%s", rank, suffix);
+    return out;
+}
+
 // FUNC 0x0019AA08 race_rank_name
 //   "1st".."12th" (g_0049C3B0) for 1..12 (one unsigned compare), else ""
 //   (0x003520E0).  Callers: ResultImplementRecords::render,
 //   RaceRankDisplay::draw.
+//   PC: past 12 (up to 999) made from them (pc_rank_name).
 const char *race_rank_name(int rank)
 {
     if ((u32)(rank - 1) < 12)
         return g_0049C3B0[rank - 1];
+    if (rank > 12 && rank < 1000)
+        return pc_rank_name(rank);          /* PC */
     return "";
 }
 

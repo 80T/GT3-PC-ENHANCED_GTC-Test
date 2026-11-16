@@ -9,6 +9,7 @@
 #include "game/race/core/T153_race_course.h"          /* (seen: UnitArena<64>) */
 #include "game/car/physics/T298_suspension_body.h"
 #include "game/car/physics/suspension_internal.h"
+#include "game/app/pc_rake.h"                       /* PC (2026-11-14): the rest pitch out of the lift's direction */
 // DATA_START 0x0033C898
 
 // FUNC 0x001E8AE0 surface_bump_wave
@@ -507,11 +508,20 @@ void car_body_motion(RaceCarDynamics *car)
                    + st->wheel[0].damperForce + st->wheel[1].damperForce
                    + st->wheel[2].damperForce + st->wheel[3].damperForce + drive[1])
                 * p->invSprungMass;
-    st->heaveAccel = upAccel - st->rot[2][2] * U081_G;
+    /* PC (2026-11-14; user: "if the car's pitch isn't perfectly straight, the
+     * car behaves as if it is on a hill even while on flat ground"): the
+     * suspension's force acts along the body's up axis - that is what a hill
+     * is to these physics - so a body that rests pitched, the two axles at
+     * different ride heights (ENH_PHYSICS_REAR_RIDE_HEIGHT), was pushed as on
+     * a slope of that pitch.  Such a car takes the up axis without its rest
+     * pitch (game/app/pc_rake.h); every other car the body's own, as before */
+    f32 level[3][3];
+    const f32 *up = pc_rake_axes(car, level[0], level[1], level[2]) ? level[2] : st->rot[2];
+    st->heaveAccel = upAccel - up[2] * U081_G;
     f32 dv = upAccel * dt;
     int axis;
     for (axis = 0; axis < 3; axis++)
-        st->vel[axis] += st->rot[2][axis] * dv;
+        st->vel[axis] += up[axis] * dv;
     st->vel[2] = st->vel[2] - dt * U081_G;
 }
 

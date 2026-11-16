@@ -57,12 +57,15 @@
 /* The GS PRIM of the scale strips: TRISTRIP (4) | ABE (0x40). */
 #define SCALE_PRIM 0x44
 
+#include "game/app/pc_hud_color.h"          /* PC: pc_hud_color */
+#include "game/app/pc_image_pack.h"         /* PC (2026-11-08): pc_image_draw_size */
+
 /* The needle's colour (ABGR: red 0xC0, alpha 0xFF). */
-#define NEEDLE_COLOR 0xFF0000C0
+#define NEEDLE_COLOR pc_hud_color(kHudNeedle, 0xFF0000C0)
 /* The enhanced engine: Lupo 2's needle (hud.md C10; L2 0x00199DF4, gp
  * 0.16667): full red, each copy at 1/6. */
 #include "game/enhanced.h"                  /* ENH_HUD_NEEDLE_LOOK */
-#define NEEDLE_COLOR_L2      0xFF0000FF
+#define NEEDLE_COLOR_L2      pc_hud_color(kHudNeedle, 0xFF0000FF)
 #define NEEDLE_PASS_ALPHA_L2 0.16666667f
 
 /* x clamped to lo..hi: max.s then min.s, volatile asm statements as every
@@ -134,7 +137,7 @@ RaceRoundMeterBase::~RaceRoundMeterBase()
 void RaceRoundMeterBase::drawMeter(GSBuffer &buf)
 {
     g_002F1968.flush();
-    pgl_color(panelColor);
+    pgl_color(pc_hud_color(kHudMeterDial, panelColor));     /* PC: as set now */
     race_draw_image_rect(image, (f32)x, (f32)y, (f32)w, (f32)h, alignX, alignY);
 }
 
@@ -156,8 +159,16 @@ void RaceRoundMeterBase::render_2nd()
     g_002F1968.flush();
     pgl_push_matrix();
     vu0_load_identity_regs();
-    scaleX = (f32)w / (f32)(((image->tex->clamp >> 14) & 0x3FF) + 1); /* implicit: __floatdisf (u64 to float) */
-    scaleY = (f32)h / (f32)(((image->tex->clamp >> 34) & 0x3FF) + 1);
+    /* PC (2026-11-08, user report: a dial picture of another size moved and
+     * resized the needle - "this is the game's normal behavior"): the scale
+     * from the panel's draw size, its original's (game/app/pc_image_pack.h),
+     * which centre and radius are in; was the texture's CLAMP MAXU / MAXV + 1 */
+    {
+        int drawW, drawH;
+        pc_image_draw_size(image, &drawW, &drawH);
+        scaleX = (f32)w / (f32)drawW;
+        scaleY = (f32)h / (f32)drawH;
+    }
     centreX = (f32)(race_align_pos(x, w, alignX) + w / 2) + centerX * scaleX;
     centreY = (f32)(race_align_pos(y, h, alignY) + h / 2) + centerY * scaleY;
     pgl_translate(centreX, centreY, 0.0f);
@@ -357,6 +368,11 @@ void RaceRoundMeter::draw_scale()
 
     if (dialIndex < 0 || dialPacket == NULL)
         return;
+    /* PC: the colours are in the packet: built again once they are set
+     * otherwise (the other buffer, as a new car's scale) */
+    if (pc_hud_color(kHudMeterMarks, scaleColor[0]) != pcBuiltColor[0] ||
+        pc_hud_color(kHudMeterRed, scaleColor[1]) != pcBuiltColor[1])
+        buildScale();
     gfx_blend_func(BLEND_ADD_FIX, PASS_ALPHA);
     for (i = 0; i < RACE_METER_PASSES; i++) {
         gs_flush_dirty_regs();
@@ -408,6 +424,8 @@ void RaceRoundMeter::buildScale()
     TStripBuilder sb(dialBuf[dialIndex]);   /* sp+0x000 */
     RaceDisplayVertex vtx;                  /* sp+0x990 */
 
+    pcBuiltColor[0] = pc_hud_color(kHudMeterMarks, scaleColor[0]);  /* PC: as set now (draw_scale) */
+    pcBuiltColor[1] = pc_hud_color(kHudMeterRed, scaleColor[1]);
     sb.setPrim(SCALE_PRIM);
     sb.setShader(0);
     vtx.z = 0;
@@ -416,9 +434,9 @@ void RaceRoundMeter::buildScale()
 
         a += halfGap;
         if (firstRed == 0 || i < firstRed)
-            color = &scaleColor[0];
+            color = &pcBuiltColor[0];
         else
-            color = &scaleColor[1];
+            color = &pcBuiltColor[1];
         sb.endStrip();
         for (j = segs + 1; j > 0; j--) {
             f32 sinA, cosA;                 /* sp+0x9A0, sp+0x9A4 */
@@ -471,7 +489,7 @@ void RaceBarMeter::drawMeter(GSBuffer &buf)
     gfx_alpha_func_raw(PGL_ATEST_LESS, (int)ref & 0xFF);
     gfx_disable(PGL_CAP_BLEND);
     gfx_enable(PGL_CAP_ALPHA_TEST);
-    pgl_color(RACE_COLOR_WHITE);
+    pgl_color(pc_hud_color(kHudRevBar, RACE_COLOR_WHITE));  /* PC */
     race_draw_image_rect(image, (f32)x, (f32)y, (f32)w, (f32)h, alignX, alignY);
     gfx_enable(PGL_CAP_BLEND);
     gfx_disable(PGL_CAP_ALPHA_TEST);

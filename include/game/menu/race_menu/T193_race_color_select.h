@@ -16,6 +16,7 @@
 #define GAME_T193_RACE_COLOR_SELECT_H
 
 #include "game/game.h"
+#include "game/race/race_cars.h"                /* PC: PC_RACE_CARS_MAX (ColorTable::car) */
 
 class RaceOrganization;                     /* T125 (references only: forward declarations) */
 class Random;                               /* T531 */
@@ -39,12 +40,13 @@ struct ColorCandidates {
 EGCS_SIZE(ColorCandidates, 0x304);
 
 /* (? name, u041.)  The candidates of every entry (a stack object of
- * race_pick_random_colors).  0x1520 bytes. */
+ * race_pick_random_colors).  0x1520 bytes (PC 0x6084: the entries of a race
+ * of up to PC_RACE_CARS_MAX cars; a static of race_pick_random_colors). */
 struct ColorTable {
     int             count;                  /* 0x0000 the entries */
-    ColorCandidates car[7];                 /* 0x0004 */
+    ColorCandidates car[PC_RACE_CARS_MAX];  /* 0x0004 (PC: was [7]) */
 };
-EGCS_SIZE(ColorTable, 0x1520);
+EGCS_SIZE(ColorTable, 0x6084);              /* (GT3 0x1520) */
 
 /* 1 for identical colours; else the dot product of the RGB directions
  * scaled by (sqrt 3 - the distance of the RGB vectors) / sqrt 3, clamped
@@ -57,6 +59,12 @@ void color_candidate_set(ColorCandidate *c, int color);                   /* 0x0
 void color_candidates_sort(ColorCandidates *list);                        /* 0x00176AA8 */
 /* The candidates of every entry of org (see the top). */
 void color_table_build(RaceOrganization &org, ColorTable *tab);           /* 0x00176C28 */
+/* PC (ROADMAP 35, no original): the candidates of every entry, the weights
+ * (and order) of entry `entry''s only: what race_pick_random_colors reads
+ * of a build, in (entries x colours) per candidate of that entry instead of
+ * every entry's.  Used for races of more than 7 entries (a 6-car race keeps
+ * color_table_build: the same picks). */
+void pc_color_table_build_entry(RaceOrganization &org, ColorTable *tab, int entry);
 /* A colour for every entry whose colour id is -1 (CarEquipments +0x8),
  * stored through CarEquipments::setColorCode.  rng: g_00351DE0 (gp-0x5C10). */
 void race_pick_random_colors(RaceOrganization &org, Random *rng);         /* 0x00176FD0 */

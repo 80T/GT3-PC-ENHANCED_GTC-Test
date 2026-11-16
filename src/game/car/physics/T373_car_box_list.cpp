@@ -144,9 +144,13 @@ void boxes_step(CarBoxList *l)
          * here, one past the last box), so box[count] gets the call count
          * times and no car's soft-wall crossing (crossedSoft) is checked in
          * this step.  With 8 cars box[8] lies past the list (DynamicsConductor
-         * +0xE340, its rules) and its softHit (+0x400) past the conductor. */
+         * +0xE340, its rules) and its softHit (+0x400) past the conductor.
+         * PC: box[j], as meant: with PC_RACE_CARS_MAX cars (game/race/
+         * race_cars.h) box[count] would write past the list into the
+         * conductor's rules.  crossedSoft has no readers (car_box_crossed_soft
+         * has no callers), so nothing else changes. */
         for (j = 0; j < l->count; j++)
-            car_box_check_soft_wall(&l->box[i], earliest);
+            car_box_check_soft_wall(&l->box[j], earliest);
 
         if (hit < 0)
             break;

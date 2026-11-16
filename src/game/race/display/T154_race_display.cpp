@@ -89,7 +89,10 @@
 /* last: the garage classes' names come first in retail's T154 type names */
 #include "game/save/T429_game_status.h"          /* getGameStatus, GameStatus::options */
 #include "game/app/pc_frame.h"                  /* PC: pc_tween, g_pcViewLag */
+#include "game/app/pc_image_pack.h"             /* PC (2026-11-08): pc_image_draw_size */
 #include "game/app/pc_aspect.h"                 /* PC: the dynamic aspect (virtual_3) */
+#include "game/app/pc_course_pick.h"            /* PC: pc_race_laps (the endurance look) */
+#include "platform/settings.h"                  /* PC: settings::replay_logo */
 
 static int pc_hud_style_changed(const void *display);  /* PC: the HUD style (setLayout, below) */
 /* PC: the speedometer's dial is km/h though mph is shown (no mph dial in the
@@ -281,7 +284,7 @@ void RaceDisplay::virtual_0(RaceOrganization *org, int raceMode, int replay)
     } else {
         RaceEvent *race = org->raceDB->event;
         int timeLimited = race->limitTime != 0;
-        int raceLaps = race->numberOfLaps;  /* (a signed compare: slti) */
+        int raceLaps = pc_race_laps(org, race->numberOfLaps);  /* (a signed compare: slti); PC: the laps run */
         int longRace = raceLaps >= 10;
         if (this->raceMode != g_002F00C0.getModeId("RACE_MODE_FREE_PRACTICE") &&
             (longRace || timeLimited)) {
@@ -645,9 +648,13 @@ void race_display_draw_tex(Tex1Image *tex, f32 x, f32 y)
         u64 clamp = tex->tex->clamp;
         int w = (int)(((clamp >> 14) & 0x3FF) + 1);
         int h = (int)(((clamp >> 34) & 0x3FF) + 1);
+        /* PC (2026-11-08): the quad at the image's draw size, whatever its
+         * texture's (game/app/pc_image_pack.h); the UVs the texture's */
+        int drawW, drawH;
+        pc_image_draw_size(tex, &drawW, &drawH);
         RaceDisplayVertex *vtx = (RaceDisplayVertex *)gfx_alloc_tail(3);
-        f32 halfH = (f32)h * 0.5f;
-        f32 halfW = (f32)w * 0.5f;
+        f32 halfH = (f32)drawH * 0.5f;
+        f32 halfW = (f32)drawW * 0.5f;
         vtx[0].x = x - halfW;
         vtx[0].y = y - halfH;
         vtx[0].z = 0;
@@ -1312,6 +1319,10 @@ void RaceDisplay::virtual_3(GSBuffer &buf)
         return;
     if (playerCar >= org->entries->count)
         return;
+    /* PC: as set now (these keep the colour they were set up with) */
+    carSign.setColor(RD_COLOR_TEXT);
+    carName.setColor(RD_COLOR_TEXT);
+    title.setColor(RD_COLOR_TEXT);
 
     buf.setDrawBuffer();
     gfx_tex_param(PGL_TEXPARAM_TCC, 1);
@@ -1384,11 +1395,11 @@ void RaceDisplay::virtual_3(GSBuffer &buf)
 #if ENH_HUD_LOGO_LOOK
     /* Lupo 2 (L2 0x001911C0, hud.md C14): only with the mini-logo flag
      * (race/core's replay toggle; Lupo 2's GT Concept front-end gate is not
-     * ported). */
-    if ((replay == RD_DEMO || show == 0) && miniLogo != 0)
+     * ported).  PC: and the settings' replay logo ([Graphics] ReplayLogo). */
+    if ((replay == RD_DEMO || show == 0) && miniLogo != 0 && settings::replay_logo())
         fader.draw();
 #else
-    if (replay == RD_DEMO || show == 0)
+    if ((replay == RD_DEMO || show == 0) && settings::replay_logo())   /* PC: [Graphics] ReplayLogo */
         fader.draw();
 #endif
     pgl_color(RD_COLOR_OPAQUE);
@@ -1594,7 +1605,8 @@ void RaceDisplay::pollSpeedEvents(RaceOrganization *org, int car)
 //   and SE_COUNT_S for the player's car; an empty message when the car does
 //   not match.  The walk stops at the first missing event or an unknown
 //   information.  Quirks: the maker name is looked up for every event; the
-//   `car < 0' tests never hold (unpack gives the car 0..15).
+//   `car < 0' tests never hold (unpack gives the car 0..15; PC: 0..31, the
+//   5-bit car field, T194).
 //   The enhanced engine: information 7, the Pod sat down (hud.md C18).
 void RaceDisplay::pollInformationEvents(RaceOrganization *org)
 {
@@ -1670,10 +1682,14 @@ void RaceDisplay::showLeaderIcon()
 //   show(0, 0): timer = -0.0), and recordTime's label is cleared (the icon
 //   takes its place).  Callers: pollInformationEvents (the pole car),
 //   showLeaderIcon.
+//   PC (ROADMAP 35): icons holds PC_RACE_CARS_MAX icons (car_icons_make,
+//   T184): a car past them has none.
 void RaceDisplay::showCarIcon(int car)
 {
     CarIcon *carIcons = icons;
     if (carIcons == NULL || car < 0 || car >= org->entries->count)
+        return;
+    if (car >= PC_RACE_CARS_MAX)            /* PC: the icon array's size */
         return;
     CarIcon *icon = &carIcons[car];
     RaceCarIconDisplay *display = &carIcon0;
@@ -1721,13 +1737,16 @@ void RaceDisplay::showLapDiff(int laps)
 //   lower, for 3 s from the last event's start, blinking 3 times, with the
 //   board's enable, and the text moves 37 the other way.  Caller:
 //   pollTimeDiffEvents.
+//   PC (ROADMAP 35): only an icon car the icon array holds (icons has
+//   PC_RACE_CARS_MAX, car_icons_make, T184; retail had no bound): past it
+//   the text alone, as without icons.
 void RaceDisplay::showTimeDiff(int diff, int iconCar)
 {
     char text[0x20];                        /* sp+0x00 */
     RaceEventDisplay *board = &events;
     int textX = 0;
     int iconX = board->x;
-    if (iconCar >= 0 && icons != NULL) {
+    if (iconCar >= 0 && iconCar < PC_RACE_CARS_MAX && icons != NULL) {  /* PC: iconCar < PC_RACE_CARS_MAX */
         textX = RD_DIFF_OFFSET_X;
         if (diff >= 0) {
             iconX -= RD_DIFF_ICON_DX;

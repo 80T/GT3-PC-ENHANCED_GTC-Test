@@ -43,7 +43,9 @@
  * for the entries' count (opening at 5 s), active = !replay, lapsOnly = the
  * race has a time limit (minutes * 60000 != 0), no car finished, the 15 s
  * timer.  Callers: ResultChampionship / ResultLinkBattle / Result2PBattle::
- * start. */
+ * start.  (PC, ROADMAP 35: the board takes the top 6 of a bigger race,
+ * ResultBoard::setup; every car's flags are cleared, up to
+ * PC_RACE_CARS_MAX.) */
 // FUNC 0x00174D50 ResultArcade::start
 void ResultArcade::start(RaceOrganization &org, int replay)
 {
@@ -52,6 +54,8 @@ void ResultArcade::start(RaceOrganization &org, int replay)
     board.setup(cars, RESULT_BOARD_TIMES, RESULT_BOARD_OPEN_TIME);
     active = (replay == 0);
     lapsOnly = (org.race->dc->rules.timeLimit * 60000) != 0;
+    if (cars > PC_RACE_CARS_MAX)            /* PC: finished / disqualified[PC_RACE_CARS_MAX] */
+        cars = PC_RACE_CARS_MAX;
     for (int i = 0; i < cars; i++) {
         finished[i] = 0;
         disqualified[i] = 0;                /* the enhanced engine (Lupo 2 L2 0x00173F38) */
@@ -99,11 +103,13 @@ void ResultArcade::update(RaceOrganization &org, Control *pad)
             int car = 0;
             if (org.eventQueue.findNth(RACE_EVENT_CAR_DISQUALIFIED, &car, i) == 0)
                 continue;
-            if (car < 0 || car >= 7 || disqualified[car] != 0)
+            if (car < 0 || car >= PC_RACE_CARS_MAX || disqualified[car] != 0)  /* PC: was 7 */
                 continue;
             disqualified[car] = 1;
             disqualifiedCount++;
             printf("menus: result board: car %d disqualified\n", car);
+            /* (PC: in a race of more than 6 cars the last places are past
+             * the board's top 6: no row, ResultBoard::setDisqualified) */
             board.setDisqualified(org.entries->count - disqualifiedCount);
         }
     }
@@ -168,7 +174,9 @@ void ResultArcade::render(GSBuffer &buf, RaceOrganization &org)
  * goal: its row in the (rebuilt) rank order is filled for good - name,
  * icon, result (setRowResult, virtual), the player's mark - and allFinished
  * is set when no entry is left running.  Nothing for a car already in, or
- * once every car is.  Caller: ResultLinkBattle::goal. */
+ * once every car is.  Caller: ResultLinkBattle::goal.  (PC, ROADMAP 35: a
+ * car past the board's top 6 is marked finished as any other; the board's
+ * setters leave its row out.  updateBoard alike.) */
 // FUNC 0x001750C8 ResultArcade::goal
 void ResultArcade::goal(RaceOrganization &org, int car)
 {

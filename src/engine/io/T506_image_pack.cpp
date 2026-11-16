@@ -9,15 +9,20 @@
  */
 #include "engine/io/file_loader_internal.h"
 #include "engine/io/T506_image_pack.h"
+#include "game/app/pc_image_pack.h"         /* PC (2026-11-08): the pack's folder of PNG files */
 
 // FUNC 0x00242058 image_pack_load
 //   ? name.  Loads path (buffer allocated) and relocates it.  Caller:
 //   0x00191830.
+//   PC (2026-11-08): the pack's folder of PNG files first, built into the
+//   same file form (game/app/pc_image_pack.h); the pack file when there is
+//   none.
 ImagePack *image_pack_load(const char *path)
 {
-    ImagePack *pack =
-        (ImagePack *)file_read_blocking(path, NULL, 0, 1, &vol_device_object);
+    ImagePack *pack = (ImagePack *)pc_image_pack_folder(path);
 
+    if (pack == NULL)
+        pack = (ImagePack *)file_read_blocking(path, NULL, 0, 1, &vol_device_object);
     image_pack_relocate(pack);
     return pack;
 }

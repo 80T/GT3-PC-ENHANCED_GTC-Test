@@ -10,6 +10,7 @@
 #include "game/data/race_database_internal.h"
 #include "game/data/T487_race_mode_database.h"
 #include "engine/io/T502_file_resolve.h"            /* PC: file_size_retry (the buffers' sizes) */
+#include "game/app/pc_param_db.h"                   /* PC: pc_common_db_file (database/common.sqlite3) */
 
 /* PC: the buffer of a file: its unpacked size rounded up to 64, at least
  * retail's fixed size. */
@@ -75,6 +76,15 @@ int RaceModeDatabase::load()
 
     if (modes != NULL)
         free(modes);
+    /* PC: both built from database/common.sqlite3 when converted
+     * (game/app/pc_param_db.h) */
+    modes = (DataBlock *)pc_common_db_file(PC_COMMON_RACE_MODES);
+    if (modes != NULL) {
+        if (details != NULL)
+            free(details);
+        details = (DataBlock *)pc_common_db_file(PC_COMMON_RACE_DETAILS);
+        return details != NULL;
+    }
     size = race_mode_buffer_size("database/racemode.db", 0x2000);  /* PC: was 0x2000 (a bigger file was cut) */
     buf = memalign(0x40, size);
     modes = (DataBlock *)loadFile("database/racemode.db", buf, size);

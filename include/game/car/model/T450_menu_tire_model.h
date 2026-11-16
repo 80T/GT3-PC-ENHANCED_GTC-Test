@@ -31,9 +31,23 @@ public:
     /* Inline in the original (? name): the copy egcs emitted has no
      * callers; Car / CarsItem (T212, T107) expand it. */
     void  setWheelModel(ModelSet *m) { wheelModel = m; }    /* 0x002245A8 */
+    /* PC (2026-11-13, no original): the brake model (wheelModel's part)
+     * measured against the wheel (game/car/model/pc_brake_fit.h): how far it
+     * is drawn moved back, into pcBrakePush.  draw calls it once after each
+     * build (a tyre is built when its files and size are set).
+     * PC (2026-11-14): filesIn - the wheel file is in and relocated (draw's
+     * withTire: a menu car's tiresReady).  With 0 nothing is read and
+     * nothing fitted: the next draw with the files in fits.  While another
+     * wheel loads, its file is read over this one's, and the bytes there are
+     * a file's own offsets, not pointers (the user's crash in the wheel
+     * shop: the list scrolled faster than the first fit came). */
+    void  pcFitBrake(int part, int filesIn = 1);
 
     TirePacket packet;                      /* 0x094 */
     ModelSet  *wheelModel;                  /* 0x0C4 the car's model set (wheels: parts 2 front, 3 rear) */
+    /* PC (2026-11-13) */
+    f32        pcBrakePush;                 /* metres along the axle, inward */
+    u8         pcBrakeFitted;               /* pcBrakePush is this wheel's and brake's */
 };
 EGCS_SIZE(MenuTireModel, 0xC8);
 

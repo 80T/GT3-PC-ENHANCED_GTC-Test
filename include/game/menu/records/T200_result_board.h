@@ -29,6 +29,7 @@
 #include "game/menu/race_menu/T199_race_menu_layer.h"      /* base RaceMenuWindow */
 #include "game/menu/race_menu/T197_race_menu_page.h"       /* RaceMenuPage, RaceMenuColor (held by value) */
 #include "game/menu/framework/T213_menu_item.h"            /* base gt2k_menu::Item */
+#include "game/race/race_cars.h"                /* PC: PC_RACE_CARS_MAX (displays) */
 
 struct CarIcon;                             /* T184_car_icon_maker.h (pointers only) */
 class GSBuffer;                             /* T514_gs_buffer.h */
@@ -181,7 +182,8 @@ public:
     ~ResultBoard();                         /* 0x001B1CE8 */
     /* `rows' rows in `mode' (RESULT_BOARD_*), opening at
      * t: the title at t, row i at t + 1 + 0.12 i, the term bar after the
-     * last row, the end 1 s after it. */
+     * last row, the end 1 s after it.  (PC: 6 rows at most, the top 6 of a
+     * bigger race; the row setters below write only the rows shown.) */
     void setup(int rows, int mode, f32 t);  /* 0x001B1DF0 */
     void clearRows();                       /* 0x001B1F20 */
     void start();                           /* 0x001B1F60 time = 0, running */
@@ -213,7 +215,8 @@ public:
     ResultTitleBar title;                   /* 0x1BC */
     ResultTermBar  term;                    /* 0x204 */
     ResultRankBar  bars[7];                 /* 0x240 */
-    CarIcon       *displays;                /* 0x8D0 the cars' icons (the race's CarIcon[7]) */
+    CarIcon       *displays;                /* 0x8D0 the cars' icons (the race's CarIcon[7]; PC
+                                               CarIcon[PC_RACE_CARS_MAX]) */
     int            bestTime;                /* 0x8D4 row 0's time */
     int            bestLaps;                /* 0x8D8 row 0's laps */
     int            highlighted;             /* 0x8DC the row in colors[0] (-1: none) */

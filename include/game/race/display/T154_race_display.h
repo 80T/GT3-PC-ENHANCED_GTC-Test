@@ -458,7 +458,8 @@ public:
     int                   currentVariant;   /* 0x0014 the variant setLayout loaded, -1 (u051 unk14) */
     RaceOrganization     *org;              /* 0x0018 */
     CarIcon              *icons;            /* 0x001C the cars' icons (the race modes' virtual_43; u051 unk1C,
-                                               u047 f1C) */
+                                               u047 f1C).  PC: an array of PC_RACE_CARS_MAX (7 on the PS2):
+                                               showCarIcon / showTimeDiff index it below that */
     RaceMiniMap           miniMap;          /* 0x0020 */
     RaceDisplayFader      fader;            /* 0x0050 the "gt_logo_mini" watermark */
     RaceLapDisplay        lapDisplay;       /* 0x0060 */

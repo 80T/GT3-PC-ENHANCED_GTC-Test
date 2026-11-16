@@ -62,8 +62,9 @@ public:
     virtual int  isPitEnabled();            /* [38] +0x13C 0x001F10F0 */
     virtual void issueCrashEvent(RaceCarState *car, int kind, int arg, f32 force); /* [40] +0x14C 0x001F10F8 F_001DA130 */
 };
-/* The enhanced engine: DynamicsConductor's (GT3 0xE3AC). */
-EGCS_SIZE(DynamicsConductorLicense, 0xE58C);
+/* The enhanced engine: DynamicsConductor's (GT3 0xE3AC; PC: 0x3B14C, the
+ * conductor's per-car arrays PC_RACE_CARS_MAX long, game/race/race_cars.h). */
+EGCS_SIZE(DynamicsConductorLicense, 0x3B14C);
 
 /* A rolling start: r->launchSpeed != 0 (getStartingFormat and slot 5 test
  * the opposite, a standing start).  Callers: slots 16 and 28. */

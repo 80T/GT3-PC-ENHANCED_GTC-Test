@@ -9,6 +9,7 @@
 #include "game/car/physics/T302_car_state.h"
 #include "game/car/physics/T347_ground_surface.h"   /* ground_is_off_course (the enhanced engine's Pod) */
 #include "game/app/pc_frame.h"                  /* PC: g_pcViewLag */
+#include "game/app/pc_race_cars.h"              /* PC: pc_car_runaway (a car whose physics blew up) */
 
 static void car_anim_view_channels(RaceCarState *car);     /* the enhanced engine (below) */
 
@@ -209,6 +210,22 @@ void car_view_update(RaceCarState *car)
     f32 dt = car->dt;
     f32 yaw = st->yaw;
 
+    /* PC: the first sign of a car whose physics blew up, logged once
+     * (pc_car_runaway): over 900 km/h, a wheel over 1800 km/h, a position
+     * that is not a number */
+    {
+        const f32 v = st->speedX;
+        if (!(v < 250.0f && v > -250.0f))
+            pc_car_runaway(car, "its speed (m/s)", v);
+        for (int i = 0; i < 4; i++) {
+            const f32 s = st->wheel[i].spin;
+            if (!(s < 500.0f && s > -500.0f))
+                pc_car_runaway(car, "a wheel's speed (m/s)", s);
+        }
+        if (st->pos[0] != st->pos[0] || st->pos[1] != st->pos[1] || st->pos[2] != st->pos[2])
+            pc_car_runaway(car, "its position", st->pos[0]);
+    }
+
     if (TWO_PI <= yaw) {
         st->yaw = yaw - TWO_PI;
         car->anglePrev[2] = car->anglePrev[2] - TWO_PI;
@@ -223,6 +240,16 @@ void car_view_update(RaceCarState *car)
         if (st->stopped != 0)
             turn = 0.0f;
         f32 rot = w->rotation + turn;
+        /* PC: a runaway wheel (a car whose physics blew up: a turn so big
+         * that taking 2 pi off no longer changes the float, and the loops
+         * below never ended - the game hung, user report) is logged once
+         * and wrapped at once (game/app/pc_race_cars.h); a wheel the game
+         * turns normally stays within a few turns and keeps the loops */
+        if (!(rot < 1024.0f && rot > -1024.0f)) {
+            pc_car_runaway(car, "a wheel's turn", rot);
+            rot = rot == rot && rot < 3.4e38f && rot > -3.4e38f ? fmodf(rot, TWO_PI) : 0.0f;
+            car->wheelRotPrev[i] = rot;
+        }
         while (TWO_PI <= rot) {
             rot -= TWO_PI;
             car->wheelRotPrev[i] -= TWO_PI;

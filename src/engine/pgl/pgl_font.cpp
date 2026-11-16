@@ -16,6 +16,8 @@
  * passes ints and pointers in 4 bytes and floats as doubles, so the slot
  * walk is replaced, conversion by conversion (docs/runtime.md). */
 #include "engine/pgl/pgl_port.h"
+#include "engine/pgl/native/pgl_vfont.h"        /* PC: vector fonts (ROADMAP 36) */
+#include "engine/pgl/native/pgl_state_prim.h"   /* PC: fullColor: text in pgl_color's colour whole */
 
 /* EE COP1 max.s */
 static inline f32 u114_maxf(f32 a, f32 b) { return a > b ? a : b; }
@@ -453,6 +455,18 @@ KanjiFontFile *kanjifile_relocate(KanjiFontFile *f)
     return f;
 }
 
+/* PC (ROADMAP 36, vector fonts: engine/pgl/native/pgl_vfont.h): the face's
+ * vector side (font_set; NULL: none), the TEX0 the open text packet's
+ * context 1 holds (font_begin, font_use_tex0: a vector glyph's page, or the
+ * face's own texture for the glyphs its font lacks), the last vector glyph
+ * drawn or measured - its kerning, while lastChar is FONT_PC_LAST_VECTOR (a
+ * pen moved or an original glyph drawn resets it, as for the original's
+ * kerning). */
+#define FONT_PC_LAST_VECTOR (-2)
+static void *s_pcVf;
+static u64 s_pcTex0;
+static u32 s_pcLastId;
+
 // FUNC 0x00249DB8 font_set
 void font_set(const PglFont *font, const GsTexRegs *tex)
 {
@@ -464,6 +478,15 @@ void font_set(const PglFont *font, const GsTexRegs *tex)
         st->fontTex1 = tex->tex1;
     }
     st->lastChar = -1;
+    s_pcVf = font != NULL ? pgl_vfont_face(font) : NULL;   /* PC */
+}
+
+/* PC (no original; G001_flare.h): Font::begin's palette ("#n") for the
+ * vector glyphs. */
+void font_set_palette(int palette)
+{
+    if (s_pcVf != NULL)
+        pgl_vfont_palette(s_pcVf, palette);
 }
 
 // FUNC 0x00249DE8 font_set_kanji
@@ -704,6 +727,132 @@ void font_begin(void)
     st->open = 1;
     st->run = NULL;
     st->kinit = 0;
+    s_pcTex0 = st->fontTex0;                /* PC */
+}
+
+/* PC (ROADMAP 36, no original): the open text packet's TEX0_1 made tex0 -
+ * the sprite run closed (as a change of PRIM or colour closes it), an A+D
+ * write.  The vector glyphs' pages and the face's own texture (the glyphs
+ * its font lacks) in one packet. */
+static void font_use_tex0(GsLibState *st, u64 tex0)
+{
+    u64 *run = st->run;
+    u64 *p = st->pktEnd;
+
+    if (tex0 == s_pcTex0)
+        return;
+    if (run != NULL) {
+        u32 n = ((u32)((u8 *)p - (u8 *)run) >> 5) | GIF_EOP;
+
+        run[1] = FONT_SPRITE_REGS;
+        run[0] = (GIF_NREG(4) | GIF_FLG_REGLIST) | n;
+        st->run = NULL;
+    }
+    FONT_PUT_AD(p, GIF_AD_TAG(1, 0), GIF_REG_AD);
+    FONT_PUT_AD(p + 2, tex0, SCE_GS_TEX0_1);
+    st->pktEnd = p + 4;
+    s_pcTex0 = tex0;
+}
+
+/* PC (ROADMAP 36, no original): a vector glyph (pgl_vfont_glyph /
+ * pgl_vfont_kanji) at the pen, as font_putc draws the original's: kerned
+ * against the vector glyph before it, the pen moved by its advance (a
+ * digit's: whole output pixels, pgl_vfont_advance) and the spacing, its cell
+ * a sprite of its page (texel corners + 1/2 as the original's, the
+ * renderer's texel centres then fall where they should) in the run. */
+static void font_put_vglyph(GsLibState *st, GsContext *ctx, const PglVGlyph *g, f32 xScale, f32 yScale)
+{
+    f32 kern = 0.0f, shift, advance, x0, x1, y0, y1;
+    union { u32 w; struct { s16 x, y; } s; } xy0, xy1;
+    s64 uv0, uv1;
+    u32 prim;
+    u64 *p, *run;
+
+    advance = pgl_vfont_advance(g, xScale, st->spacingX, &shift);
+    if (st->lastChar == FONT_PC_LAST_VECTOR && s_pcLastId != 0)
+        kern = pgl_vfont_kern(s_pcVf, s_pcLastId, g->id);
+    x0 = st->curX + (g->x0 + shift + kern) * xScale;
+    st->curX = st->curX + (advance + kern) * xScale + st->spacingX;
+    st->lastChar = FONT_PC_LAST_VECTOR;
+    s_pcLastId = g->id;
+    if (g->w == 0 || g->tex0 == 0)
+        return;
+    y0 = st->curY + g->y0 * yScale;
+    x1 = x0 + (f32)g->w * xScale;
+    y1 = y0 + (f32)g->h * yScale;
+    x0 *= 16.0f;
+    x1 *= 16.0f;
+    y0 *= 16.0f;
+    y1 *= 16.0f;
+    {
+        f32 xmax = (f32)ctx->tgtA.xend, xmin = (f32)ctx->tgtA.xoff;
+        f32 ymin = (f32)ctx->tgtA.yoff, ymax = (f32)ctx->tgtA.yend;
+
+        if (((xmax < x0) | (x1 < xmin) | (ymax < y0) | (y1 < ymin)) != 0)
+            return;
+    }
+    uv0 = (s64)(s32)((((u32)g->v * 16 + 8) << 16) | ((u32)g->u * 16 + 8));
+    uv1 = uv0 + (s32)(((u32)g->w << 4) | ((u32)g->h << 20));
+    prim = ctx->primAttr | (GS_PRIM_FST | GS_PRIM_ABE | GS_PRIM_TME | GS_PRIM_SPRITE | GS_PRIM_FULL_COLOR);
+    xy0.s.x = (s16)(s32)x0;
+    xy0.s.y = (s16)(s32)y0;
+    xy1.s.x = (s16)(s32)x1;
+    xy1.s.y = (s16)(s32)y1;
+    font_use_tex0(st, g->tex0);
+    if (st->lastPrim != prim || pgl::prim::fullColor(*ctx) != st->lastColor) {
+        run = st->run;
+        p = st->pktEnd;
+        if (run != NULL) {
+            u32 n = ((u32)((u8 *)p - (u8 *)run) >> 5) | GIF_EOP;
+
+            run[1] = FONT_SPRITE_REGS;
+            run[0] = (GIF_NREG(4) | GIF_FLG_REGLIST) | n;
+            st->run = NULL;
+        }
+        st->lastPrim = prim;
+        st->lastColor = pgl::prim::fullColor(*ctx);
+        {
+            u64 *q = p;
+
+            q[1] = GIF_REG_RGBAQ | (GIF_REG_PRIM << 4);
+            p += 2;
+            q[0] = GIF_NREG(2) | GIF_FLG_REGLIST | GIF_TAG_LO(1, 0);
+            ((u32 *)p)[0] = st->lastColor;
+            ((u32 *)p)[1] = GS_Q_ONE;
+            p++;
+            *p++ = (u64)st->lastPrim;
+            st->pktEnd = p;
+        }
+    }
+    run = st->run;
+    p = st->pktEnd;
+    if (run == NULL) {
+        st->run = p;
+        p += 2;
+    }
+    *p++ = (u64)uv0;
+    ((u32 *)p)[0] = xy0.w;
+    ((u32 *)p)[1] = ctx->spriteZF;
+    p++;
+    *p++ = (u64)uv1;
+    ((u32 *)p)[0] = xy1.w;
+    ((u32 *)p)[1] = ctx->spriteZF;
+    p++;
+    st->pktEnd = p;
+}
+
+/* PC (ROADMAP 36): the pen moved by a vector glyph, as font_put_vglyph moves
+ * it (the measuring of font_measure_char / font_measure_kanji). */
+static void font_measure_vglyph(GsLibState *st, const PglVGlyph *g, f32 xScale)
+{
+    f32 kern = 0.0f, shift, advance;
+
+    advance = pgl_vfont_advance(g, xScale, st->spacingX, &shift);
+    if (st->lastChar == FONT_PC_LAST_VECTOR && s_pcLastId != 0)
+        kern = pgl_vfont_kern(s_pcVf, s_pcLastId, g->id);
+    st->curX = st->curX + (advance + kern) * xScale + st->spacingX;
+    st->lastChar = FONT_PC_LAST_VECTOR;
+    s_pcLastId = g->id;
 }
 
 // FUNC 0x0024A5F8 font_end
@@ -754,6 +903,20 @@ int font_put_kanji(int code)
     const u8 *glyph;
     u64 *p, *q;
 
+    /* PC (ROADMAP 36): the kanji font's (or the face's vector font's) glyph,
+     * drawn as the face's other vector glyphs (context 1, its pages) */
+    if (s_pcVf != NULL) {
+        PglVGlyph vg;
+
+        if (pgl_vfont_kanji(s_pcVf, code, &vg)) {
+            ctx = GS_SPR_CTX;
+            yScale = st->scaleY;
+            if (ctx->halfHeight)
+                yScale *= 0.5f;
+            font_put_vglyph(st, ctx, &vg, st->scaleX, yScale);
+            return 0;
+        }
+    }
     st->lastChar = -1;
     if (kf == NULL)
         return -1;
@@ -810,13 +973,13 @@ int font_put_kanji(int code)
                                          0, (u64)st->kfont->h - 1), SCE_GS_CLAMP_2);
         st->kinit = 1;
     }
-    prim = ctx->primAttr | (GS_PRIM_CTXT2 | GS_PRIM_FST | GS_PRIM_ABE | GS_PRIM_TME | GS_PRIM_SPRITE);
-    if (st->lastPrim != prim || ctx->colorTex != st->lastColor) {
+    prim = ctx->primAttr | (GS_PRIM_CTXT2 | GS_PRIM_FST | GS_PRIM_ABE | GS_PRIM_TME | GS_PRIM_SPRITE | GS_PRIM_FULL_COLOR);
+    if (st->lastPrim != prim || pgl::prim::fullColor(*ctx) != st->lastColor) {
         u32 color;
         u64 *t = q;
 
         st->lastPrim = prim;
-        color = ctx->colorTex;
+        color = pgl::prim::fullColor(*ctx);
         st->lastColor = color;
         t[1] = GIF_REG_RGBAQ | (GIF_REG_PRIM << 4);
         q += 2;
@@ -892,6 +1055,15 @@ int font_putc(int c)
         st->lastChar = -1;
         break;
     default:
+        /* PC (ROADMAP 36): the face's vector font's glyph, when it has one */
+        if (s_pcVf != NULL && c >= 0x20) {
+            PglVGlyph vg;
+
+            if (pgl_vfont_glyph(s_pcVf, c, &vg)) {
+                font_put_vglyph(st, ctx, &vg, xScale, yScale);
+                break;
+            }
+        }
         if (c < font->first || font->last < c) {
             st->lastChar = -1;
             return 0;
@@ -924,12 +1096,14 @@ int font_putc(int c)
         }
         uv0 = (s64)(s32)((((u32)g->v * 16 + 8) << 16) | ((u32)g->u * 16 + 8));
         uv1 = uv0 + (s32)(((u32)g->w << 4) | ((u32)g->h << 20));
-        prim = ctx->primAttr | (GS_PRIM_FST | GS_PRIM_ABE | GS_PRIM_TME | GS_PRIM_SPRITE);
+        prim = ctx->primAttr | (GS_PRIM_FST | GS_PRIM_ABE | GS_PRIM_TME | GS_PRIM_SPRITE | GS_PRIM_FULL_COLOR);
         xy0.s.x = (s16)(s32)x0;
         xy0.s.y = (s16)(s32)y0;
         xy1.s.x = (s16)(s32)x1;
         xy1.s.y = (s16)(s32)y1;
-        if (st->lastPrim != prim || ctx->colorTex != st->lastColor) {
+        if (s_pcVf != NULL)
+            font_use_tex0(st, st->fontTex0);    /* PC: the face's own texture (after vector glyphs) */
+        if (st->lastPrim != prim || pgl::prim::fullColor(*ctx) != st->lastColor) {
             run = st->run;
             p = st->pktEnd;
             if (run != NULL) {
@@ -941,7 +1115,7 @@ int font_putc(int c)
                 run = NULL;
             }
             st->lastPrim = prim;
-            st->lastColor = ctx->colorTex;
+            st->lastColor = pgl::prim::fullColor(*ctx);
             {
                 u64 *q = p;
 
@@ -1136,6 +1310,7 @@ f32 font_text_width(const u8 *s)
     s32 lastChar;
     f32 width;
     int c;
+    const u32 pcLastId = s_pcLastId;        /* PC: (restored with lastChar) */
 
     startX = st->startX;
     startY = st->startY;
@@ -1163,6 +1338,7 @@ f32 font_text_width(const u8 *s)
     st->curY = curY;
     st->maxX = maxX;
     st->lastChar = lastChar;
+    s_pcLastId = pcLastId;
     return width;
 }
 
@@ -1222,6 +1398,15 @@ int font_measure_kanji(int code)
     GsLibState *st = &g_002F72C0;
     const PglFont *font = st->font;
 
+    /* PC (ROADMAP 36): a vector glyph's advance (font_put_kanji's) */
+    if (s_pcVf != NULL) {
+        PglVGlyph vg;
+
+        if (pgl_vfont_kanji(s_pcVf, code, &vg)) {
+            font_measure_vglyph(st, &vg, st->scaleX);
+            return 0;
+        }
+    }
     (void)code;
     st->lastChar = -1;
     if (st->kfont == NULL)
@@ -1267,6 +1452,15 @@ int font_measure_char(int c)
         st->lastChar = -1;
         break;
     default:
+        /* PC (ROADMAP 36): the face's vector font's glyph, when it has one */
+        if (s_pcVf != NULL && c >= 0x20) {
+            PglVGlyph vg;
+
+            if (pgl_vfont_glyph(s_pcVf, c, &vg)) {
+                font_measure_vglyph(st, &vg, xScale);
+                break;
+            }
+        }
         if (c < font->first || font->last < c) {
             st->lastChar = -1;
             return 0;

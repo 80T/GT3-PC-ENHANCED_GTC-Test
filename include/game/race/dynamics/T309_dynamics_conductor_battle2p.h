@@ -48,8 +48,9 @@ public:
     virtual int  virtual_34();              /* [34] +0x11C 0x001F0298 (isDirtCourse's answer is dropped) */
     virtual void chargePenaltyBySurface(RaceCarState *car, int left, int right); /* [39] +0x144 0x001F02C0 empty */
 };
-/* The enhanced engine: DynamicsConductor's (GT3 0xE3AC). */
-EGCS_SIZE(DynamicsConductorBattle2P, 0xE58C);
+/* The enhanced engine: DynamicsConductor's (GT3 0xE3AC; PC: 0x3B14C, the
+ * conductor's per-car arrays PC_RACE_CARS_MAX long, game/race/race_cars.h). */
+EGCS_SIZE(DynamicsConductorBattle2P, 0x3B14C);
 
 
 #endif /* GAME_T309_DYNAMICS_CONDUCTOR_BATTLE2P_H */

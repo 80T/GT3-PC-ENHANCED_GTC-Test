@@ -23,7 +23,8 @@ void DynamicsConductor::clearGateTimes()
 
     clock = 0;
     for (g = 0; g < 4; g++) {
-        for (i = 0; i < 8; i++)             /* reversed by loop.c (bgez) */
+        /* PC: PC_RACE_CARS_MAX (was 8), the row of gateTime (game/race/race_cars.h) */
+        for (i = 0; i < PC_RACE_CARS_MAX; i++)  /* reversed by loop.c (bgez) */
             gateTime[g][i] = RACE_TIME_INVALID;
         gateLap[g] = -1;
         gateCount[g] = 0;

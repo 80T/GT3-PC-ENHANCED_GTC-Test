@@ -8,6 +8,7 @@
 #include "vu0asm.h"
 #include "engine/gfx/T451_model_set.h"
 #include "platform/settings.h"                  /* PC: settings::lod_enabled (levels of detail off) */
+#include "engine/pgl/native/pgl_bridge.h"       /* PC: pglr_modelset_loaded (the overlays) */
 /* .sdata (0x00352AD4..0x00352AF4), all explicitly initialised: retail has
  * the zero words among the others, in address order (an uninitialised C++
  * global would come after them, at the end of the file's output). */
@@ -53,6 +54,9 @@ void modelset_relocate(ModelSet *m)
                 vif_model_relocate(m->packets[i]);
             }
         }
+        /* PC: the overlays among the packets (a lamp's lit glow lying on its
+         * lens: the GS's integer Z tied them, a float depth did not) */
+        pglr_modelset_loaded((const void *const *)m->packets, m->nPackets);
     }
     if (m->materials != NULL) {
         int i;
@@ -455,7 +459,7 @@ void modelset_run_part(ModelSet *m, int part)
 
     texSet = -1;
     if (g_00352AE4 != 0) {
-        if (!settings::lod_enabled())
+        if (modelset_pc_full_detail())
             texSet = 0;                     /* PC: levels of detail off: the full textures (docs/renderer.md) */
         else if (m->texSets != NULL && g_00352AEC < 0)
             texSet = modelset_tex_lod(&m->bounds[part]);
@@ -641,6 +645,15 @@ void modelset_run_part(ModelSet *m, int part)
  * jump table starts at 1.  The operands are read with the asm readers of
  * model_set_internal.h, the branches with U102_BRANCH, whose loop notes align the case
  * labels after 0x08 and 0x07 as retail.) */
+/* PC (2026-11-12): the level every LOD command takes, -1: none
+ * (modelset_pc_force_lod, T451_model_set.h) */
+static int g_pcForceLod = -1;
+
+void modelset_pc_force_lod(int level)
+{
+    g_pcForceLod = level;
+}
+
 /* PC: diagnostics of the LOD choice, on with GT3PC_LOD_LOG=1 in the
  * environment (the projected size, the projection scale, the sphere's
  * radius and depth, the level chosen; the first 200 choices, then one in
@@ -698,7 +711,9 @@ u8 *modelset_exec(u8 op, u8 *p)
     case 0x07: {
         f32 size = modelset_sphere_size(p);
         int k, n;
-        if (!settings::lod_enabled())
+        if (g_pcForceLod >= 0)
+            k = g_pcForceLod;               /* PC (2026-11-12): a forced level (modelset_pc_force_lod) */
+        else if (modelset_pc_full_detail())
             k = 0;                         /* PC: levels of detail off: always the full model (docs/renderer.md) */
         else if (g_00352AD4 != NULL)
             k = g_00352AD4->selectLOD(size);
@@ -727,6 +742,13 @@ u8 *modelset_exec(u8 op, u8 *p)
         break;
     }
     case 0x0F:
+        /* PC: it would replace the course scale's world scale (game/app/
+         * pc_course_scale.h): logged once, should a course use it */
+        if (pgl_world_scale_on()) {
+            static int warned;
+            if (warned++ == 0)
+                printf("PC: course scale: a course model loads a matrix (command 0x0F): drawn unscaled\n");
+        }
         pgl_load_matrix((const float *)p);
         p += 0x40;
         break;
@@ -1043,6 +1065,32 @@ void modelset_set_projection_scale(f32 scale)
             printf("lod: projection scale %.3f (centre x %.3f, side x %.3f, scale %.2f)\n",
                    g_00353258, centre.f[0], side.f[0], scale);
     }
+}
+
+/* PC (no original): T451_model_set.h. */
+f32 modelset_get_projection_scale(void)
+{
+    return g_00353258;
+}
+
+void modelset_put_projection_scale(f32 v)
+{
+    g_00353258 = v;
+}
+
+/* PC: the levels of detail of the models drawn now (T451_model_set.h). */
+static int g_pcDetail = PC_DETAIL_SETTING;
+
+void modelset_pc_set_detail(int mode)
+{
+    g_pcDetail = mode;
+}
+
+int modelset_pc_full_detail(void)
+{
+    if (g_pcDetail == PC_DETAIL_SETTING)
+        return !settings::lod_enabled();
+    return g_pcDetail == PC_DETAIL_FULL;
 }
 
 /* ------------------------------------------------------------------------ */

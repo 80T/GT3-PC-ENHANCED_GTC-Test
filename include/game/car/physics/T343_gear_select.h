@@ -32,5 +32,9 @@ int  car_gear_for_speed(RaceCarState *car, f32 speed);          /* 0x001E4E80 */
  * driver 1 or a control mode): 0 / 2 automatic (car_shift_auto, bySpeed
  * 0 / 1), 1 semi-automatic, 3, 4, 6 manual, 5 sequential. */
 int  car_select_gear(RaceCarState *car, GearInput *in);         /* 0x001E5690 */
+/* PC (2026-11-09): transmission modes 3, 4, 6's own - the shift buttons, the
+ * reverse a gear its control shifts into (1st the shift up from it) - for
+ * the clutch mode's GT3 MT (game/app/pc_clutch.h). */
+int  car_shift_manual(RaceCarState *car, GearInput *in);        /* 0x001E5540 */
 
 #endif /* GAME_T343_GEAR_SELECT_H */

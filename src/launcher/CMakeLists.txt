@@ -1,13 +1,23 @@
 # gt3launcher.exe: the launcher (configure, install the game files from the
 # user's disc image, start gt3pc.exe).  Plain Win32 and the Windows SDK, with
-# the game's control mappings (src/platform/input_map.cpp) and SDL3,
+# the game's control mappings (src/platform/input_map.cpp), its save folders
+# (src/platform/save_folders.cpp: the save manager's), its music files'
+# formats (src/engine/sound/native/bgm_files.cpp, spu2_adpcm.cpp: the .ads
+# to .wav conversion; src/engine/media/native/mp4_movie.cpp: an .mp3 decoded
+# by Media Foundation for the song manager's beat markers), its product
+# configs' and database folder's tables (src/platform/gcf_tables.cpp,
+# param_db.cpp, param_schema.cpp and SQLite, cmake/sqlite.cmake: the .gcf and
+# .db to .sqlite3 conversions), its IPU picture decoder and PNG files
+# (src/engine/media/native/ipu_image.cpp, src/platform/png_image.cpp: the
+# .ipic to .png conversion), its texture library (src/engine/pgl/native/
+# gs_imgs.cpp, gs_tex*.cpp: the .imgs to PNG folders conversion) and SDL3,
 # delay-loaded as in the game, for the Controls tab's capture of gamepad and
 # wheel inputs (cmake/sdl3.cmake).
 # Included from src/CMakeLists.txt; also buildable on its own:
 #   tools\msvc.cmd cmake -S src/launcher -B build/launcher -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     cmake_minimum_required(VERSION 3.25)
-    project(gt3launcher LANGUAGES CXX RC)
+    project(gt3launcher LANGUAGES C CXX RC)
     set(CMAKE_CXX_STANDARD 17)
     set(CMAKE_CXX_STANDARD_REQUIRED ON)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -18,6 +28,9 @@ endif()
 if(NOT TARGET gt3_sdl3)
     include(${GT3PC_ROOT}/cmake/sdl3.cmake)
 endif()
+if(NOT TARGET gt3_sqlite)
+    include(${GT3PC_ROOT}/cmake/sqlite.cmake)
+endif()
 
 add_executable(gt3launcher WIN32
     main.cpp
@@ -25,23 +38,76 @@ add_executable(gt3launcher WIN32
     panel.cpp
     controls.cpp
     install.cpp
+    disc_list.cpp
+    disc_files.cpp
+    engines.cpp
     display.cpp
     inflate.cpp
     iso9660.cpp
     util.cpp
     volume.cpp
+    music.cpp
+    gameconf.cpp
+    databases.cpp
+    stills.cpp
+    image_packs.cpp
+    beats.cpp
+    song_manager.cpp
+    mod_manager.cpp
+    mod_card.cpp
+    texture_manager.cpp
+    save_manager.cpp
+    save_card.cpp
+    ps2_icon.cpp
+    pclog.cpp
     ${GT3PC_ROOT}/src/platform/input_map.cpp
+    ${GT3PC_ROOT}/src/platform/save_folders.cpp
+    ${GT3PC_ROOT}/src/engine/sound/native/bgm_files.cpp
+    ${GT3PC_ROOT}/src/engine/sound/native/spu2_adpcm.cpp
+    ${GT3PC_ROOT}/src/engine/media/native/mp4_movie.cpp
+    ${GT3PC_ROOT}/src/engine/media/native/ipu_image.cpp
+    ${GT3PC_ROOT}/src/engine/media/native/ipu_csc.cpp
+    ${GT3PC_ROOT}/src/engine/media/native/mpeg2_tables.cpp
+    ${GT3PC_ROOT}/src/engine/media/native/mpeg2_idct.cpp
+    ${GT3PC_ROOT}/src/platform/png_image.cpp
+    ${GT3PC_ROOT}/src/engine/pgl/native/gs_imgs.cpp
+    ${GT3PC_ROOT}/src/engine/pgl/native/gs_tex1.cpp
+    ${GT3PC_ROOT}/src/engine/pgl/native/gs_tex_decode.cpp
+    ${GT3PC_ROOT}/src/engine/pgl/native/gs_tex_format.cpp
+    ${GT3PC_ROOT}/src/engine/pgl/native/gs_tex_layout.cpp
+    ${GT3PC_ROOT}/src/engine/pgl/native/gs_tex_space.cpp
+    ${GT3PC_ROOT}/src/platform/gcf_tables.cpp
+    ${GT3PC_ROOT}/src/platform/param_db.cpp
+    ${GT3PC_ROOT}/src/platform/param_schema.cpp
     gt3launcher.rc
     gt3launcher.manifest
 )
 target_compile_definitions(gt3launcher PRIVATE UNICODE _UNICODE)
 target_include_directories(gt3launcher PRIVATE ${GT3PC_ROOT}/src)
-target_link_libraries(gt3launcher PRIVATE comctl32 comdlg32 shell32 ole32 windowscodecs gt3_sdl3)
+target_link_libraries(gt3launcher PRIVATE comctl32 comdlg32 shell32 ole32 windowscodecs gt3_sdl3 gt3_sqlite)
 add_custom_command(TARGET gt3launcher POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${GT3PC_SDL3_DLL} $<TARGET_FILE_DIR:gt3launcher>)
-# (the background art: a resource, decoded by WIC)
+# (the background art and the mods window's default picture: resources,
+# decoded by WIC)
 set_property(SOURCE gt3launcher.rc APPEND PROPERTY OBJECT_DEPENDS
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../launcher_bg.png ${CMAKE_CURRENT_SOURCE_DIR}/../../gt3pc.ico)
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../launcher_bg.png ${CMAKE_CURRENT_SOURCE_DIR}/../../mod.png
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../gt3pc.ico)
+# The demo replays an install writes over the disc's and the launcher's start
+# refreshes in the installed versions (install.cpp write_demos,
+# refresh_demos): the licence tests' (L*) and the arcade time trials'
+# (AT010001..AT100001), the files of demo\, resources of the type GT3DEMO named
+# as the files.  A file added there reconfigures, a changed one rebuilds.
+file(GLOB GT3PC_DEMOS LIST_DIRECTORIES false CONFIGURE_DEPENDS ${GT3PC_ROOT}/demo/*)
+if(GT3PC_DEMOS)
+    set(GT3PC_DEMOS_RC "")
+    foreach(demo ${GT3PC_DEMOS})
+        get_filename_component(name ${demo} NAME)
+        string(APPEND GT3PC_DEMOS_RC "${name} GT3DEMO \"${demo}\"\n")
+    endforeach()
+    file(CONFIGURE OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/demos.rc CONTENT "${GT3PC_DEMOS_RC}" @ONLY)
+    target_sources(gt3launcher PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/demos.rc)
+    set_property(SOURCE ${CMAKE_CURRENT_BINARY_DIR}/demos.rc APPEND PROPERTY OBJECT_DEPENDS ${GT3PC_DEMOS})
+endif()
 # Small: no incremental-link padding, unreferenced code dropped (the .pdb
 # keeps the debug information).
 target_link_options(gt3launcher PRIVATE /INCREMENTAL:NO /OPT:REF /OPT:ICF)

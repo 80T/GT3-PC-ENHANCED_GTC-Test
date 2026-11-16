@@ -16,6 +16,7 @@
 #include "engine/pdistd/T532_heap.h"                     /* free */
 #include "game/data/car_database_internal.h"                               /* hash_string, FONT_PARAM_* */
 #include "engine/text/T496_font.h"
+#include "engine/pgl/native/pgl_vfont.h"            /* PC: vector fonts (ROADMAP 36) */
 
 /* FontDict's inline constructor (free list = 0, then FontDict::init), the
  * eight file slots zeroed (from the last), then the fields: no kanji file,
@@ -82,6 +83,7 @@ int Font::loadFile(const char *path)
     if (file == 0)
         return -1;
     files[slot] = fontset_relocate(file);
+    pgl_vfont_set_loaded(path, file);       /* PC: the faces' vector fonts, if any */
     for (i = 0; i < file->count; i++) {
         PglFont *font = file->fonts[i];
 
@@ -112,6 +114,7 @@ void Font::releaseFile(int slot)
                 if (found == font)
                     dict.remove(found->name);
             }
+            pgl_vfont_set_released(file);   /* PC */
             free(file);
         }
         files[slot] = 0;
@@ -134,6 +137,7 @@ int Font::loadKanjiFont(const char *path)
     kanjiFile = kanjifile_relocate(file);
     kanjiFont = file->fonts[0];
     kanjiCluts = file->cluts;
+    pgl_vfont_kanji_loaded(path);           /* PC: its vector font, if any */
     return 0;
 }
 
@@ -145,6 +149,7 @@ void Font::releaseKanjiFont(int unused)
     kanjiFile = 0;
     kanjiFont = 0;
     kanjiCluts = 0;
+    pgl_vfont_kanji_loaded(NULL);           /* PC */
 }
 
 /* The default face = the face `name'; 0, or -1 if there is none (the

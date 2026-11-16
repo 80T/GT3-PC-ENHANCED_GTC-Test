@@ -12,6 +12,7 @@
 #define GAME_T408_CAR_PROGRESS_H
 
 #include "game/game.h"
+#include "game/race/race_cars.h"            /* PC: PC_RACE_CARS_MAX (cars[]'s size) */
 
 class RaceOrganization;                     /* T125 */
 
@@ -21,7 +22,8 @@ class RaceOrganization;                     /* T125 */
  * every camera's update gets it (VariableCameraBase::updateFrame / slot 12;
  * T382's camera_find_next_record_for).  u092 called it CameraCommon, u093
  * CameraCourseSearch.  Not polymorphic.  Size 0x60 (u091; init's loop ends at
- * +0x60): in CameraManager +0x2D8..+0x2FF is the alignment of the views. */
+ * +0x60): in CameraManager +0x2D8..+0x2FF is the alignment of the views.
+ * PC (ROADMAP 35): cars[PC_RACE_CARS_MAX] (7 on the PS2), size 0x18C. */
 class CarProgressEntry {
 public:
     int lap;                                /* 0x0 (lap - 1) % the laps of the course's camera file */
@@ -39,8 +41,8 @@ public:
     int              ready;                 /* 0x00 1 after two updates */
     int              frames;                /* 0x04 */
     f32              length;                /* 0x08 the lap length */
-    CarProgressEntry cars[7];               /* 0x0C */
+    CarProgressEntry cars[PC_RACE_CARS_MAX];    /* 0x0C PC: was [7] (the races of up to 32 cars) */
 };
-EGCS_SIZE(CarProgress, 0x60);
+EGCS_SIZE(CarProgress, 0x18C);              /* PC: PS2 0x60 (cars[7]) */
 
 #endif /* GAME_T408_CAR_PROGRESS_H */

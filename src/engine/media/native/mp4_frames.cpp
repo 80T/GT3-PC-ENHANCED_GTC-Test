@@ -6,6 +6,7 @@
 #include "platform/log.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <condition_variable>
 #include <cstring>
@@ -19,8 +20,6 @@ namespace {
 
 constexpr int kAhead = 4;                   /* frames decoded ahead */
 constexpr uint8_t kAlpha = 0x80;            /* the IPU's alpha */
-/* the slot's display aspect for its pixel ratio: 640 x 448 is 4:3 */
-constexpr double kPs2PixelAspect = (448.0 * 4.0) / (640.0 * 3.0);
 
 /* A resampling filter's taps for each output position: an area average
  * down, linear up. */
@@ -71,27 +70,19 @@ void make_taps(int src, int dst, Taps &t)
 /* The picture's place in the slot and the filters (for one source size). */
 struct Layout {
     int srcW = 0, srcH = 0;
-    double par = 0.0;
     int cx = 0, cy = 0, cw = 0, ch = 0;     /* the picture's rectangle in the slot */
     Taps h, v;
 };
 
-void make_layout(Layout &l, int w, int h, double par, int slotW, int slotH)
+/* The whole slot: the picture's shape on screen is the draw's (pc_movie_fit,
+ * [Display] MovieAspect). */
+void make_layout(Layout &l, int w, int h, int slotW, int slotH)
 {
     l.srcW = w;
     l.srcH = h;
-    l.par = par;
-    const double slotAspect = (double)slotW / slotH * kPs2PixelAspect;
-    const double srcAspect = (double)w * par / h;
-    if (srcAspect > slotAspect) {           /* wider: bars above and below */
-        l.cw = slotW;
-        l.ch = std::max(1, (int)std::lround(slotH * slotAspect / srcAspect));
-    } else {                                /* narrower: bars at the sides */
-        l.ch = slotH;
-        l.cw = std::max(1, (int)std::lround(slotW * srcAspect / slotAspect));
-    }
-    l.cx = (slotW - l.cw) / 2;
-    l.cy = (slotH - l.ch) / 2;
+    l.cw = slotW;
+    l.ch = slotH;
+    l.cx = l.cy = 0;
     make_taps(w, l.cw, l.h);
     make_taps(h, l.ch, l.v);
 }
@@ -184,10 +175,16 @@ struct Mp4FrameWorker::Impl {
     int produce = 0;                        /* the next frame the thread makes */
     int resetTo = -1;                       /* a jump asked for */
     bool quit = false;
+    std::atomic<double> aspect{0.0};        /* the picture's shape (0: not open yet) */
     std::thread thread;
 
     void run();
 };
+
+double Mp4FrameWorker::aspect() const
+{
+    return impl_->aspect.load(std::memory_order_relaxed);
+}
 
 Mp4FrameWorker::Mp4FrameWorker(const std::string &path, int width, int height, int frames, bool loop)
     : path_(path), impl_(new Impl)
@@ -240,9 +237,11 @@ void Mp4FrameWorker::Impl::run()
     MfScope mf;
     Mp4VideoReader r;
     const bool ok = mf.ok() && r.open(path.c_str());
-    if (ok)
+    if (ok) {
         pclog::write("movie: %s: %d x %d pictures (pixel aspect %.3f), %d frames of two %d x %d pictures (59.94 a "
                      "second)", path.c_str(), r.width(), r.height(), r.pixel_aspect(), frames, slotW, slotH);
+        aspect.store((double)r.width() * r.pixel_aspect() / r.height(), std::memory_order_relaxed);
+    }
     Layout layout;
     std::vector<uint8_t> cur, nxt;          /* the source picture shown, the next one decoded */
     int64_t curT = 0, nxtT = 0, convertedT = -1;
@@ -295,8 +294,8 @@ void Mp4FrameWorker::Impl::run()
                     nxt.assign(px, px + (size_t)r.width() * r.height() * 4);
                     nxtT = ft;
                     haveNxt = true;
-                    if (layout.srcW != r.width() || layout.srcH != r.height() || layout.par != r.pixel_aspect())
-                        make_layout(layout, r.width(), r.height(), r.pixel_aspect(), slotW, slotH);
+                    if (layout.srcW != r.width() || layout.srcH != r.height())
+                        make_layout(layout, r.width(), r.height(), slotW, slotH);
                 }
                 if (!haveCur || nxtT <= t) {    /* (the first picture shows from frame 0) */
                     cur.swap(nxt);

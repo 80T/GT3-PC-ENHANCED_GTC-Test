@@ -932,6 +932,20 @@ int  fmt_vprintf(PglPutcFunc put, const u8 *fmt, const u8 *args); /* 0x0024DB30 
 /* vu1_lighting.c */
 void vifmodel_draw_lit(const VifModel *m, u32 prog);        /* 0x0024E2B8 */
 void vifmodel_draw(const VifModel *m, u32 prog);            /* 0x0024E4A0 */
+/* PC (2026-11-07): the hide box of the models drawn from now on (the cockpit
+ * camera's driver's head, the eye in it: game/app/pc_headcam.h): a box in
+ * the model's space, centre and half sizes, whose inside the renderer does
+ * not draw (the pixel shader discards it: pgl_d3d.cpp vs_vu1 / ps_body, from
+ * PglrModelPart's hideC / hideH) - a head that is its own batch or one
+ * merged with the seats alike; and n parts (model, part) whose translucent
+ * texels are not drawn (hideOn 2: a glass shell wound to face inward, which
+ * the eye in the cabin would see tinted; its opaque texels - the pillars in
+ * the same batch - stay).  NULL, NULL, NULL, 0: nothing hidden. */
+typedef struct VifPartRef {
+    const VifModel *model;
+    int part;
+} VifPartRef;
+void vifmodel_pc_hide(const float *centre, const float *half, const VifPartRef *skip, int n);
 void pgl_sync_matrices(GsContext *ctx);                     /* 0x0024E670 */
 void pgl_send_matrix(GsContext *ctx, u32 vuAddr);           /* 0x0024E7F0 */
 void pgl_send_dirty_regs(GsContext *ctx, u32 vuAddr);       /* 0x0024E858 */
@@ -941,6 +955,16 @@ void pgl_set_envmap_params(f32 a, f32 b);                   /* 0x0024F7A8 */
 void pgl_envmap_rotate(f32 x, f32 y, f32 z);                /* 0x0024F7B8 */
 void pgl_envmap_point_at(f32 x, f32 y, f32 z);              /* 0x0024F900 */
 void pgl_envmap_set_basis(f32 ax, f32 ay, f32 az, f32 bx, f32 by, f32 bz); /* 0x0024F928 */
+/* PC (no original): the draws until it is set off (on 0) have a world scale
+ * (x, y, z) before the view (the course scale, game/app/pc_course_scale.h):
+ * the lighting's inverses are affine ones meanwhile, billboards turn by the
+ * view without it. */
+void pgl_set_world_scale(int on, f32 x, f32 y, f32 z);
+/* PC (no original): pgl_set_world_scale's on. */
+int  pgl_world_scale_on(void);
+/* PC (no original): 1 while the world scale mirrors (an odd number of its
+ * axes negative): gs_select_vu1_prog culls the other faces then. */
+int  pgl_world_scale_mirrored(void);
 
 /* vu1_prim.c */
 void *pgl_light_vertices(GsContext *ctx, const void *xyz, const void *normals,
@@ -1142,6 +1166,7 @@ void gfx_offset_xy(float dx, float dy);                     /* 0x00252B40 */
 void gfx_set_draw_area(int x, int y, int w, int h);         /* 0x00252BB8 */
 void gs_update_scissor_and_viewport(GsContext *ctx);        /* 0x00252BE8 */
 void gfx_set_scissor(int x, int y, int w, int h);           /* 0x00252D30 */
+void gfx_scissor_below(f32 top);                            /* PC: the scissor's part below `top' of its height */
 void gfx_set_depth_offset(float ofs);                       /* 0x00252DF8 */
 void gs_set_depth_bias_at(float dz, float x, float y, float z); /* 0x00252E08 */
 void gs_set_clear_color_f(float r, float g, float b, float a); /* 0x00252F58 */
@@ -1261,6 +1286,10 @@ void gfx_set_menu_aspect(float aspect);
  * to their shape, the alignment kept (font_apply_align measures the
  * squeezed text); (1, 1) none.  pgl_font.cpp. */
 void font_set_squeeze(f32 kx, f32 ky);
+/* PC (no original, ROADMAP 36): the palette ("#n") of the face font_set
+ * selected, for its vector glyphs (engine/pgl/native/pgl_vfont.h; T498
+ * Font::begin).  pgl_font.cpp. */
+void font_set_palette(int palette);
 /* PC (no original): the 2D drawn next was designed for the 4:3 screen and
  * squeezed by (kx, ky) into the GS frame (pc_hud_begin): the renderer keeps
  * its textures' texel centres in design pixels, and gfx_offset_xy's steps
@@ -1279,6 +1308,12 @@ void gfx_model_written(VifModel *m);
  * fbWordAddr, before its 2D (the blit into the frame, the HUD): with FXAA
  * chosen, the renderer filters it there.  pgl_driver.cpp. */
 void gfx_post_antialias(u32 fbWordAddr, int w, int h);
+/* PC (2026-11-14, no original): the w x h buffer at fbWordAddr drawn at dx x
+ * dy times the output scale from its next draw on (1, 1: back to it) - its GS
+ * size and the draws unchanged, more native pixels per GS pixel (the road
+ * reflection's buffer: [Graphics] ReflectionResolution, T131).
+ * pgl_driver.cpp. */
+void gfx_pc_target_detail(u32 fbWordAddr, int w, int h, f32 dx, f32 dy);
 /* PC (no original): what is shown presented again, the PC overlays redrawn
  * (the tick step's pause, game/app/pc_frame.cpp).  pgl_driver.cpp. */
 void gfx_present_again(void);

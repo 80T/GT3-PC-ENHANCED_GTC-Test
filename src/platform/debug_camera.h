@@ -12,7 +12,11 @@
  * the players' controllers and wheels give the game nothing (at rest:
  * platform/pad_pc.cpp, wheel.cpp).  Its Lock control holds the camera where
  * it is and gives the players their input back ("DEBUG CAMERA LOCKED"), and
- * a press again flies it ("UNLOCKED"). */
+ * a press again flies it ("UNLOCKED").  Its Y-axis look control, a press each
+ * way, makes forward and back follow the pitch ("DEBUG CAMERA Y-AXIS LOOK
+ * ON" / "OFF"; kept in [Debug] CameraYLook), and its Ground collision
+ * control keeps it a height above the road, which up and down change
+ * ("DEBUG CAMERA GROUND COLLISION ON" / "OFF"; [Debug] CameraGround). */
 #pragma once
 
 namespace debug_camera {
@@ -39,7 +43,8 @@ struct Controls {
     int fasterSteps, fovSteps;              /* mouse wheel notches since the last read (a binding of one) */
 };
 /* The game thread, once a frame: the profile's controls now (all 0 while a
- * menu has the input); a press of Lock locks or unlocks. */
+ * menu has the input); a press of Lock locks or unlocks, one of Y-axis look
+ * or Ground collision turns it on or off. */
 void read(Controls *out);
 /* A short notice over the picture (the speed or the field of view as it
  * changes: settings_menu::notice). */

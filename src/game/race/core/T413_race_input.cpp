@@ -30,6 +30,8 @@
 #include "engine/input/T472_analog_curve.h"             /* g_003416F8, the analog stick curve (PC: not read here) */
 #include "game/race/core/T413_race_input.h"               /* RaceInput, FuncBit, g_002DFB18, g_002DFB58, raceinput_* */
 #include "game/enhanced.h"                      /* ENH_CAMERA_ZOOM_BUTTON (the cameras' switch) */
+#include "game/app/pc_frame.h"                  /* PC: pc_replay_speed_buttons */
+#include "game/app/pc_clutch.h"                 /* PC (2026-11-09): the clutch mode's frames */
 
 /* The configured functions 1..8 and their button bits (T413's .data
  * 0x002DFB18, writable in retail: .data, not .rodata). */
@@ -142,6 +144,9 @@ void RaceInput::read(CarInput *in)
     } else {
         readPad(in);
         readWheel(in);
+        /* PC (2026-11-09): the clutch mode's clutch and H-shifter gate of the
+         * player, recorded with the frame (game/app/pc_clutch.h) */
+        pc_clutch_live_input(port, in, in->device == STEER_WHEEL || in->device == STEER_WHEEL_DFP);
         rec.rec.record(in);
     }
 }
@@ -298,6 +303,12 @@ void RaceInput::emulatePressure()
             if (raw & PADRAW_TRIANGLE)          /* Lupo 2: the zoom (L2 0x0021D1CC) */
                 out |= RIB_REPLAY_ZOOM;
 #endif
+            /* PC: L2 / R2 step the replay's speed (game/app/pc_frame.h): here
+             * for the pad's own bits - a lone wheel's are in raw[0] too, where
+             * 1 and 2 are its replay buttons - and not with L1 or R1 held,
+             * all four being the logo's toggle (T132) */
+            if ((raw & (PADRAW_L1 | PADRAW_R1)) == 0)
+                pc_replay_speed_buttons(player, raw & PADRAW_L2, raw & PADRAW_R2);
             break;
         }
         raw = curButtons.raw[1];

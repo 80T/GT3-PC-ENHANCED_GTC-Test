@@ -79,6 +79,14 @@ bool tex1_parse(const uint8_t *file, size_t size, size_t offset, Tex1Set &out,
  * are 32-bit); returns false elsewhere. */
 bool tex1_from_memory(const void *img, Tex1Set &out);
 
+/* The same from a copy of such a set's header (0x30 bytes), register blocks
+ * (nTex x 0x28) and upload records (nXfer x 0xC), taken while nothing
+ * changed them: the game relinks a set in place for every VRAM block it gets
+ * (tex1_set_vram_base) - while the renderer's executor thread reads what the
+ * game recorded a frame before.  The texels, CLUT variations and animations
+ * are read where the copy points (relinking leaves them). */
+bool tex1_from_copy(const uint8_t *hdr, const uint8_t *tex, const uint8_t *xfer, Tex1Set &out);
+
 /* Finds every set in a buffer (the 'Tex1' magic at a 4-aligned offset
  * whose header parses), in file order.  For loose .img files, packs and
  * model files alike. */

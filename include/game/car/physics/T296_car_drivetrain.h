@@ -80,6 +80,10 @@ EGCS_SIZE(TyreData, 0x1B4);
 /* The angular speed of the driven axle(s) by GearCalc.driveType: the rear,
  * the front, the mean (3) or a blend by awdSplit (7). */
 f32  car_driven_axle_speed(RaceCarDynamics *car);   /* 0x001E6C28 */
+/* The engine speed the driven wheels give in the current gear (>= 0, rad/s).
+ * PC (2026-11-09): declared here for the realistic rev limiter
+ * (game/app/pc_rev_cut.cpp). */
+f32  car_engine_speed_from_wheels(RaceCarDynamics *car);   /* 0x001E6CA8 */
 void car_tyre_slip_ratios(RaceCarDynamics *car);    /* 0x001E7328 tyre_slip_ratio of the 4 wheels */
 /* The engine speed through the clutch (engine_update, T338), at most
  * engine.redline + 10 rpm, and the rpm. */

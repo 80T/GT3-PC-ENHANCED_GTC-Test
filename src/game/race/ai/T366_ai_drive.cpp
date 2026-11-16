@@ -25,8 +25,21 @@ enum {
 };
 
 /* Where in the stop area a computer car stops, by (rank - 1) / 2: the
- * leaders at its far end (Lupo 2's table L2 0x002DF128). */
+ * leaders at its far end (Lupo 2's table L2 0x002DF128).  PC: the index at
+ * most 3 (pod_stop_share): ranks 9.. of a race of up to 32 cars
+ * (game/race/race_cars.h) read past the table; they stop where 7th / 8th
+ * do. */
 static const f32 podStopShare[4] = { 0.75f, 0.5f, 0.25f, 0.0f };
+
+/* PC: podStopShare[(rank - 1) / 2], the index held to the table (above). */
+static inline f32 pod_stop_share(int rank)
+{
+    int i = (rank - 1) / 2;
+
+    if (i > 3)
+        i = 3;
+    return podStopShare[i];
+}
 
 /* The corner index, 0 past the last one. */
 // FUNC 0x001F7078 ai_corner_index
@@ -108,7 +121,7 @@ f32 ai_brake_factor(AIDriver *ai)
             f32 start, length, target;
 
             pod_rules_area(ai->conductor, &start, &length);
-            target = start + length * podStopShare[(st->rank - 1) / 2];
+            target = start + length * pod_stop_share(st->rank);    /* PC: the index held to the table */
             if (ai->line != LINE_PIT_LANE) {
                 /* the point lies in the segment the car is in, ahead of it */
                 if (ai->corner == count) {
@@ -887,7 +900,9 @@ void ai_drive(AIDriver *ai)
                 ai->holdCount = 6000;
         }
         ai->throttle = throttle * brakeFactor;
-        if (st->rank * 100 + 5000 < (int)(dc->clock / 3))
+        /* PC: the rank at most 6 (ai_rank_capped, ai_internal.h): a car past
+         * 6th of a race of up to 32 cars waits as the 6th does */
+        if (ai_rank_capped(st->rank) * 100 + 5000 < (int)(dc->clock / 3))
             ai_avoid_traffic(ai);
     } else {
         if (drive == -1) {

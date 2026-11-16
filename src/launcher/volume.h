@@ -35,4 +35,18 @@ using Reader = std::function<bool(uint64_t offset, void *buf, uint32_t size)>;
  * message when the table of contents is not a RoFS one or does not fit. */
 bool list_files(const Reader &read, uint64_t volume_size, std::vector<File> *files, std::wstring *error);
 
+/* ---- the unified structure (install.h) --------------------------------------
+ * PC (2026-11-14): moved here from install.cpp, for the game too - it reads a
+ * disc image's volume in the same structure (platform/disc_image.h). */
+
+/* The courses' region folder of a language (the game's course_set_region:
+ * Japanese JP, English (US) US, English (UK) UK, the others EU). */
+std::string course_region(const std::string &language);
+/* The volume has its courses in courses/ itself and none in a folder of it
+ * (the Japanese disc). */
+bool flat_courses(const std::vector<File> &files);
+/* A volume path's place in the data folder.  `flatCourses`: its courses go
+ * into courses/<region>/ (courses/.list stays). */
+std::string unified_path(const std::string &path, bool flatCourses, const std::string &region);
+
 } // namespace volume

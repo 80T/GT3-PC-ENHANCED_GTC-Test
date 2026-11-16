@@ -96,8 +96,8 @@ void pgl_put_texcoords(GsContext *ctx, const void *uvs, int n)
 /* A vertex array as one strip of the VU1 primitive program (nothing for n >
  * 64 or without a program): generated arrays first, then the strip with
  * PRIM = primAttr | TRISTRIP, TME by uvs, the colours or one constant
- * colour (colorTex textured, else color).  Statistics: n vertices, n - 2
- * primitives, 1 part. */
+ * colour (fullColor textured - PC: was colorTex - else color).  Statistics:
+ * n vertices, n - 2 primitives, 1 part. */
 void pgl_draw_strip_vu1(const void *xyz, const void *normals, const void *colors, const void *uvs, int n)
 {
     GsContext *ctx = GS_SPR_CTX;
@@ -126,7 +126,12 @@ void pgl_draw_strip_vu1(const void *xyz, const void *normals, const void *colors
         prim |= GS_PRIM_TME;
     else
         prim &= ~GS_PRIM_TME;
-    constRgba = uvs != NULL ? ctx->colorTex : ctx->color;
+    /* PC: textured, the colour whole (pgl_state_prim.h PRIM_FULL_COLOR; was
+     * colorTex), and only when it is the draw's one colour: an array's are in
+     * GS units */
+    constRgba = uvs != NULL ? pgl::prim::fullColor(*ctx) : ctx->color;
+    if (uvs != NULL && colors == NULL)
+        prim |= GS_PRIM_FULL_COLOR;
     if (uvs != NULL)
         pgl_put_texcoords(ctx, uvs, n);
     if (colors == NULL)
@@ -230,7 +235,8 @@ void mat_scale_set(u32 kind, f32 r, f32 g, f32 b, f32 a)
 
 // FUNC 0x0024C148 draw_poly2d
 /* A triangle fan of n window-pixel points (y * 8 for field rendering),
- * optional texels uv and colours rgba (else colorTex / color once). */
+ * optional texels uv and colours rgba (else fullColor / color once; PC: was
+ * colorTex). */
 void draw_poly2d(const f32 *xy, const f32 *uv, const u32 *rgba, u32 n)
 {
     GsContext *ctx = GS_SPR_CTX;

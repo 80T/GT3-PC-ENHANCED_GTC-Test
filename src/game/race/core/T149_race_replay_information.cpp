@@ -24,6 +24,13 @@
 #include "game/race/core/T130_race_ps2_base.h"        /* RaceEntryPS2 (createEntries) */
 #include "game/race/core/T129_race_base.h"            /* race_create_by_name, race_destroy */
 #include "game/race/display/race_license_internal.h"
+#include "game/race/core/T125_race_organization.h"    /* PC: RaceOrganization::course */
+#include "game/app/pc_course_scale.h"                 /* PC: pc_course_scale_bind */
+#include "game/app/pc_course_pick.h"                  /* PC: pc_race_run_load */
+#include "game/app/pc_car_tuning.h"                   /* PC: pc_car_tuning_load */
+#include "game/app/pc_rev_cut.h"                      /* PC (2026-11-08): pc_rev_cut_load */
+#include "game/app/pc_shift.h"                        /* PC (2026-11-08): pc_shift_load */
+#include "game/app/pc_race_cars.h"                    /* PC: the slots of the cars past 8 */
 
 // FUNC 0x0018D1D8 RaceReplayInformation::RaceReplayInformation
 //   RaceInformation, blk (stored before the vptr), the vptr (+0x54); the
@@ -69,23 +76,34 @@ RaceEntryBase *RaceReplayInformation::createEntries()
 
 // FUNC 0x0018D330 RaceReplayInformation::getEntryCount
 //   (index.txt: virtual_8)
+//   PC: held to the slots a block holds (game/app/pc_race_cars.h).
 int RaceReplayInformation::getEntryCount()
 {
-    return blk->carCount;
+    return pc_race_info_cars(blk);
 }
 
 // FUNC 0x0018D340 RaceReplayInformation::setupEntry
 //   (index.txt: virtual_10) The entry is loaded from the block's slot of
 //   its number.
+//   PC: a car past 8 from the slots after the block (pc_race_info_slot).
 void RaceReplayInformation::setupEntry(RaceEntryCar *car)
 {
-    race_entry_load_slot(car, &blk->slots[car->number]);
+    race_entry_load_slot(car, pc_race_info_slot(blk, car->number));
 }
 
 // FUNC 0x0018D378 RaceReplayInformation::setupOrganization
 //   (index.txt: virtual_11) Nothing.
+//   PC: the course at the scale the saved race recorded (none: 100 %;
+//   game/app/pc_course_scale.h), and its lap count and time limit (none:
+//   the race record's; game/app/pc_course_pick.h), and its car multipliers
+//   (none: 100 %; game/app/pc_car_tuning.h).
 void RaceReplayInformation::setupOrganization(RaceOrganization *org)
 {
+    pc_course_scale_bind(org->course, blk);
+    pc_race_run_load(org, blk);
+    pc_car_tuning_load(org, blk);
+    pc_rev_cut_load(org, blk);              /* PC (2026-11-08): the rev limiter it ran */
+    pc_shift_load(org, blk);                /* PC (2026-11-08): the gear shifts it ran */
 }
 
 // FUNC 0x0018D380 RaceReplayInformation::createRace

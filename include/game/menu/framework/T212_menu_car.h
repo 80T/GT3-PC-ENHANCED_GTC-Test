@@ -126,6 +126,13 @@ public:
      * `buffer' holds (MENU_CAR_BUFFER_SIZE, or the own buffer's). */
     void         *bigBuffer;                /* 0x720 */
     u32           bufferSize;               /* 0x724 */
+    /* PC (ROADMAP 45): ticks left of the right stick's turn (pc_menu_car.h) */
+    int           pcStickHold;
+    /* PC (2026-11-12): modelPath / wheelPath are the race model's (cars/day,
+     * wheel/: [Debug] MenuRaceModel, game/app/pc_menu_race_model.h); the
+     * setting changed: the car loaded again (update) */
+    int           pcRaceModel;
+    void pcCheckRaceModel();
 };
 
 /* Clears the two "loading" flags (g_00352560).  Called by T010

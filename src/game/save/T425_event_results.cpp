@@ -154,10 +154,15 @@ EventResult *EventResults::find(const char *event)
     return event_result_at(this, index);
 }
 
-/* 1 if p is a new best place of `event'. */
+/* 1 if p is a new best place of `event'.  PC (ROADMAP 35): in a race of
+ * more than 6 cars the 7th and lower count as the 6th (PC_RESULT_LAST_PLACE,
+ * T484): the event's marks know 6 places (EventStatusObject, T041), and 8
+ * means "never raced". */
 // FUNC 0x00217050 EventResults::updatePlace
 int EventResults::updatePlace(const char *event, int p)
 {
+    if (p > PC_RESULT_LAST_PLACE)           /* PC: the 6th */
+        p = PC_RESULT_LAST_PLACE;
     return find(event)->place.update(p);
 }
 

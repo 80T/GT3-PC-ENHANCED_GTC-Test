@@ -377,7 +377,10 @@ int MemorycardFile::getFileList(int port, McFileEntry *list)
     int count = 0;
     for (int i = 0; i < listed; i++) {
         McDirEntry *e = &entries[i];
-        if (strcmp(".", e->name) != 0 && strcmp("..", e->name) != 0)
+        /* PC: held to the callers' room: 20 entries fit 18 only through "."
+         * and "..", which a listing of the card's root has not (an empty
+         * name: MemorycardFileManager::readInfo) */
+        if (strcmp(".", e->name) != 0 && strcmp("..", e->name) != 0 && count < MC_SAVE_FILES_MAX)
             list[count++] = *e;
     }
     return count;

@@ -439,6 +439,53 @@ void invertRigid(Vec4 m[4])
     m[3].w = t.w;
 }
 
+Vec4 g_worldScale = v4(1.0f, 1.0f, 1.0f, 0.0f);
+
+void invertAffine(Vec4 m[4])
+{
+    const float a = m[0].x, b = m[0].y, c = m[0].z;
+    const float d = m[1].x, e = m[1].y, f = m[1].z;
+    const float g = m[2].x, h = m[2].y, i = m[2].z;
+    const float c0 = e * i - f * h, c1 = f * g - d * i, c2 = d * h - e * g;
+    const float det = a * c0 + b * c1 + c * c2;
+    if (det == 0.0f) {
+        invertRigid(m);                             /* (singular: as the original) */
+        return;
+    }
+    const float k = 1.0f / det;
+    const Vec4 r0 = v4(c0 * k, (c * h - b * i) * k, (b * f - c * e) * k, 0.0f);
+    const Vec4 r1 = v4(c1 * k, (a * i - c * g) * k, (c * d - a * f) * k, 0.0f);
+    const Vec4 r2 = v4(c2 * k, (b * g - a * h) * k, (a * e - b * d) * k, 0.0f);
+    const Vec4 t = m[3];
+    m[0] = r0;
+    m[1] = r1;
+    m[2] = r2;
+    for (int n = 0; n < 3; n++)                     /* (row vectors: -t A^-1) */
+        m[3][n] = -(t.x * r0[n] + t.y * r1[n] + t.z * r2[n]);
+}
+
+void invertModelview(Vec4 m[4])
+{
+    if (g_worldScale.w != 0.0f)
+        invertAffine(m);
+    else
+        invertRigid(m);
+}
+
+void normalizeModelviewRows(Vec4 m[4])
+{
+    if (g_worldScale.w == 0.0f)
+        return;
+    for (int r = 0; r < 3; r++) {
+        const float l = std::sqrt(m[r].x * m[r].x + m[r].y * m[r].y + m[r].z * m[r].z);
+        if (l > 0.0f) {
+            m[r].x /= l;
+            m[r].y /= l;
+            m[r].z /= l;
+        }
+    }
+}
+
 /* vu0_invert_rigid on vf28..vf31. */
 void vu0InvertRigid(Vu0 &vu) { invertRigid(&vu.vf[28]); }
 
@@ -1079,7 +1126,7 @@ void envmapSetBasis(Vu0 &vu, EnvMap &em, const Vec4 modelview[4],
     em.basis[1] = a;
     em.basis[2] = c;
     Vec4 inv[4] = {modelview[0], modelview[1], modelview[2], modelview[3]};
-    invertRigid(inv);
+    invertModelview(inv);                       /* PC: affine under the course scale (g_worldScale) */
     for (int r = 0; r < 3; r++)
         em.viewRot[r] = inv[r];
     em.eye = inv[3];                            /* (0, 0, 0, 1) through the inverse */
@@ -1089,10 +1136,14 @@ void envmapSetBasis(Vu0 &vu, EnvMap &em, const Vec4 modelview[4],
 
 void envmapBuildMatrix(EnvMap &em, const Vec4 modelview[4])
 {
+    /* PC: under the course scale the normals' rows normalised and the
+     * inverse affine (g_worldScale) */
+    Vec4 rows[4] = {modelview[0], modelview[1], modelview[2], modelview[3]};
+    normalizeModelviewRows(rows);
     for (int r = 0; r < 3; r++)
-        em.texMtx[r] = vu::xform3(em.rot, modelview[r]);
+        em.texMtx[r] = vu::xform3(em.rot, rows[r]);
     Vec4 inv[4] = {modelview[0], modelview[1], modelview[2], modelview[3]};
-    invertRigid(inv);
+    invertModelview(inv);
     em.texMtx[3] = inv[3];
     em.texMtx[1].w = em.phase + 0.875f;
     em.texMtx[0].w = -0.125f;

@@ -100,7 +100,10 @@ enum { LINK_BATTLE_SLOTS = 8, LINK_BATTLE_START_COUNT = 10 };
 enum { CONTROL_RECORD_SIZE = 0x20000, CONTROL_RECORDS = 2 };
 
 /* The race object pool of game_init (race_pool_assign).  PC (ROADMAP 18, no
- * memory limits): 1 MB, not 0x22000 - the race classes grew PC members. */
-enum { RACE_POOL_SIZE = 0x100000 };
+ * memory limits): 1 MB, not 0x22000 - the race classes grew PC members.
+ * PC (ROADMAP 35): 4 MB - the races of up to 32 cars (game/race/race_cars.h):
+ * their entries (0x2190 bytes each), the race classes' 32 car icons and
+ * conductor cars. */
+enum { RACE_POOL_SIZE = 0x400000 };
 
 #endif /* U001_H */

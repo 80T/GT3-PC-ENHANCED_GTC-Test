@@ -156,13 +156,17 @@ enum class ColorPremul : uint8_t {
 };
 /* C = Ad, the frame's alpha (0x80 = 1.0): DEST_ALPHA holds Ad / 255 and a
  * UNORM target clamps o0 to 1 before blending, so no single fixed-function
- * pass gives Ad / 128.  (A 24-bit frame stores no alpha: the GS takes Ad as
- * 0x80 there, translated as FIX 0x80.) */
+ * pass gives Ad / 128 - nor can an 8-bit alpha hold the weights above 1.0
+ * (Ad 0x81..0xFF) that the GS allows and GT3 uses (the course's env view's
+ * alphas, PC 2026-11-05).  (A 24-bit frame stores no alpha: the GS takes Ad
+ * as 0x80 there, translated as FIX 0x80.) */
 enum class AdMode : uint8_t {
     None,
     TwoPass,        /* Cs Ad + Cd, Cs Ad: the draw twice, o0 = Cs, src DEST_ALPHA - Ad / 255 each, Ad / 128
                      * together; the first pass without the alpha write (Ad stays) and with the form's dst
-                     * (ONE / ZERO), the second with dst ONE.  Exact within one unit (rounding) */
+                     * (ONE / ZERO), the second with dst ONE.  Exact within one unit (rounding).  PC
+                     * (2026-11-05): the two as one draw of two instances where it may (pgl_d3d.h
+                     * PSF_AD_INST) */
     Shader          /* the other forms: blending off, the shader computes the GS's ((A - B) Ad >> 7) + D
                      * from a copy of the target (t1, made fresh for the draw).  Exact; a draw's own
                      * overlapping primitives read the target as it was before the draw */

@@ -2,6 +2,7 @@
 #include "util.h"
 
 #include <windows.h>
+#include <shobjidl.h>
 
 #include <stdio.h>
 
@@ -104,6 +105,35 @@ std::string narrow(const std::wstring &w)
     std::string s(n, '\0');
     WideCharToMultiByte(CP_UTF8, 0, w.data(), (int)w.size(), &s[0], n, nullptr, nullptr);
     return s;
+}
+
+std::wstring choose_folder(void *owner, const wchar_t *title, const wchar_t *ok, const std::wstring &start)
+{
+    std::wstring out;
+    IFileOpenDialog *d = nullptr;
+    if (FAILED(CoCreateInstance(__uuidof(FileOpenDialog), nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&d))))
+        return out;
+    DWORD o = 0;
+    d->GetOptions(&o);
+    d->SetOptions(o | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST | FOS_NOCHANGEDIR);
+    d->SetTitle(title);
+    d->SetOkButtonLabel(ok);
+    IShellItem *at = nullptr;
+    if (!start.empty() && SUCCEEDED(SHCreateItemFromParsingName(start.c_str(), nullptr, IID_PPV_ARGS(&at)))) {
+        d->SetFolder(at);
+        at->Release();
+    }
+    IShellItem *it = nullptr;
+    if (SUCCEEDED(d->Show((HWND)owner)) && SUCCEEDED(d->GetResult(&it))) {
+        PWSTR p = nullptr;
+        if (SUCCEEDED(it->GetDisplayName(SIGDN_FILESYSPATH, &p))) {
+            out = p;
+            CoTaskMemFree(p);
+        }
+        it->Release();
+    }
+    d->Release();
+    return out;
 }
 
 } // namespace util

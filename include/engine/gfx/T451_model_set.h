@@ -147,5 +147,23 @@ void  modelset_set_tex_set(int set);                        /* 0x00225C60 the fo
 /* The projection scale (pixels per unit at w 1) from the current matrices,
  * times scale. */
 void  modelset_set_projection_scale(f32 scale);             /* 0x00225C68 */
+/* PC (no original): the projection scale as it is, and put back (the course
+ * scale's draws multiply it for the LODs: game/app/pc_course_scale.h). */
+f32   modelset_get_projection_scale(void);
+void  modelset_put_projection_scale(f32 v);
+/* PC (no original): the levels of detail of the models drawn from now on -
+ * PC_DETAIL_SETTING as [Graphics] Lod (off: level 0 and the full textures),
+ * PC_DETAIL_FULL level 0 and the full textures, PC_DETAIL_GAME the game's
+ * own choice (the road reflection's: [Graphics] ReflectionDetail, T131);
+ * the game thread's.  modelset_pc_full_detail: level 0 now (game/app/
+ * pc_detail.h pc_lod follows it). */
+enum { PC_DETAIL_SETTING, PC_DETAIL_FULL, PC_DETAIL_GAME };
+void  modelset_pc_set_detail(int mode);
+int   modelset_pc_full_detail(void);
+/* PC (2026-11-12, no original): every LOD command (0x07) of the models drawn
+ * from now on takes `level' (at most the command's last), whatever the
+ * callback, the size or the detail above say; -1: off (the menus' race
+ * model, [Debug] MenuRaceModelLod: game/app/pc_menu_race_model.h). */
+void  modelset_pc_force_lod(int level);
 
 #endif /* GAME_T451_MODEL_SET_H */

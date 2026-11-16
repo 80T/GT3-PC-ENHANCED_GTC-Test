@@ -7,10 +7,12 @@
  * from the PC: each port (slot 0) is a DualShock 2 in pressure mode, built
  * through the mapping of gt3pc.ini [Controller1] / [Controller2]
  * (platform/input_map.h, the launcher's Controls tab) from the port's game
- * controller (platform/gamepad.h, SDL3) and the keyboard and mouse, their
+ * controller (platform/gamepad.h, SDL3), the devices its bindings name
+ * (`@<name>': pedals, a button box...) and the keyboard and mouse, their
  * values combined.  Port 1 is always plugged in (by default it has the
- * keyboard); port 2 while its controller is connected, or always when
- * [Controller2] maps keys.  The game's motors drive the controller's rumble.
+ * keyboard); port 2 while its controller or a device it names is
+ * connected, or always when [Controller2] maps keys.  The game's motors
+ * drive the controller's rumble.
  *
  * Controller 1's default keys:
  *   arrows        D-pad (menus; steering in a race)
@@ -21,9 +23,10 @@
  *   J / L / I / K right stick (left / right / up / down); also the chase
  *                 camera's controls (its free orbit, game/app/pc_freecam.h:
  *                 camera, not the DualShock 2's), with the right stick
- * A button from an analog source (a trigger, a stick) is pressed from
- * halfway (a trigger from the slightest press), its travel the pressure;
- * the sticks' and triggers' dead zones apply first.
+ * A button from an analog source (a trigger, a stick, a pedal) is pressed
+ * from halfway (a trigger, or a pedal - a whole joystick axis -, from the
+ * slightest press), its travel the pressure; the sticks' and triggers' dead
+ * zones apply first.
  *
  * The answer (mode id 0x79, DualShock 2 with pressure): byte 0 = 0 (valid),
  * 1 = 0x79, 2..3 = the buttons, active low (byte 2: Select, L3, R3, Start,
@@ -32,6 +35,7 @@
  * = the pressures of Right, Left, Up, Down, Triangle, Circle, Cross, Square,
  * L1, R1, L2, R2 (0xFF pressed). */
 #include "libpad.h"
+#include "platform/cockpit_osd.h"              /* PC (2026-11-08): the cockpit camera's calibration */
 #include "platform/debug_camera.h"
 #include "platform/gamepad.h"
 #include "platform/input_map.h"
@@ -72,12 +76,23 @@ bool maps_input(int port)
     return false;
 }
 
+/* The port's profile names a device (`@<name>') that is connected (port 2
+ * is then plugged in). */
+bool uses_device(int port)
+{
+    const Profile &p = profile(kController1 + port);
+    for (int c = 0; c < kPadControlCount; c++)
+        if (p.map[c][0].device != 0 && gamepad::device_present(p.map[c][0].device))
+            return true;
+    return false;
+}
+
 bool connected(int port, int slot)
 {
     if (port < 0 || port > 1 || slot != 0 || !g_open[port])
         return false;
     PadSource raw;
-    return port == 0 || gamepad::read_raw(port, &raw) || maps_input(port);   /* port 1 has the keyboard */
+    return port == 0 || gamepad::read_raw(port, &raw) || maps_input(port) || uses_device(port);   /* port 1 has the keyboard */
 }
 
 /* The buttons of the answer (gamepad.h's bits: bytes 2..3, active high) and
@@ -144,6 +159,16 @@ void apply_deadzones(int port, PadSource *raw)
             raw->axes[a] = to_axis(apply_deadzone(raw->axes[a] / 32767.0f, d));
 }
 
+/* The devices the bindings name, read; the controller's dead zones on the
+ * sticks and triggers of those SDL maps as gamepads. */
+void read_devices(int port, gamepad::Devices *devs)
+{
+    gamepad::read_devices(devs);
+    for (int d = 0; d < devs->count; d++)
+        if (devs->src[d].pad != nullptr)
+            apply_deadzones(port, &devs->pad[d]);
+}
+
 /* A control's value: the larger of its slots'; analog: from an axis. */
 float control_value(const Profile &p, int c, const Sources &s, const Binding **from)
 {
@@ -175,15 +200,19 @@ void fill_answer(int port, unsigned char *d)
     const bool pad = gamepad::read_raw(port, &raw);
     if (pad)
         apply_deadzones(port, &raw);
-    Sources s = {pad ? &raw : nullptr, nullptr, window::key_down, 0};
+    gamepad::Devices devs;
+    read_devices(port, &devs);
+    Sources s = {pad ? &raw : nullptr, nullptr, window::key_down, 0, devs.src, devs.count};
     for (int c = 0; c <= PAD_START; c++) {
         const Binding *from;
         const float v = control_value(p, c, s, &from);
-        /* an analog source from halfway (a trigger from its slightest
-         * press), its travel the pressure */
+        /* an analog source from halfway (a trigger, or a pedal - a whole
+         * joystick axis -, from its slightest press), its travel the
+         * pressure */
         const bool analog = v > 0.0f && is_analog(*from);
-        const bool trigger = analog && from->source == Source::pad_axis &&
-                             (from->index == kPadAxisLeftTrigger || from->index == kPadAxisRightTrigger);
+        const bool trigger = analog && ((from->source == Source::pad_axis && (from->index == kPadAxisLeftTrigger ||
+                                                                              from->index == kPadAxisRightTrigger)) ||
+                                        (from->source == Source::joy_axis && (from->dir == 2 || from->dir == -2)));
         const bool tap = (g_taps[port] >> c) & 1;
         if (!(v >= (trigger ? kTriggerPress : 0.5f)) && !tap)
             continue;
@@ -199,6 +228,26 @@ void fill_answer(int port, unsigned char *d)
         const float v = control_value(p, o.plus, s, &from) - control_value(p, o.minus, s, &from);
         const long b = lroundf(127.5f + v * 127.5f);
         d[o.byte] = (unsigned char)(b < 0 ? 0 : b > 0xFF ? 0xFF : b);
+    }
+    /* PC (2026-11-08): the cockpit camera's calibration (cockpit_osd.h) has
+     * the calibrating player's D-pad and Cross / Circle / Triangle while it
+     * is on (the other player's pad takes it over with a press): their state
+     * to it, and - when they are its - released for the game */
+    if (cockpit_osd::active()) {
+        static const int kCalib[7] = {PAD_UP, PAD_DOWN, PAD_LEFT, PAD_RIGHT, PAD_CROSS, PAD_CIRCLE, PAD_TRIANGLE};
+        unsigned held = 0;
+        for (int i = 0; i < 7; i++) {
+            const ButtonOut &o = kButtonOut[kCalib[i]];
+            if (!((d[2 + (o.bit >> 3)] >> (o.bit & 7)) & 1))
+                held |= 1u << i;
+        }
+        if (cockpit_osd::pad_state(0, port, held))
+            for (int i = 0; i < 7; i++) {
+                const ButtonOut &o = kButtonOut[kCalib[i]];
+                d[2 + (o.bit >> 3)] |= (unsigned char)(1 << (o.bit & 7));
+                if (o.pressure >= 0)
+                    d[8 + o.pressure] = 0;
+            }
     }
 }
 
@@ -225,6 +274,8 @@ void take_taps()
     const bool notchUp = up != g_wheelUp, notchDown = down != g_wheelDown;
     g_wheelUp = up;
     g_wheelDown = down;
+    gamepad::DevicePresses devPressed;      /* (the devices bindings name: taken once for both ports) */
+    gamepad::take_pressed_devices(&devPressed);
     for (int port = 0; port < 2; port++) {
         const Profile &p = profile(kController1 + port);
         const uint32_t padPressed = gamepad::take_pressed_raw(port);
@@ -232,9 +283,13 @@ void take_taps()
         for (int c = 0; c <= PAD_START; c++)
             for (int slot = 0; slot < kSlots; slot++) {
                 const Binding &b = p.map[c][slot];
+                const bool named = b.device != 0 && b.device <= kMaxDevices;
                 bool tap = false;
                 if (b.source == Source::pad_button) {
-                    tap = b.index < 32 && ((padPressed >> b.index) & 1);
+                    const uint32_t bits = b.device == 0 ? padPressed : named ? devPressed.pad[b.device - 1] : 0;
+                    tap = b.index < 32 && ((bits >> b.index) & 1);
+                } else if (b.source == Source::joy_button) {
+                    tap = named && b.index < 128 && devPressed.joy[b.device - 1][b.index];
                 } else if (b.source == Source::key) {
                     if (!taken[b.index]) {
                         taken[b.index] = true;
@@ -262,7 +317,12 @@ void camera(int port, bool wheel, bool skipX, bool skipY, float *x, float *y)
     PadSource raw;
     gamepad::Joystick joy;
     JoySource js = {};
-    Sources s = {nullptr, nullptr, window::key_down, 0};
+    gamepad::Devices devs;
+    if (wheel)
+        gamepad::read_devices(&devs);
+    else
+        read_devices(port, &devs);
+    Sources s = {nullptr, nullptr, window::key_down, 0, devs.src, devs.count};
     if (wheel) {
         if (gamepad::read_wheel(port, &joy)) {
             js = {joy.buttonCount, joy.axisCount, joy.hatCount, joy.buttons, joy.axes, joy.hats};
@@ -284,7 +344,7 @@ void camera(int port, bool wheel, bool skipX, bool skipY, float *x, float *y)
                 for (int ss = 0; ss < kSlots; ss++) {
                     const Binding &o = p.map[sticks[i]][ss];
                     taken = taken || (b.source != Source::none && b.source == o.source && b.index == o.index &&
-                                      b.dir == o.dir);
+                                      b.dir == o.dir && b.device == o.device);
                 }
             if (!taken)
                 v = std::max(v, value(b, s));

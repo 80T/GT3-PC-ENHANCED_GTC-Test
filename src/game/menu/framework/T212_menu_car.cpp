@@ -17,6 +17,8 @@
 #define U064_T212                           /* page_manager_internal.h: this unit's declarations */
 #include "game/menu/framework/page_manager_internal.h"
 #include "game/menu/framework/T212_menu_car.h"
+#include "game/app/pc_menu_car.h"                /* PC: the right stick */
+#include "game/app/pc_menu_race_model.h"         /* PC (2026-11-12): [Debug] MenuRaceModel */
 /* Not used here: retail T212's .rodata starts with the format string of
  * SimpleCameraBase::print's inline body, "(%f, %f, %f) %f %f %f\n"
  * (0x00333BC0, before the jump tables), so the original unit saw that
@@ -187,6 +189,8 @@ Car::Car(Tex1Image *envImage, MenuCarSpec *carSpec, int carPlayer, void *carBuff
     /* PC: a caller's buffer is MENU_CAR_BUFFER_SIZE too (T010's) */
     bigBuffer = 0;
     bufferSize = buffer != 0 ? MENU_CAR_BUFFER_SIZE : 0;
+    pcStickHold = 0;                        /* PC */
+    pcRaceModel = 0;                        /* PC (2026-11-12) */
     render.setEnvImage(envImage);
     modelPath[0] = '\0';
     wheelName[0] = '\0';
@@ -232,7 +236,9 @@ void Car::setCar(const char *newCar)
             modelPath[0] = '\0';
             car = 0;
         } else {
-            car_model_path(code, modelPath, CAR_MODEL_MENU);
+            /* PC (2026-11-12): or the race model ([Debug] MenuRaceModel) */
+            pcRaceModel = pc_menu_race_model();
+            car_model_path(code, modelPath, pcRaceModel ? pc_menu_race_model_kind() : CAR_MODEL_MENU);
             file = 0;
             tiresSet = 0;
         }
@@ -240,11 +246,33 @@ void Car::setCar(const char *newCar)
     color = 0;
     prevColor = 0;
     camera.reset();
+    pcStickHold = 0;                        /* PC: a new car starts on its own spin */
     wheelName[0] = '\0';
     loadState = 0;
     g_00352560[player] = 0;
     if (intr)
         EI();
+}
+
+/* PC (2026-11-12, no original): [Debug] MenuRaceModel turned on or off while
+ * a car is on show: the same car again from the other file (as setCar
+ * restarts it for another car: the camera's preset, the colour, the fade
+ * in), the wheel fitted kept (its file from the other folder). */
+void Car::pcCheckRaceModel()
+{
+    if (car == 0 || (pc_menu_race_model() != 0) == (pcRaceModel != 0))
+        return;
+    char wheel[sizeof(wheelName)];
+    memcpy(wheel, wheelName, sizeof(wheel));
+    const int keepColor = color;
+    const char *shown = car;
+    car = 0;                                /* (setCar returns at once for the car it has) */
+    setCar(shown);
+    if (wheel[0] != '\0')
+        setWheel(wheel);
+    color = keepColor;
+    prevColor = keepColor;
+    printf("PC: menu car %s: the %s model\n", modelPath, pcRaceModel ? "race" : "menu");
 }
 
 // FUNC 0x001B8A58 gt2k_menu::Car::setWheel
@@ -266,7 +294,7 @@ void Car::setWheel(const char *name)
     }
     int intr = intr_suspend();
     if (wheelName[0] != '\0')
-        wheel_file_path(wheelPath, wheelName, 1);
+        wheel_file_path(wheelPath, wheelName, pcRaceModel ? 0 : 1);    /* PC (2026-11-12): the race wheel */
     tiresReady = 0;
     tiresSet = 0;
     if (intr)
@@ -455,6 +483,7 @@ void Car::virtual_1()
     Transitive::virtual_1();
     blend.setVelocity(-10.0f);
     blend.update(0.0f);
+    pcCheckRaceModel();                     /* PC (2026-11-12) */
     loadStep();
     int shown;
     if (camera.getType() == 6 || camera.getType() == 7)
@@ -462,7 +491,19 @@ void Car::virtual_1()
     else
         shown = ready != 0 && tiresReady != 0;
     if (shown != 0) {
+        /* PC (ROADMAP 45): the right stick turns the car, the automatic spin
+         * off meanwhile, and the preset's damping (the stick's speed is the
+         * same in every menu).  Not with a force waiting: the car wash's
+         * (TumbleCar, T037) is the only one, as virtual_8 uses it up every
+         * tick */
+        const f32 autoSpin = camera.rotSpeed[1], autoDamping = camera.rotDamping;
+        if (camera.tumbleY.force == 0.0f && pc_menu_car_spin(player, &pcStickHold, &camera.tumbleY.velocity)) {
+            camera.rotSpeed[1] = 0.0f;
+            camera.rotDamping = 0.0f;
+        }
         camera.virtual_8(&g_002EB170);
+        camera.rotSpeed[1] = autoSpin;
+        camera.rotDamping = autoDamping;
         /* Lupo 2 (L2 0x001BE448 / 0x001BE450): the model's animations */
         model.animate();
         model.applyAnims();
@@ -531,6 +572,7 @@ void Car::virtual_2()
     if (fade.get() < 0.8f)
         mirrorPasses = 1;
     model.setDirt(dirt);
+    pc_menu_race_model_begin(pcRaceModel);  /* PC (2026-11-12): its level of detail, its wheels' faces */
     render.beginFrame();
     if (drawMirror != 0)
         render.draw(&model, tires, color, prevColor, 1, 0, tiresReady, fade.get(),
@@ -538,6 +580,7 @@ void Car::virtual_2()
     render.draw(&model, tires, color, prevColor, 0, 0, tiresReady, fade.get(),
                 CAR_MAXF(blend.get(), 0.0f), passes);
     render.endFrame();
+    pc_menu_race_model_end();
 }
 
 // FUNC 0x001B91E8 gt2k_menu::Car::getCamera

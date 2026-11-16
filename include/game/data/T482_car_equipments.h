@@ -809,7 +809,12 @@ struct CarSpec {
     u8  turboRpm[2];                        /* 0x0AA x 100 rpm */
     u8  turboBoost[2];                      /* 0x0AC x 0.1 */
     u8  turboRate[2];                       /* 0x0AE x 0.1 */
-    u8  unk_0B0[2];                         /* 0x0B0 */
+    /* PC (2026-11-08): the GEAR record's kind (its category: 0 stock, 1
+     * close, 2 super close, 3 fully customisable), a byte no GT3 code reads
+     * or writes (getSpec's memset leaves it 0).  Writer: specGear; gear_calc
+     * copies it to GearCalc.gearKind (game/app/pc_shift.h). */
+    u8  gearKind;                           /* 0x0B0 */
+    u8  unk_0B1;                            /* 0x0B1 */
     u8  layout;                             /* 0x0B2 drivetrain: 0 FR, 1 FF, 2 4WD, 3 MR, 4 RR */
     u8  awdType;                            /* 0x0B3 drivetrain (4WD kind 0..7) */
     u8  awdSplit;                           /* 0x0B4 drivetrain's VCD default (x 0.01) */

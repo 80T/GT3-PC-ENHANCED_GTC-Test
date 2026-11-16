@@ -21,7 +21,7 @@ namespace {
 
 using overlay::rgba;
 
-enum Action { ACT_NONE, ACT_BACK, ACT_RESTART, ACT_EXIT };
+enum Action { ACT_NONE, ACT_BACK, ACT_RESTART, ACT_RESTART_NEW_GAME, ACT_EXIT };
 
 struct Item {
     const char *label;
@@ -33,13 +33,18 @@ struct Item {
 const Item kItems[] = {
     {"BACK", "CLOSES THIS MENU.", ACT_BACK},
     {"RESTART", "THE GAME STARTS AGAIN FROM THE BEGINNING.\nWHAT IS NOT SAVED IS LOST.", ACT_RESTART},
+    {"RESTART AS NEW GAME",
+     "THE GAME STARTS AGAIN WITHOUT LOADING A SAVE.\nYOUR SAVES STAY ON THE MEMORY CARD.\nWHAT IS NOT SAVED IS LOST.",
+     ACT_RESTART_NEW_GAME},
     {"EXIT", "CLOSES THE GAME.\nWHAT IS NOT SAVED IS LOST.", ACT_EXIT},
 };
 constexpr int kItemCount = (int)(sizeof(kItems) / sizeof(kItems[0]));
 
 std::atomic<bool> g_shown{false};
 std::atomic<bool> g_restart{false};
-std::mutex g_lock;                              /* the selection and the pending action (window / render threads) */
+std::atomic<bool> g_restartNewGame{false};
+bool g_newGameRun;                              /* set once, before the game threads */
+std::mutex g_lock;                             /* the selection and the pending action (window / render threads) */
 int g_sel;
 /* Restart / Exit chosen while a memory card was being written: done at the
  * first present after it (present) */
@@ -55,6 +60,10 @@ void act(Action a)
 {
     if (a == ACT_RESTART) {
         pclog::write("system menu: restart");
+        g_restart = true;
+    } else if (a == ACT_RESTART_NEW_GAME) {
+        pclog::write("system menu: restart as a new game");
+        g_restartNewGame = true;
         g_restart = true;
     } else {
         pclog::write("system menu: exit");
@@ -127,7 +136,9 @@ const uint32_t kNotice = rgba(255, 200, 80, 255);
 
 const char kWaiting[] = "WAITING FOR THE MEMORY CARD:\nTHE SAVE GOES ON. ESC: CANCEL.";
 const char kHint1[] = "UP/DOWN CHOOSE   ENTER SELECT   ESC CLOSE";
-const char kHint2[] = "PAD: D-PAD, CROSS SELECT, CIRCLE CLOSE";
+/* (%s: the controller's names of its south and east buttons - CROSS,
+ * CIRCLE; A, B... - gamepad::button_names) */
+const char kHint2[] = "PAD: D-PAD, %s SELECT, %s CLOSE";
 
 /* The lines of text and the longest (characters). */
 void text_extent(const char *t, int *rows, int *cols)
@@ -164,7 +175,10 @@ void build(int bw, int bh)
     for (const Item &it : kItems)
         text_extent(it.help, &helpRows, &cols);
     text_extent(kWaiting, &helpRows, &cols);
-    cols = std::max(cols, (int)strlen(kHint2));
+    char hint2[64];                             /* PC (2026-11-07): the controller's button names */
+    const gamepad::ButtonNames names = gamepad::button_names();
+    snprintf(hint2, sizeof(hint2), kHint2, names.south, names.east);
+    cols = std::max(cols, (int)strlen(hint2));
     /* title, a gap, the items, a gap, the help, a gap, two hints */
     const int rows = kItemCount + helpRows + 6;
     const int s = std::max(1, std::min({bh / 360, (bw - 16) / (cols * 6 + 20), (bh - 16) / (rows * 12 + 20)}));
@@ -202,7 +216,7 @@ void build(int bw, int bh)
     y += (float)(helpRows + 1) * lineH;
     overlay::text(x0, y, s, kHint1, kHint);
     y += lineH;
-    overlay::text(x0, y, s, kHint2, kHint);
+    overlay::text(x0, y, s, hint2, kHint);
 }
 
 } // namespace
@@ -272,6 +286,21 @@ void present(ID3D11RenderTargetView *bb)
 bool restart_requested()
 {
     return g_restart.load();
+}
+
+bool restart_as_new_game()
+{
+    return g_restartNewGame.load();
+}
+
+void set_new_game_run()
+{
+    g_newGameRun = true;
+}
+
+bool new_game_run()
+{
+    return g_newGameRun;
 }
 
 } // namespace system_menu

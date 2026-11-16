@@ -118,6 +118,16 @@ enum {
 
 /* DynCarState.ctrlMode / flags: CTRL_* / DYN_FLAG_* (T288). */
 
+/* PC (no original): the highest running position the driver's rank-scaled
+ * values are made for - GT3's races hold 6 cars.  With up to
+ * PC_RACE_CARS_MAX (game/race/race_cars.h) a car past 6th drives as the 6th
+ * does (ai_rev_engine's revving, ai_drive's traffic delay): 5 - 0.2 x rank
+ * would reach 0 at rank 25.  A race of 6 cars or fewer is unchanged. */
+static inline int ai_rank_capped(int rank)
+{
+    return (rank > 6) ? 6 : rank;
+}
+
 /* ======================================================================== */
 /* Data of this unit                                                        */
 /* ======================================================================== */

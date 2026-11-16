@@ -97,7 +97,16 @@ enum {
     MOUNT_CHASE          = 1,
     MOUNT_FIRST_OWN      = 2,               /* findMountsToward / ByDirection search from here */
     MOUNT_FIRST_CHECKED  = 5,               /* isViewBlocked tests the mounts from here */
-    MOUNT_MIN_SELECTABLE = 6                /* fewer mounts: the replay buttons keep mount 0 */
+    MOUNT_MIN_SELECTABLE = 6,               /* fewer mounts: the replay buttons keep mount 0 */
+    /* PC: the view button's extra cameras (OnBoardCamera::pcNextView): mount
+     * 2 ("reserved", a copy of the chase mount) is no view of its own, so
+     * GameOptions::onboardMount takes it for the cockpit view */
+    MOUNT_PC_COCKPIT     = 2,
+    MOUNT_PC_FIRST_EXTRA = 3,
+    /* PC (2026-11-14): GameOptions::onboardMount from here: the custom
+     * camera in view (game/app/pc_customcam.h), this + its number - 1 (the
+     * car files have 20 mounts at most) */
+    MOUNT_PC_CUSTOM      = 64
 };
 
 /* getMountDirection's mask (g_002DB7B0 by 45-degree sector of the heading) */

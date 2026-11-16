@@ -353,6 +353,21 @@ void envmapBuildMatrix(EnvMap &em, const Vec4 modelview[4]);    /* pgl_build_env
  * transposed (w = 0), row 3.xyz = -t R^T, row 3.w kept. */
 void invertRigid(Vec4 m[4]);
 
+/* PC (no original): the course scale (game/app/pc_course_scale.h).  Its
+ * draws put a world scale (x, y, z) before the view, so the modelview is not
+ * rigid while w != 0 (pgl_set_world_scale): the lighting's inverses
+ * (pgl_update_eye_lights, the env matrices) are general affine ones then,
+ * the rows that turn normals are taken normalised, and a billboard's axis
+ * comes from the view without the scale (vu0g::billboardAxis). */
+extern Vec4 g_worldScale;
+/* The affine inverse in invertRigid's layout: rows 0..2 the 3x3's inverse
+ * (w = 0), row 3.xyz = -t A^-1, row 3.w kept. */
+void invertAffine(Vec4 m[4]);
+/* invertAffine while g_worldScale is on, else invertRigid. */
+void invertModelview(Vec4 m[4]);
+/* Rows 0..2's xyz normalised while g_worldScale is on (else as they are). */
+void normalizeModelviewRows(Vec4 m[4]);
+
 /* ======================================================================== */
 /* GsContext-level entry points (templates over the context type)          */
 /* ======================================================================== */

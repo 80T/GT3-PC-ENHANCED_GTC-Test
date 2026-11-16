@@ -13,6 +13,7 @@ if(NOT TARGET gt3_sound_native)
         ${CMAKE_CURRENT_SOURCE_DIR}/spu2_adpcm.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/spu2_reverb.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/spu2.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/bgm_files.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/ads_stream.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/sound_native.cpp)
     target_include_directories(gt3_sound_native PUBLIC ${GT3PC_SRC})

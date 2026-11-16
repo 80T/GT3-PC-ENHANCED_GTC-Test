@@ -14,6 +14,9 @@
 #include "game/car/physics/T296_car_drivetrain.h"
 #include "game/car/physics/suspension_internal.h"
 #include "game/enhanced.h"                          /* ENH_PHYSICS_*, ENH_AI_SKILL_AS_GRIP */
+#include "game/app/pc_car_tuning.h"                 /* PC: the tyre wear multiplier */
+#include "game/app/pc_shift.h"                      /* PC (2026-11-08): the realistic gear shift */
+#include "game/app/pc_clutch.h"                     /* PC (2026-11-09): its clutch mode */
 // DATA_START 0x0033C7C0
 
 // FUNC 0x001E6C28 car_driven_axle_speed
@@ -83,12 +86,16 @@ void car_update_rpm(RaceCarDynamics *car)
  * when the clutch input is 0.  While slipping the wheels' engine speed is
  * recorded and, after a shift and in transmission modes other than 3 / 6,
  * the throttle becomes 0 / 1 (the engine must come down / up to the
- * wheels). */
+ * wheels).  PC (2026-11-08): a realistic shift's throttle is its own
+ * (game/app/pc_shift.h: with the clutch out an upshift's shut, a
+ * downshift's the metered blip; the driver's as it snaps in). */
 void car_clutch_state(RaceCarDynamics *car)
 {
     CarDynState *st = &car->st;
     GearCalc *gear = &car->params.gear;
 
+    if (pc_clutch_state(car))
+        return;                             /* PC (2026-11-09): the player's own clutch (game/app/pc_clutch.h) */
     switch (st->clutchState) {
     case CLUTCH_FREE:
         if (st->clutch != 0.0f) {
@@ -126,6 +133,8 @@ void car_clutch_state(RaceCarDynamics *car)
         if (transMode == 6)
             return;
         if (st->clutchState == CLUTCH_SHIFT) {
+            if (pc_shift_throttle(car))     /* PC (2026-11-08): the realistic shift's */
+                return;
             if (wheelSpeed < st->engineWPrev) {
                 st->throttleOut = 0.0f;
                 return;
@@ -408,7 +417,9 @@ void car_tyre_long_forces(RaceCarDynamics *car)
  * register set again after each store.  Left: that register ($a0 in retail,
  * $v1 here, the constant 1 in $v1 / $a1) and the order of the lock block's
  * two byte stores; all 24 orders of the lock block and the state's types
- * tried.) */
+ * tried.)  PC (2026-11-08): a realistic shift (game/app/pc_shift.h) does
+ * not lock while its clutch is out (the engine kept at idle at least) and
+ * locks when its snap's time is up. */
 void car_engine_speed(RaceCarDynamics *car)
 {
     CarParams *p = &car->params;
@@ -445,6 +456,10 @@ void car_engine_speed(RaceCarDynamics *car)
             u8 transMode = 0;
             if (st->driver != 1 && st->ctrlMode == 0)
                 transMode = st->transMode;
+            /* PC (2026-11-09): the clutch mode's slipping clutch (game/app/
+             * pc_clutch.h): the engine kept at its idle at least, no lock
+             * below the idle's wheel speed, GT3's frees below not taken */
+            const int pcClutch = st->clutchState == CLUTCH_SLIP ? pc_clutch_engine(car, wheelSpeed) : PC_CLUTCH_GT3;
             if ((transMode == 3 || transMode == 6) && st->clutch == 1.0f) {
                 f32 axleSpeed = st->engineSpeed / gear->ratio[gearbox_ratio_slot(gear, st->gear)];
                 int axle;
@@ -459,12 +474,17 @@ void car_engine_speed(RaceCarDynamics *car)
             } else {
                 f32 wheelsBefore = st->wheelEngineW;
                 f32 engineBefore = st->engineWPrev;
+                /* PC (2026-11-08): the realistic shift's step */
+                const int pcShift = st->clutchState == CLUTCH_SHIFT ? pc_shift_engine(car) : PC_SHIFT_GT3;
                 speed = st->engineSpeed;
                 /* the engine crossed the wheels' speed (either way) */
-                if ((engineBefore <= wheelsBefore && wheelSpeed <= speed)
-                    || (wheelsBefore <= engineBefore && speed <= wheelSpeed)) {
+                if (pcShift == PC_SHIFT_ENGAGE || pcClutch == PC_CLUTCH_LOCK
+                    || (pcShift == PC_SHIFT_GT3 && pcClutch != PC_CLUTCH_HOLD
+                        && ((engineBefore <= wheelsBefore && wheelSpeed <= speed)
+                            || (wheelsBefore <= engineBefore && speed <= wheelSpeed)))) {
                     st->clutchState = CLUTCH_LOCKED;
-                    st->shiftTimer = 12;
+                    if (pcClutch == PC_CLUTCH_GT3)
+                        st->shiftTimer = 12;        /* (PC 2026-11-09: not the player's clutch's) */
                     st->engineSpeed = wheelSpeed;
                     speed = wheelSpeed;
                 }
@@ -474,7 +494,7 @@ void car_engine_speed(RaceCarDynamics *car)
                     st->clutchState = CLUTCH_FREE;
                 }
             }
-            if (st->clutchState == CLUTCH_SLIP) {
+            if (st->clutchState == CLUTCH_SLIP && pcClutch == PC_CLUTCH_GT3) {     /* (PC: the player's clutch) */
                 if (st->brake > 0.75f) {
                     if (speed < (f32)(p->engine.idle + 500) * U081_RPM)
                         st->clutchState = CLUTCH_FREE;
@@ -504,10 +524,13 @@ void car_engine_speed(RaceCarDynamics *car)
 // FUNC 0x001E77E0 car_gear_select
 /* Applies the gear car_select_gear asks for (-1: none); a slipping or
  * locked clutch becomes CLUTCH_SHIFT for a forward -> forward change, else
- * CLUTCH_SLIP. */
+ * CLUTCH_SLIP.  PC (2026-11-08): the shift told to the realistic gear shift
+ * (game/app/pc_shift.h). */
 void car_gear_select(RaceCarDynamics *car)
 {
     CarDynState *st = &car->st;
+    if (pc_clutch_gear_select(car))
+        return;                             /* PC (2026-11-09): the clutch mode's gears (game/app/pc_clutch.h) */
     int gear = car_select_gear(car, &st->ctrl);
 
     if (gear == -1)
@@ -516,8 +539,11 @@ void car_gear_select(RaceCarDynamics *car)
         if (gear != 0 && st->gear != 0) {
             /* Lupo 2: a clutchless box changes forward gears without the
              * clutch phase (L2 0x001E55B8) */
-            if (!gearbox_is_clutchless(&car->params.gear))
+            if (!gearbox_is_clutchless(&car->params.gear)) {
+                const bool pcWasShift = st->clutchState == CLUTCH_SHIFT;   /* PC (2026-11-08) */
                 st->clutchState = CLUTCH_SHIFT;
+                pc_shift_begin(car, st->gear, gear, pcWasShift);           /* PC (2026-11-08) */
+            }
             /* Lupo 2: the shift event of the model animation, +1 up, -1
              * down (L2 0x001E55D0..0x001E560C) */
             if (st->gear < gear)
@@ -913,6 +939,7 @@ void car_yaw_lateral(RaceCarDynamics *car, int airborne)
         TyreData *tyre = CarDynamics_getTyre(p, i, surface);
         grip += tyre->surfaceGrip[surface] * tyre->grip;
     }
+    grip *= pc_car_tuning(car, PC_TUNE_GRIP);   /* PC: of the grip the multiplier gives */
     st->latGripUse = (accelY * 4.0f) / grip;
 }
 
@@ -973,13 +1000,16 @@ void car_integrate_velocity(RaceCarDynamics *car, int airborne)
  * levels; unless a wheel is on counted ground (flag 0x10), each loaded
  * wheel off surface 1 wears by min(squealVolume, the cap slipCap) x the
  * tyre's wearRate x (wearBase + load x wearLoad, >= 0) x dt, and its squeal
- * level is min(squealVolume, cap) x wearRate x 255 (at most 255). */
+ * level is min(squealVolume, cap) x wearRate x 255 (at most 255).
+ * PC: the wear x the car's tyre wear multiplier (game/app/pc_car_tuning.h;
+ * the squeal level kept). */
 void car_tyre_wear(RaceCarDynamics *car)
 {
     CarDynState *st = &car->st;
     CarParams *p = &car->params;
     WearCurve *wear = &car->dc->wear;
     f32 dt = car->dt;
+    const f32 pcWear = pc_car_tuning(car, PC_TUNE_TIRE_WEAR);   /* PC */
     int wearOn = 1;
     int i;
 
@@ -1010,7 +1040,7 @@ void car_tyre_wear(RaceCarDynamics *car)
         if (wear->slipCap < rate)
             rate = wear->slipCap;
         rate = rate * tyre->wearRate;
-        w->wear = w->wear + rate * loadRate * dt;
+        w->wear = w->wear + rate * loadRate * dt * pcWear;   /* PC: x the multiplier */
         rate = rate * 255.0f;
         if (rate > 255.0f)
             rate = 255.0f;
@@ -1078,7 +1108,9 @@ void car_tyre_check(RaceCarDynamics *car)
 
 // FUNC 0x001E84D8 car_rolling_resistance
 /* Clears the force terms; the rolling resistance = - sign(speed) x the
- * speed curve x the sum of load x the surface's coefficient. */
+ * speed curve x the sum of load x the surface's coefficient.
+ * PC: the race's raw coefficient of the surface where it has one
+ * (game/app/pc_car_tuning.h). */
 void car_rolling_resistance(RaceCarDynamics *car)
 {
     CarDynState *st = &car->st;
@@ -1092,7 +1124,8 @@ void car_rolling_resistance(RaceCarDynamics *car)
     st->rollResist = 0.0f;
     f32 sum = st->unk_4D0;
     for (i = 0; i < 4; i++)
-        sum += st->wheel[i].load * g_002D2CE0.rollingResistance[st->wheel[i].surface];
+        sum += st->wheel[i].load * pc_surface_resistance(car, st->wheel[i].surface,   /* PC */
+                                                         g_002D2CE0.rollingResistance[st->wheel[i].surface]);
 
     if (speed > 0.0f)
         st->rollResist = -curveLookupLinear(&g_002D2CE0.resistCurve, speed) * sum;

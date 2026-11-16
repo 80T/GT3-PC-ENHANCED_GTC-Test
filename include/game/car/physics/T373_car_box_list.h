@@ -4,7 +4,8 @@
  *
  * CarBoxList (T167_rigid_body.h; u083 CarAuxSet, u085 CourseGrid +0xC) is
  * DynamicsConductor +0xBBB4: {dc, count, course, CarBox box[8]} (+0x0, +0x4,
- * +0x8, +0xC; CarBox 0x4F0, T376_car_box_walls.h).  boxes_step runs all cars:
+ * +0x8, +0xC; CarBox 0x4F0, T376_car_box_walls.h; PC: box[PC_RACE_CARS_MAX]
+ * of 0x4B0).  boxes_step runs all cars:
  * the cars' states in, up to two passes of predict / detect the earliest hit
  * (T375 / T376) / advance everyone to it / resolve it, then the rest of the
  * frame, the states back to the cars and the impact feedback (T374).

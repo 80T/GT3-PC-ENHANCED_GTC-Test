@@ -20,7 +20,7 @@
  *         from the cars, the collision step of a frame (up to 2 passes of
  *         predict / detect / advance to the first hit / respond)
  *         (T373_car_box_list.h)
- *   T374  one car's collision box (CarBox, 0x4F0): an octagon of 8 corners
+ *   T374  one car's collision box (CarBox, 0x4F0; PC 0x4B0): an octagon of 8 corners
  *         and 8 edges, the pose / sweep / bounding box, the impact feedback
  *         to the car, save / restore of its corners (T374_car_box.h)
  *

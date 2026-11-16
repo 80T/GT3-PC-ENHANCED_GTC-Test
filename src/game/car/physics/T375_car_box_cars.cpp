@@ -16,6 +16,17 @@
 #include "car_box_vec2.h"
 // DATA_START 0x0033DE90
 
+/* PC: retail's b->reach2[other] (car_box_link, T374): the sum of the two
+ * boxes' radii, squared - computed here, the same floats, instead of kept in
+ * a table per box that would be PC_RACE_CARS_MAX long (game/race/
+ * race_cars.h). */
+static inline f32 car_box_reach2(const CarBox *b, const CarBox *other)
+{
+    f32 reach = b->radius + other->radius;
+
+    return reach * reach;
+}
+
 // FUNC 0x001FBCE8 car_box_resolve_car_contacts
 //   For each corner resting on an edge of another box (flags bit 1): when
 //   the corner has left the edge's extent the flag is cleared; when it is
@@ -87,15 +98,17 @@ void car_box_resolve_car_contacts(CarBox *b)
 //   already recorded, the hit is stored (carEdge / carOther / carVertex /
 //   carContact, hitTime, carHit) and the front / rear flags of both boxes
 //   are set.  Returns 1 when stored.  Caller: boxes_step (T373).
+//   PC: the sector test (runway_is_neighbour, a list walk) after the
+//   bounding box and reach tests, which retail made after it: all of them
+//   only return 0, none has a side effect, so the result is the same;
+//   with up to 32 cars (game/race/race_cars.h) most pairs are far apart and
+//   leave at the float tests.
 int car_box_sweep_car(CarBox *b, int other)
 {
     if (b->collidable == 0)
         return 0;
     CarBox *otherBox = &b->boxes[other];
     if (otherBox->collidable == 0)
-        return 0;
-    if (b->sector != otherBox->sector &&
-        runway_is_neighbour(b->course->data->runway, b->sector, otherBox->sector) == 0)
         return 0;
 
     f32 overlapX = otherBox->bbMax[0] - b->bbMin[0];
@@ -127,7 +140,12 @@ int car_box_sweep_car(CarBox *b, int other)
         closest.x = relPos.x + relMove.x * k;
         closest.y = relPos.y + relMove.y * k;
     }
-    if (b->reach2[other] < closest.x * closest.x + closest.y * closest.y)
+    /* PC: car_box_reach2 (retail's reach2[other] table, T374) */
+    if (car_box_reach2(b, otherBox) < closest.x * closest.x + closest.y * closest.y)
+        return 0;
+    /* PC: the sector test here, after the float tests (above) */
+    if (b->sector != otherBox->sector &&
+        runway_is_neighbour(b->course->data->runway, b->sector, otherBox->sector) == 0)
         return 0;
 
     /* the other box's pose relative to this one, at both ends */
@@ -368,6 +386,8 @@ void car_box_separate_car(CarBox *b, const f32 *rotA, const f32 *rotB)
 //   the deepest push (projected on d) moves the other box by +1/2 and this
 //   box by -1/2 of it (car_box_translate, corners included).  Caller:
 //   boxes_step (T373).
+//   PC: the reach test before the sector test, as in car_box_sweep_car (the
+//   same result: both only return).
 void car_box_push_out_car(CarBox *b, int other)
 {
     if (b->collidable == 0)
@@ -375,13 +395,14 @@ void car_box_push_out_car(CarBox *b, int other)
     CarBox *otherBox = &b->boxes[other];
     if (otherBox->collidable == 0)
         return;
-    if (b->sector != otherBox->sector &&
-        runway_is_neighbour(b->course->data->runway, b->sector, otherBox->sector) == 0)
-        return;
 
     f32 centresX = otherBox->pos.x - b->pos.x;
     f32 centresY = otherBox->pos.y - b->pos.y;
-    if (b->reach2[other] < centresX * centresX + centresY * centresY)
+    /* PC: car_box_reach2 (retail's reach2[other] table, T374) */
+    if (car_box_reach2(b, otherBox) < centresX * centresX + centresY * centresY)
+        return;
+    if (b->sector != otherBox->sector &&
+        runway_is_neighbour(b->course->data->runway, b->sector, otherBox->sector) == 0)
         return;
 
     f32 bestY = 0.0f;

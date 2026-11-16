@@ -30,6 +30,7 @@
 #include <string>
 #include <vector>
 
+#include "engine/pgl/native/gs_imgs.h"        /* PC (2026-11-08): imgsround */
 #include "engine/pgl/native/gs_tex1.h"
 #include "engine/pgl/native/gs_tex_decode.h"
 #include "engine/pgl/native/gs_tex_format.h"
@@ -647,11 +648,70 @@ int cmd_memtest(const std::string &path)
     return 0;
 }
 
+/* PC (2026-11-08): the image packs' PNG form (gs_imgs.h): each pack's images
+ * read, the pack built again from them as the game builds it from its PNG
+ * files, that read back - every image the same size and pixels; and the
+ * alpha's PNG round trip for 0 .. 0x80.  Prints a line a pack. */
+int cmd_imgsround(const std::vector<std::string> &paths)
+{
+    for (uint32_t a = 0; a <= 0x80; a++)
+        if (imgs_alpha_from_png(imgs_alpha_to_png(a)) != a) {
+            std::printf("alpha %u does not survive the PNG round trip\n", a);
+            return 1;
+        }
+    int bad = 0;
+    for (const std::string &path : paths) {
+        std::vector<uint8_t> f, built;
+        std::vector<ImgsImage> images, back;
+        std::string why;
+        if (!read_file(path, f)) {
+            std::printf("%s: cannot read\n", path.c_str());
+            bad++;
+            continue;
+        }
+        if (!imgs_read(f.data(), f.size(), images, &why)) {
+            std::printf("%s: KEPT AS IT IS: %s\n", path.c_str(), why.c_str());
+            bad++;
+            continue;
+        }
+        if (!imgs_build(images, built, &why) || !imgs_read(built.data(), built.size(), back, &why)) {
+            std::printf("%s: rebuild failed: %s\n", path.c_str(), why.c_str());
+            bad++;
+            continue;
+        }
+        int counts[3] = {0, 0, 0};          /* T4, T8, CT32 */
+        const std::vector<Tex1Set> sets = tex1_scan(built.data(), built.size());
+        for (const Tex1Set &s : sets) {
+            const uint32_t psm = Tex0::decode(s.tex[0].tex0).psm;
+            counts[psm == PSMT4 ? 0 : psm == PSMT8 ? 1 : 2]++;
+        }
+        size_t same = 0;
+        std::string firstBad;
+        for (const ImgsImage &img : images) {
+            const ImgsImage *b = nullptr;
+            for (const ImgsImage &x : back)
+                if (x.name == img.name)
+                    b = &x;
+            if (b != nullptr && b->w == img.w && b->h == img.h && b->rgba == img.rgba)
+                same++;
+            else if (firstBad.empty())
+                firstBad = img.name;
+        }
+        std::printf("%s: %zu images, %zu identical after the rebuild (T4 %d, T8 %d, CT32 %d), %zu -> %zu bytes%s%s\n",
+                    path.c_str(), images.size(), same, counts[0], counts[1], counts[2], f.size(), built.size(),
+                    firstBad.empty() ? "" : "; FIRST DIFFERENT: ", firstBad.c_str());
+        if (same != images.size())
+            bad++;
+    }
+    return bad != 0 ? 1 : 0;
+}
+
 void usage()
 {
     std::fprintf(stderr,
                  "usage: texdump selftest | scan FILE | tex1 FILE OUTDIR | imgs FILE OUTDIR |\n"
-                 "       pmb FILE OUTDIR | font FILE OUTDIR | kanji FILE OUTDIR [N] | ico FILE OUTDIR\n"
+                 "       pmb FILE OUTDIR | font FILE OUTDIR | kanji FILE OUTDIR [N] | ico FILE OUTDIR |\n"
+                 "       imgsround FILE.imgs...\n"
                  "options: --full --view --raw-alpha --mips --vram --variations --palette P\n");
 }
 
@@ -684,6 +744,8 @@ int main(int argc, char **argv)
         return cmd_scan(args[1]);
     if (cmd == "memtest" && args.size() >= 2)
         return cmd_memtest(args[1]);
+    if (cmd == "imgsround" && args.size() >= 2)
+        return cmd_imgsround(std::vector<std::string>(args.begin() + 1, args.end()));
     if (args.size() < 3) {
         usage();
         return 2;

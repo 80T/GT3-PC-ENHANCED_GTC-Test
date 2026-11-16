@@ -35,8 +35,18 @@
  * 0x0030F088). */
 #include "game/menu/gtmode/T041_event_status.h"
 #include "game/menu/gtmode/gtmode_buttons_internal.h"
+#include "game/app/pc_course_pick.h"            /* PC: the course randomizer's pictures */
 
 namespace gt2k_menu {
+
+/* PC (ROADMAP 35): the mark of a best place: marks[6] ("mark_1".."6").  A
+ * race of more than 6 cars records its 7th and lower as the 6th
+ * (EventResults::updatePlace); a place past it still reads the 6th's mark,
+ * not past the array (the quirk above). */
+static inline int pc_mark_place(int place)
+{
+    return place > PC_RESULT_LAST_PLACE ? PC_RESULT_LAST_PLACE : place;
+}
 
 // FUNC 0x00117C58 gt2k_menu::EventStatusObject::EventStatusObject
 /* One caller (T036 make_event_status).  Item(res, NULL); the marks and
@@ -160,7 +170,7 @@ void EventStatusObject::virtual_2()
         x += frame->w * 0.5f;
         place = results->getPlace(linkMenu);
         if (place != EVENT_PLACE_NONE)
-            mark = marks[place];
+            mark = marks[pc_mark_place(place)];     /* PC: within marks[6] */
         frame->x.set(x);
         frame->virtual_2();
         if (mark != 0) {
@@ -177,7 +187,7 @@ void EventStatusObject::virtual_2()
             sprintf(name, "%s%02d", base, number);
             place = results->getPlace(name);
             if (place != EVENT_PLACE_NONE)
-                boxMark = marks[place];
+                boxMark = marks[pc_mark_place(place)];  /* PC: within marks[6] */
             box->x.set(x);
             box->virtual_2();
             if (boxMark != 0) {
@@ -202,7 +212,7 @@ void EventStatusObject::virtual_2()
             sprintf(name, "%s%02d", base, number);
             place = results->getPlace(name);
             if (place != EVENT_PLACE_NONE)
-                boxMark = marks[place];
+                boxMark = marks[pc_mark_place(place)];  /* PC: within marks[6] */
             frame->x.set(x);
             frame->virtual_2();
             if (boxMark != 0) {
@@ -236,7 +246,7 @@ EventStatusButtonObject::EventStatusButtonObject(MenuLayoutItem *res, Button *bu
     place = getGameStatus()->events.getPlace(event);
     if (place != EVENT_PLACE_NONE) {
         char markName[0x40];                /* sp+0x00 (the RaceDataBase reuses the slot) */
-        sprintf(markName, "mark_%d", place + 1);
+        sprintf(markName, "mark_%d", pc_mark_place(place) + 1);    /* PC: "mark_1".."6" */
         /* implicit: operator new, operator delete (new-expression) */
         mark = new Item(markName, layout);
     }
@@ -244,7 +254,12 @@ EventStatusButtonObject::EventStatusButtonObject(MenuLayoutItem *res, Button *bu
         RaceDataBase db;                    /* sp+0x00 */
         if (db.select(nameToCode(event)) != 0) {
             const char *courseName = db.F_002389C8(db.course);
-            picture = new Item(courseName, layout);
+            /* PC (ROADMAP 24): the course randomizer's "?" in the course's
+             * place (game/app/pc_course_pick.h) */
+            if (pc_course_hidden(event))
+                picture = pc_course_question(layout, courseName, NULL);
+            if (picture == 0)
+                picture = new Item(courseName, layout);
         }
     }
     z = res->z;

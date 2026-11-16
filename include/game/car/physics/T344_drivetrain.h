@@ -40,6 +40,12 @@ class EngineSpecSheet;                      /* T291_engine.h */
 void gearbox_cvt_limit(GearCalc *g, f32 *engineSpeed, f32 *factor);
 f32  gearbox_cvt_torque(RaceCarState *car);
 f32  gearbox_electric_torque(RaceCarState *car);
+/* PC (no original): the CVT controller's rates computed now if they are
+ * not yet (gearbox_cvt_torque computes them at its first call, in the
+ * calling thread's FPU mode): DynamicsConductor::update calls it on the
+ * game thread before it hands the cars to native worker threads
+ * (game/race/dynamics/pc_physics_threads.h), so no worker writes them. */
+void gearbox_cvt_rates_init();
 
 /* The Honda Dualnote (docs/gearbox_dualnote.md; RaceCarState.hybrid,
  * batteryCharge, batteryCapacity, batteryFlow; the front motors' load in

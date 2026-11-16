@@ -24,6 +24,13 @@
  * has them in courses\ itself, so they go into courses\JP\ (unified_path;
  * docs/languages.md "The installed files").
  *
+ * A version the game plays also has its arcade stills written as PNG files
+ * (stills.h), and gets the demo replays of the licence tests and the arcade
+ * time trials over the disc's: this tree's demo\, built into the launcher
+ * (write_demos), so every install and region has the same set; an installed
+ * version gets the set's files that differ when the launcher starts
+ * (refresh_demos), so a set that grew reaches it without a new install.
+ *
  * The marker (kMarkerFile) says which disc the files are from, in "key
  * value" lines the game reads (platform/paths.h install_info): release (the
  * disc's name), boot (SYSTEM.CNF's boot file), language (the disc's own:
@@ -81,6 +88,10 @@ std::wstring installed_release(const std::wstring &folder, const std::wstring &d
 /* Its disc's own language ("US", "BR", "JP"...; "US" for an earlier
  * launcher's install). */
 std::string installed_language(const std::wstring &folder, const std::wstring &data);
+/* PC (2026-11-15): the value of the marker's line "<key> <value>" of the data
+ * folder at the path `data' ("" without one): a disc image's folder's
+ * "image" and "volume" (prepare_disc; disc_files.h). */
+std::string marker_info(const std::wstring &data, const char *key);
 /* It has the menus of the language with the country code `code`
  * (menu\<code>\gt_mode301.pmb; platform/language.h). */
 bool language_installed(const std::wstring &folder, const std::wstring &data, const char *code);
@@ -140,5 +151,44 @@ Result install_from_iso(const std::wstring &iso_path, const std::wstring &folder
  * gt3.vol). */
 Result install_from_volume(const std::wstring &volume_path, const std::wstring &folder, Listener &listener,
                            std::wstring *message);
+
+/* The demo replays built into the launcher (this tree's demo\) written into
+ * the installed data folder `data` (its full path) where a file is missing
+ * or differs from the launcher's, over the disc's copies too (<name>_*): the
+ * launcher does this for every installed version when it starts.  *written:
+ * how many demos had a file written (0: the install already had the set);
+ * false with the reason in *message when one could not be written. */
+bool refresh_demos(const std::wstring &data, int *written, std::wstring *message);
+
+/* ---- playing straight from a disc image --------------------------------------
+ * PC (2026-11-14, user request: "implement direct .iso loading for the Play
+ * from disc... feature").  The game reads a version's disc image in place
+ * (src/platform/disc_image.h): its data folder is then a small one of the
+ * image's own, <folder>\discs\<boot file>_<id> (id: the CRC-32 of its
+ * volume's table of contents, so two discs of one boot file - a retail disc
+ * and a prototype - have a folder each, and an image moved keeps its own),
+ * holding the marker - an install's lines, then "image <its path>" (UTF-8)
+ * and "volume <its volume in the image>" - and the launcher's demo replays
+ * (write_demos), nothing of the disc's.  The game reads a file of that folder
+ * in place of the disc's of the same path, so it is also where a changed
+ * file of that disc goes.  A version's variant - its number under other
+ * letters, a prototype's SCEF_502.94 for Europe's SCES_502.94 - is played as
+ * that version (the marker's boot line the version's, "disc <its own>"
+ * after it); any other Gran Turismo 3 engine disc is refused, as the Play tab
+ * has no Play for a data-only extraction. */
+constexpr const wchar_t *kDiscsFolder = L"discs";
+
+struct DiscFolder {
+    std::wstring name;      /* its folder in discs\: "SCUS_971.02_5F3A9C10" */
+    std::wstring release;   /* "Gran Turismo 3 A-Spec (USA, SCUS-97102)" */
+    Version version = Version::data_only;
+};
+
+/* Checks the image at `iso_path` (check_disc; a disc the game does not play
+ * is Result::wrong_disc) and readies its data folder in `folder` - made, its
+ * demo replays written where they are missing or differ, its marker written
+ * last, with the image's path as it is now.  Quick: nothing of the volume is
+ * copied.  `message`: the reason for anything but Result::ok. */
+Result prepare_disc(const std::wstring &iso_path, const std::wstring &folder, DiscFolder *out, std::wstring *message);
 
 } // namespace install

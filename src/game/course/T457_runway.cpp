@@ -21,6 +21,7 @@
 #include "game/camera/T383_race_camera_base.h"     /* (no use: RaceCameraBase's name) */
 #include "game/car/physics/T167_rigid_body.h"           /* WallSeg (Runway::walls) */
 #include "game/course/T457_runway.h"
+#include "game/app/pc_course_scale.h"              /* PC: pc_course_runway_reach */
 
 /* runway_find_interval: the value is below the first / at or above the last
  * bound. */
@@ -591,10 +592,15 @@ void runway_for_each_tri(Runway *r, RunwayTriFunc cb, void *ctx, int sector,
 
     if (sector >= 0)
         near = &r->sectors[sector].neighbourCount;
-    xa = x0 - 8.0f;
-    za = z0 - 8.0f;
-    xb = x1 + 8.0f;
-    zb = z1 + 8.0f;
+    {
+        /* PC: 8 m, or more on a larger course (the walls' vertices farther
+         * apart: game/app/pc_course_scale.h) */
+        const f32 reach = pc_course_runway_reach(r);
+        xa = x0 - reach;
+        za = z0 - reach;
+        xb = x1 + reach;
+        zb = z1 + reach;
+    }
     i0 = runway_find_interval(r->triMap->bounds, r->triMap->nx, xa);
     j0 = runway_find_interval(&r->triMap->bounds[r->triMap->nx], r->triMap->nz, za);
     i1 = runway_find_interval(r->triMap->bounds, r->triMap->nx, xb);
@@ -648,10 +654,13 @@ void runway_for_each_point(Runway *r, RunwayPointFunc cb, void *ctx, int sector,
 
     if (sector >= 0)
         near = &r->sectors[sector].neighbourCount;
-    xa = x0 - 8.0f;
-    za = z0 - 8.0f;
-    xb = x1 + 8.0f;
-    zb = z1 + 8.0f;
+    {
+        const f32 reach = pc_course_runway_reach(r);  /* PC: as runway_for_each_tri's */
+        xa = x0 - reach;
+        za = z0 - reach;
+        xb = x1 + reach;
+        zb = z1 + reach;
+    }
     i0 = runway_find_interval(r->pointMap->bounds, r->pointMap->nx, xa);
     j0 = runway_find_interval(&r->pointMap->bounds[r->pointMap->nx], r->pointMap->nz, za);
     i1 = runway_find_interval(r->pointMap->bounds, r->pointMap->nx, xb);

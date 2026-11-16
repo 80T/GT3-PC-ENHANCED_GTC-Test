@@ -27,4 +27,6 @@ set(GT3_MEDIA_SERVICE_SOURCES
     # the modded MP4 movies (Windows Media Foundation: docs/movies.md "MP4 movies")
     ${GT3_MEDIA_NATIVE_DIR}/mp4_movie.cpp
     ${GT3_MEDIA_NATIVE_DIR}/mp4_frames.cpp
+    ${GT3_MEDIA_NATIVE_DIR}/mp4_gpu.cpp
+    ${GT3_MEDIA_NATIVE_DIR}/still_cache.cpp
 )

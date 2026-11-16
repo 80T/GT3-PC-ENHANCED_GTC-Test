@@ -293,10 +293,14 @@ void draw_trophy_ring(PrizeBase *prize, int count, f32 alpha, f32 focus, f32 eye
         depthOfField = 0;
     /* PC: drawn straight (as CarRender::draw, T245): no sub-pixel jitter (the
      * PS2's antialiasing; at the native resolution the jitter spans a pixel
-     * and the mean blurred the trophy); the passes only for the depth of
-     * field, else one */
-    if (!depthOfField)
-        count = 1;
+     * and the mean blurred the trophy); and one pass with the depth of field
+     * too: its passes turned the eye on a circle of eyeDelta around the
+     * focus plane, which at the native resolution showed as separate copies
+     * of the cup, not a blur (user report: the championship's trophy,
+     * TrophyGetControl's 4 passes).  The eye at the circle's centre: the
+     * framing of the passes' mean. */
+    count = 1;
+    eyeDelta = 0.0f;
     f32 step = 360.0f / (f32)count;
 
     pgl_push_attrib(PGL_ATTR_DRAW_BUFFER | PGL_ATTR_DEPTH | PGL_ATTR_TARGET_B |

@@ -193,7 +193,15 @@ void CarRender::drawModel(CarModel *model, MenuTireModel *tires, int mirror, int
     }
     /* spec->car read for every call, as in hiddenWheel */
     f32 radius = spec->car.dyn.gear.tyreRadius[0];
+#if ENH_PHYSICS_REAR_RIDE_HEIGHT
+    /* PC (2026-11-12): pitched for the rear axle's own height, the tyres
+     * with it (ShowRoomCar::pcRestLift) */
+    f32 pitch;
+    pgl_translate(0.0f, spec->car.pcRestLift(radius, &pitch), 0.0f);
+    vu0_rotate_x(pitch);
+#else
     pgl_translate(0.0f, radius - spec->car.wheelHeight(0, 0.0f, 0.0f), 0.0f);
+#endif
     model->draw();
     if (tires != NULL) {
         int hidden = -1;

@@ -154,7 +154,7 @@ void CameraTargetSelector::reset()
 {
     int i;
 
-    for (i = 6; i >= 0; i--) {
+    for (i = PC_RACE_CARS_MAX - 1; i >= 0; i--) {  /* PC: every table entry (was i = 6: 7 cars) */
         slot[i].reset();
         holdTimer[i] = 40;
         carAtRank[i] = -1;
@@ -172,7 +172,7 @@ int CameraTargetSelector::findTarget(RaceEntryBase *entries, int car, int minRel
 {
     int carCount = entries->count;     /* compared signed */
     int best = -1;
-    int bestRank = 7;
+    int bestRank = PC_RACE_CARS_MAX;        /* PC: past every place (was 7: 7 cars) */
     int rank;
     int j;
 
@@ -222,7 +222,7 @@ void CameraTargetSelector::update(RaceOrganization *org, DynamicsConductor *dc, 
     int j;
     int k;                                  /* the slot loop's own index (s5; i is s1) */
 
-    for (i = 6; i >= 0; i--) {
+    for (i = PC_RACE_CARS_MAX - 1; i >= 0; i--) {  /* PC: every slot (was i = 6: 7 cars) */
         CameraTargetSlot *s = &slot[i];
         s->tick();
         s->changed = 0;
@@ -251,7 +251,7 @@ void CameraTargetSelector::update(RaceOrganization *org, DynamicsConductor *dc, 
         }
     }
 
-    for (i = 0; i < 7; i++) {
+    for (i = 0; i < PC_RACE_CARS_MAX; i++) {    /* PC: every place (was i < 7: 7 cars) */
         prevCarAtRank[i] = carAtRank[i];
         prevRankOfCar[i] = rankOfCar[i];
         carAtRank[i] = -1;
@@ -259,7 +259,10 @@ void CameraTargetSelector::update(RaceOrganization *org, DynamicsConductor *dc, 
     }
     for (i = 0; i < carCount; i++) {
         int rank = org->entries->cars[i]->state->st.rank - 1;  /* 1-based in the car */
-        carAtRank[rank] = i;
+        /* PC: only a place the table has (a car not ranked yet, rank 0, wrote
+         * carAtRank[-1], the end of relation[][]) */
+        if ((u32)rank < (u32)PC_RACE_CARS_MAX)
+            carAtRank[rank] = i;
         rankOfCar[i] = rank;
     }
 

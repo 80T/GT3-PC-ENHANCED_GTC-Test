@@ -2,8 +2,11 @@
  * code. */
 #include "game/app/pc_debugcam.h"
 #include "engine/pgl/G001_flare.h"              /* pgl_get_matrix, vu0_scale */
+#include "game/course/T457_runway.h"            /* the road's triangles (pc_debugcam_ground) */
 #include "platform/debug_camera.h"
+#include "platform/frame_step.h"
 #include "platform/scheduler.h"
+#include "platform/settings.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -23,12 +26,24 @@
 #define DEBUGCAM_FOV_MAX     150.0f
 #define DEBUGCAM_DEAD_ZONE   0.1f
 #define DEBUGCAM_MOUSE_DEG   0.05f          /* degrees a count of the mouse's movement (raw: 40 an inch at 800 dpi) */
+#define DEBUGCAM_GROUND_MIN  0.3f           /* m: the eye above the road at the least (as the chase camera's, pc_freecam) */
+#define DEBUGCAM_GROUND_RISE 1.0f           /* m: the road rising this, and the step moved, is still the same road */
 
 static const f32 kDegToRad = 0.017453292f;
 
-static int s_bypass;                        /* PcDebugcamBypass scopes alive */
+/* The listener's eye at the last sound tick (pc_debugcam_listener_tick) and
+ * when; have: 0 none yet (the debug camera just started). */
+static struct {
+    int have;
+    f32 eye[3];
+    double at;
+} s_listen;
+#define DEBUGCAM_SOUND_STEP_MAX (0.9f * 5.524167f)  /* m a tick: 0.9 of the speed of sound a tick
+                                                       (race_entry_internal.h SOUND_SPEED_PER_FRAME) */
+#define DEBUGCAM_SOUND_GAP      0.25                /* s: a longer gap since the last tick, no motion */
 static const void *s_forced;                /* the onboard camera put in the chase view (pc_debugcam_mount) */
 static int s_forcedMount;                   /* its mount before */
+static int s_stepFrames;                    /* it was on in this tick step pause (pc_debugcam_step_frames) */
 
 /* 0 off; 1 on, to start from the camera at its next view; 2 flying */
 static struct {
@@ -41,6 +56,9 @@ static struct {
     f32 fov;                                /* degrees, vertical; 0: the camera's (pc_debugcam_projection) */
     f32 speed;                              /* m/s */
     double last;                            /* the last frame's time */
+    int onGround;                           /* the ground collision has found the road */
+    f32 groundY, height;                    /* the road's height, the eye's above it */
+    f32 groundEye[3];                       /* the eye as pc_debugcam_ground left it */
 } s = {0, {0, 0, 0}, 0, 0, 1, 1, {1, 1, 1}, {0}, 0, DEBUGCAM_SPEED_START, 0.0};
 
 static f32 clampf(f32 v, f32 lo, f32 hi)
@@ -107,7 +125,33 @@ static int start_from(const f32 *cam)
     s.sU = dot3(a[1], u) >= 0.0f ? 1.0f : -1.0f;
     memcpy(s.base, cam, sizeof(s.base));
     s.fov = 0.0f;
+    s.onGround = 0;
     return 1;
+}
+
+/* The road at (x, z): of its triangles there the highest not above limit, else
+ * the lowest above it (runway_query's highest would be a bridge overhead).
+ * 0: no road there. */
+static int ground_at(const Runway *r, f32 x, f32 z, f32 limit, f32 *height)
+{
+    const u16 *cell = runway_map_find(r->triMap, x, z);
+    int found = 0;
+    f32 best = 0.0f;
+    for (; cell != NULL && cell[0] != 0; cell += cell[0] + 2) {
+        const RunwaySector *sector = &r->sectors[cell[1]];
+        for (int i = 0; i < cell[0]; i++) {
+            const RunwayTri *t = &sector->tris[cell[2 + i]];
+            if (!runway_tri_contains(t, sector->verts, x, z))
+                continue;
+            const f32 h = runway_tri_height(t, sector->verts, x, z);
+            if (!found || (h <= limit ? best > limit || h > best : best > limit && h < best)) {
+                best = h;
+                found = 1;
+            }
+        }
+    }
+    *height = best;
+    return found;
 }
 
 int pc_debugcam_on(void)
@@ -117,17 +161,51 @@ int pc_debugcam_on(void)
 
 int pc_debugcam_owns(int view)
 {
-    return view == 0 && s.state != 0 && s_bypass == 0 && debug_camera::active();
+    return view == 0 && s.state != 0 && debug_camera::active();
 }
 
-PcDebugcamBypass::PcDebugcamBypass()
+int pc_debugcam_step_frames(void)
 {
-    s_bypass++;
+    if (debug_camera::active())
+        s_stepFrames = 1;
+    return s_stepFrames;
 }
 
-PcDebugcamBypass::~PcDebugcamBypass()
+int pc_debugcam_listener_prev(int view, f32 *xyz)
 {
-    s_bypass--;
+    f32 eye[3];
+    if (!pc_debugcam_eye(view, eye))
+        return 0;
+    memcpy(xyz, eye, sizeof(eye));          /* (no motion: the first tick, after a gap) */
+    if (!s_listen.have || sched::now_seconds() - s_listen.at > DEBUGCAM_SOUND_GAP)
+        return 1;
+    f32 d[3] = {eye[0] - s_listen.eye[0], eye[1] - s_listen.eye[1], eye[2] - s_listen.eye[2]};
+    const f32 len = sqrtf(dot3(d, d));
+    const f32 k = len > DEBUGCAM_SOUND_STEP_MAX ? DEBUGCAM_SOUND_STEP_MAX / len : 1.0f;
+    for (int j = 0; j < 3; j++)
+        xyz[j] = eye[j] - d[j] * k;
+    return 1;
+}
+
+int pc_debugcam_side(int view, f32 *xyz)
+{
+    if (!pc_debugcam_owns(view) || s.state != 2)
+        return 0;
+    f32 f[3], r[3], u[3];
+    axes(f, r, u);
+    for (int j = 0; j < 3; j++)
+        xyz[j] = r[j] * s.len[0];           /* (as the view matrix's column 0, pc_debugcam_view) */
+    return 1;
+}
+
+void pc_debugcam_listener_tick(void)
+{
+    f32 eye[3];
+    s_listen.have = pc_debugcam_eye(0, eye);
+    if (s_listen.have) {
+        memcpy(s_listen.eye, eye, sizeof(eye));
+        s_listen.at = sched::now_seconds();
+    }
 }
 
 int pc_debugcam_view(int view, const f32 *cam, f32 *out)
@@ -185,6 +263,8 @@ void pc_debugcam_frame(void)
     const double now = sched::now_seconds();
     const f32 dt = clampf((f32)(now - s.last), 0.0f, 0.1f);
     s.last = now;
+    if (!frame_step::paused())
+        s_stepFrames = 0;
     if (!debug_camera::active()) {
         s.state = 0;
         return;
@@ -226,14 +306,39 @@ void pc_debugcam_frame(void)
             debug_camera::notice(text, 1.0);
         }
     }
-    /* the move: forward / right in the heading's horizontal plane, up
-     * vertically */
-    const f32 y = s.yaw * kDegToRad;
-    const f32 fwd[3] = {sinf(y), 0.0f, cosf(y)}, right[3] = {s.sR * cosf(y), 0.0f, -s.sR * sinf(y)};
+    /* the move: forward / right in the heading's horizontal plane (with the
+     * Y-axis look forward is along the look, the pitch too), up vertically */
+    const f32 y = s.yaw * kDegToRad, p = settings::debug_camera_y_look() ? s.pitch * kDegToRad : 0.0f;
+    const f32 fwd[3] = {cosf(p) * sinf(y), sinf(p), cosf(p) * cosf(y)}, right[3] = {s.sR * cosf(y), 0.0f, -s.sR * sinf(y)};
     const f32 mf = shape(c.forward), mr = shape(c.right), mu = shape(c.up);
     for (int j = 0; j < 3; j++)
         s.eye[j] += (fwd[j] * mf + right[j] * mr) * s.speed * dt;
     s.eye[1] += mu * s.speed * dt;
+}
+
+void pc_debugcam_ground(const Runway *runway)
+{
+    if (s.state != 2 || !settings::debug_camera_ground()) {
+        s.onGround = 0;
+        return;
+    }
+    const f32 dx = s.eye[0] - s.groundEye[0], dz = s.eye[2] - s.groundEye[2];
+    const f32 limit = s.onGround ? s.groundY + DEBUGCAM_GROUND_RISE + sqrtf(dx * dx + dz * dz) : s.eye[1];
+    f32 h;
+    const int found = ground_at(runway, s.eye[0], s.eye[2], limit, &h);
+    if (s.onGround)
+        s.height += s.eye[1] - s.groundEye[1];  /* the vertical moves since the last frame */
+    else if (found) {
+        s.height = s.eye[1] - h;            /* the height it is at */
+        s.onGround = 1;
+    } else
+        return;                             /* off the road, none yet: it flies freely */
+    if (found)
+        s.groundY = h;                      /* (off the road: the last road's height kept) */
+    if (s.height < DEBUGCAM_GROUND_MIN)
+        s.height = DEBUGCAM_GROUND_MIN;
+    s.eye[1] = s.groundY + s.height;
+    memcpy(s.groundEye, s.eye, sizeof(s.eye));
 }
 
 void pc_debugcam_race(int on)
@@ -241,6 +346,7 @@ void pc_debugcam_race(int on)
     debug_camera::race(on != 0);
     s.state = 0;
     s_forced = NULL;                        /* (a camera of the race gone, or not yet made) */
+    s_stepFrames = 0;
 }
 
 int pc_debugcam_mount(const void *key, int live, int mount, int chase)

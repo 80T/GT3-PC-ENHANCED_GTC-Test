@@ -156,5 +156,17 @@ u32 course_file_size(u64 code);
  * do).  PC: declared here too for RaceCourse's log (car_sound_internal.h
  * has T179's own list). */
 char *course_path(u64 code, char *buf);                          /* 0x001A9A60 */
+/* PC (no original): the course table's file name of course `code', NULL
+ * when the run's course folder has no such file (course_file_name gives
+ * the first course's then). */
+const char *course_table_name(u64 code);
+/* PC (no original): the course table: every file of the run's course folder,
+ * i 0 .. course_table_size() - 1 (course_table_at: its name). */
+int         course_table_size(void);
+const char *course_table_at(int i);
+/* PC (no original): course `code' reads the file of course `file' (code 0:
+ * none), its code and its database row staying: the race keeps its name,
+ * kind and tyres (the course forcer, game/app/pc_course_pick.h). */
+void        course_read_file_of(u64 code, u64 file);
 
 #endif /* GAME_T179_COURSE_DATA_H */

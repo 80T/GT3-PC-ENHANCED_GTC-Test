@@ -185,21 +185,110 @@ void color_table_build(RaceOrganization &org, ColorTable *tab)
     }
 }
 
+/* PC (ROADMAP 35, no original): color_table_build for the pick of entry
+ * `entry' alone.  An entry's weights depend only on the candidates' colours
+ * (and its own first weights), not on the other entries' weights, so the
+ * candidate lists of every entry are built as color_table_build does, but
+ * the crowd, the order and the normalisation only for `entry': (entries x
+ * colours) similarities per candidate of it, where color_table_build does
+ * that for every candidate of every entry (and race_pick_random_colors
+ * builds once per entry: (entries x colours)^2 x entries in all, some 30 M
+ * similarities for 32 cars of 32 colours).  The sums over the other entries
+ * run in their unsorted order (color_table_build sorts the entries before
+ * `entry' first): rounding apart, the same weights.  Used past 7 entries
+ * (GT3's races have at most 6, which keep color_table_build). */
+void pc_color_table_build_entry(RaceOrganization &org, ColorTable *tab, int entry)
+{
+    int i, j, k, m;
+    CarColorDataBase *db = &g_00352D98;
+    int entries = org.entries->count;
+    if (entries > PC_RACE_CARS_MAX)
+        entries = PC_RACE_CARS_MAX;
+    tab->count = entries;
+
+    for (i = 0; i < entries; i++) {
+        CarEquipments *eq = &org.entries->cars[i]->info;
+        ColorCandidates *list = &tab->car[i];
+        u64 model = eq->getModelCode();
+        u32 color = eq->colorCode;
+        if (color == (u32)-1) {
+            int count = db->getNumColors(model);
+            f32 decay = 0.984375f;          /* 63/64 */
+            f32 weight = 1.0f;
+            list->count = count;
+            f32 sum = 0.0f;
+            for (j = 0; j < count; j++) {
+                sum += weight;
+                ColorCandidate *c = &list->c[j];
+                color_candidate_set(c, db->getColor(model, j));
+                c->weight = weight;
+                weight *= decay;
+            }
+            for (j = 0; j < count; j++)
+                list->c[j].weight /= sum;
+        } else {
+            list->count = 1;
+            color_candidate_set(&list->c[0], color);
+            list->c[0].weight = 1.0f;
+        }
+    }
+
+    if (entry < 0 || entry >= entries)
+        return;
+    i = entry;
+    ColorCandidates *list = &tab->car[i];
+    f32 total = 0.0f;
+    for (j = 0; j < list->count; j++) {
+        ColorCandidate *cand = &list->c[j];
+        f32 crowd = 1.0f;
+        for (k = 0; k < entries; k++) {
+            ColorCandidates *other = &tab->car[k];
+            for (m = 0; m < other->count; m++) {
+                if (i == k && j == m)
+                    continue;
+                f32 s = color_similarity(cand, &other->c[m]);
+                if (other->count == 1) {
+                    /* a fixed colour: s^64 * 10000 */
+                    for (int p = 5; p >= 0; p--)
+                        s *= s;
+                    s *= 10000.0f;
+                }
+                crowd += s;
+            }
+        }
+        cand->weight = cand->weight * (1.0f / crowd);
+        total += cand->weight;
+    }
+    color_candidates_sort(list);
+    int count = list->count;
+    for (j = 0; j < count; j++)
+        list->c[j].weight /= total;
+}
+
 // FUNC 0x00176FD0 race_pick_random_colors
 //   The whole candidate table is rebuilt for every entry that gets a colour:
 //   CarEquipments::setColorCode stores the colour, so the colours picked so
 //   far count as fixed colours (the strong s^64 * 10000 penalty) for the
 //   later entries.  The entry count is read once.
+//   PC (ROADMAP 35): the table holds PC_RACE_CARS_MAX entries (0x6084
+//   bytes: a static, not on the stack; one game thread runs at a time and
+//   nothing here waits); past 7 entries each pick builds only what it reads
+//   (pc_color_table_build_entry).
 void race_pick_random_colors(RaceOrganization &org, Random *rng)
 {
-    ColorTable tab;
+    static ColorTable tab;                  /* PC: was a stack object */
 
     int entries = org.entries->count;
+    if (entries > PC_RACE_CARS_MAX)         /* PC: tab.car[PC_RACE_CARS_MAX] */
+        entries = PC_RACE_CARS_MAX;
     for (int i = 0; i < entries; i++) {
         CarEquipments *eq = &org.entries->cars[i]->info;
         if (eq->colorCode != (u32)-1)
             continue;
-        color_table_build(org, &tab);
+        if (entries > 7)                    /* PC: a bigger race than GT3's */
+            pc_color_table_build_entry(org, &tab, i);
+        else
+            color_table_build(org, &tab);
         ColorCandidates *list = &tab.car[i];
         int last = list->count - 1;
         int j = 0;

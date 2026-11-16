@@ -16,6 +16,10 @@
  * small particles (size <= 3) are split by their ground plane: the part
  * above is drawn as is, the part below is projected onto the ground (along
  * the view ray, its spread clamped to twice the size) and fades to alpha 0.
+ *
+ * PC (ROADMAP 35): 1024 particles (SMOKE_PARTICLES), not 256: the wheels of
+ * a race of up to 32 cars emit into them (with 256 the weakest were reused
+ * all the time and the smoke of the cars near the camera thinned out).
  */
 #include "game/race/pause/replay_pause_internal.h"
 #include "vu0asm.h"                         /* VU0_ACC, VU0_Q */
@@ -29,13 +33,14 @@
 #include "engine/gfx/T514_gs_buffer.h"            /* GSBuffer */
 #include "game/effects/T173_race_smoke.h"           /* + T159 Vec3 / Vec4, T131 Matrix44 */
 #include "engine/pgl/native/vu0_game.h"            /* PC: the VU0 register file (the transforms below) */
+#include "platform/settings.h"                     /* PC: settings::smoke_opacity (RaceSmoke::color) */
 
 /* ======================================================================== */
 /* T173: the smoke                                                          */
 /* ======================================================================== */
 
 enum {
-    SMOKE_PARTICLES = 256,                  /* RaceSmoke::particles */
+    SMOKE_PARTICLES = 1024,                 /* RaceSmoke::particles (PC: was 256; the s16 links hold it) */
     SMOKE_TYPE_COUNTERS = 11,               /* RaceSmoke::emitCount */
     SMOKE_DIV_MAX   = 64                    /* CourseEnv::smokeDivX / Y: 1..64 (else 1) */
 };
@@ -195,8 +200,9 @@ const f32 g_003307F0[4][4][2] = {           /* 0x003307F0 */
 };
 
 // FUNC 0x001A45A8 RaceSmoke::RaceSmoke
-//   The particle block (memalign(0x40, 0x4000)), no texture, reset.  (env
-//   is set by RacePS2Base::virtual_8.)  Caller: RacePS2Base's constructor.
+//   The particle block (memalign(0x40, 0x4000); PC: 0x10000, 1024
+//   particles), no texture, reset.  (env is set by RacePS2Base::
+//   virtual_8.)  Caller: RacePS2Base's constructor.
 RaceSmoke::RaceSmoke()
 {
     void *block = memalign(0x40, SMOKE_PARTICLES * sizeof(SmokeParticle));
@@ -216,8 +222,9 @@ RaceSmoke::~RaceSmoke()
 }
 
 // FUNC 0x001A4630 RaceSmoke::reset
-//   No active particle; the free list 0, 1, .., 255 (255's next = -1); the
-//   11 emission counters cleared; the VU0 random seed 0.1 (vu0_rand_seed).
+//   No active particle; the free list 0, 1, .., 255 (255's next = -1; PC:
+//   up to SMOKE_PARTICLES - 1, 1023); the 11 emission counters cleared; the
+//   VU0 random seed 0.1 (vu0_rand_seed).
 //   (Both loops count up in the source: loop.c reverses them, retail stores
 //   from the last element down.)  Callers: gt2k_menu::LoggerControl::runPage
 //   (F_00136838), RacePS2Base::virtual_8, the constructor.
@@ -497,7 +504,8 @@ union U058Qword {
 void RaceSmoke::draw(int mode)
 {
     Matrix44 proj;                          /* sp+0x0000 */
-    SmokeVis vis[SMOKE_PARTICLES];          /* sp+0x0040 */
+    SmokeVis vis[SMOKE_PARTICLES];          /* sp+0x0040 (PC: 0x4000 bytes, 1024; the game threads' stacks
+                                               are at least 1 MB) */
     /* sp+0x1040 the prefetch pointer: in memory at its declaration (retail's
      * slot is below planeBuf's); volatile is the form that places it so */
     SmokeParticle * volatile prefetch;
@@ -826,6 +834,10 @@ void RaceSmoke::drawClippedQuad(const SmokeVis *v)
 //   density x (with CourseEnv::flags ENV_SMOKE_FOG: min(fogStart / dist, 1)
 //   x fogScale + fogOffset, the fog factor of the VU1 code; else 255),
 //   truncated, at most 0x80.
+//   PC: then x the settings' smoke opacity ([Graphics] SmokeOpacity: 100,
+//   75 or 50 %), after the clamp (the thick smoke's alpha is at it, so
+//   scaled before, it would hardly change).  Every particle drawn takes it
+//   (drawQuad, drawClippedQuad; the mirror's, the offscreen buffer's).
 u32 RaceSmoke::color(const SmokeVis *v)
 {
     SmokeParticle *p = &particles[v->index];
@@ -844,6 +856,7 @@ u32 RaceSmoke::color(const SmokeVis *v)
         byte = (int)(alpha * 255.0f);
     if (!(byte < 0x81))
         byte = 0x80;
+    byte = byte * settings::smoke_opacity_percent(settings::smoke_opacity()) / 100;    /* PC */
     return p->color | ((u32)byte << 24);
 }
 

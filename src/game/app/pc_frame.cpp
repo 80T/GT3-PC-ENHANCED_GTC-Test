@@ -2,12 +2,13 @@
  * original: new PC code. */
 #include "game/app/pc_frame.h"
 #include "game/app/pc_aspect.h"                 /* pc_aspect_frame_begin */
-#include "game/app/pc_debugcam.h"               /* pc_debugcam_frame, pc_debugcam_on */
+#include "game/app/pc_debugcam.h"               /* pc_debugcam_frame, pc_debugcam_step_frames */
 #include "engine/pgl/G001_flare.h"              /* pgl_get_matrix / pgl_load_matrix, gfx_vsync */
 #include "eekernel.h"                           /* DelayThread */
 #include "libc.h"                               /* printf, sqrtf */
 #include "platform/frame_monitor.h"
 #include "platform/frame_pacing.h"
+#include "platform/osd.h"                       /* the replay speed's message */
 #include "platform/scheduler.h"
 #include "platform/settings.h"                  /* the frame cap */
 #include "game/app/pc_sound.h"                  /* pc_sound_tick */
@@ -36,9 +37,10 @@ static double s_lastTicksCall;
 /* Ticks so far (pc_view_interpolate tells a new tick by it). */
 static u32 s_tickNo;
 /* The vblank times of the ticks pc_frame_ticks gave (the first's; each next
- * one a vblank later) and the tick running: its own (the sound's block
- * time, game/app/pc_sound.h). */
+ * one s_batchStep later: a vblank, but in a replay at another speed) and the
+ * tick running: its own (the sound's block time, game/app/pc_sound.h). */
 static double s_batchFirst;
+static double s_batchStep;
 static int s_batchIdx;
 static double s_curTickTime;
 /* GT3PC_FRAME_RATE's pacing: the next frame's time. */
@@ -46,6 +48,23 @@ static double s_nextFrame;
 /* The ticks one frame catches up at most (7.5 frames a second): a longer
  * stall (a load) runs one, the game waits instead of racing ahead. */
 enum { PC_MAX_TICKS = 8 };
+/* A replay's speeds (L2 a step down, R2 a step up; pc_frame.h), and the ticks
+ * a frame runs at most at them: frames too slow for a speed lose the rest,
+ * not the frame rate. */
+static const double kReplaySpeeds[] = {0.125, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0};
+static const char *const kReplaySpeedNames[] = {"1/8", "1/4", "1/2", "1X", "2X", "4X", "8X"};
+enum { PC_REPLAY_SPEEDS = 7, PC_REPLAY_NORMAL = 3, PC_REPLAY_MAX_TICKS = 16 };
+static int s_replayStep = PC_REPLAY_NORMAL;
+/* The last tick ran a replay on screen (pc_replay_speed_request). */
+static int s_replayRun;
+/* The buttons held at the last pad read, by player. */
+static int s_replayHeld[2][2];
+/* The ticks of this frame ran at the replay's speed: s_speedFrac is how far
+ * past the last tick the frame clock lies, in ticks, counted up to
+ * s_speedClock. */
+static int s_speedOn;
+static double s_speedFrac;
+static double s_speedClock;
 /* Statistics, logged every 10 s while the loop runs free or ticks were
  * caught up / dropped. */
 static double s_statStart;
@@ -93,6 +112,47 @@ void pc_frame_request_interpolation(void)
     s_request = 1;
 }
 
+void pc_replay_speed_request(void)
+{
+    s_replayRun = 1;
+}
+
+void pc_replay_speed_reset(void)
+{
+    s_replayStep = PC_REPLAY_NORMAL;
+}
+
+/* The ticks' rate against the vblanks: the normal rate unless a replay ran in
+ * the last tick. */
+static double replay_speed(void)
+{
+    return s_replayRun != 0 ? kReplaySpeeds[s_replayStep] : 1.0;
+}
+
+void pc_replay_speed_buttons(int port, int slower, int faster)
+{
+    int *held = s_replayHeld[port & 1];
+    const int down = slower != 0 && held[0] == 0, up = faster != 0 && held[1] == 0;
+
+    held[0] = slower != 0;
+    held[1] = faster != 0;
+    if (s_replayRun == 0 || (down == 0 && up == 0))
+        return;
+    int step = s_replayStep + up - down;
+    if (step < 0)
+        step = 0;
+    if (step >= PC_REPLAY_SPEEDS)
+        step = PC_REPLAY_SPEEDS - 1;
+    if (step != s_replayStep) {
+        s_replayStep = step;
+        printf("frame: replay speed %.3f\n", kReplaySpeeds[step]);
+    }
+    /* (at the end of the range too: the press is answered) */
+    char text[32];
+    snprintf(text, sizeof(text), "REPLAY SPEED %s", kReplaySpeedNames[step]);
+    osd::show(text);
+}
+
 int pc_frame_interpolating(void)
 {
     return s_interpolating;
@@ -102,8 +162,9 @@ void pc_frame_tick_begin(void)
 {
     pc_units_sync();                            /* a units setting changed (game/app/pc_units.h) */
     s_request = 0;
+    s_replayRun = 0;
     s_tickNo++;
-    s_curTickTime = s_batchFirst + (double)s_batchIdx++ * sched::vblank_period();
+    s_curTickTime = s_batchFirst + (double)s_batchIdx++ * s_batchStep;
 }
 
 void pc_frame_tick_end(void)
@@ -117,9 +178,10 @@ void pc_frame_tick_end(void)
      * frame cap (its rate whatever the display: below 60 a second too, the
      * ticks caught up), or with neither cap nor vsync (PC: uncapped on a 60 Hz
      * display too - user, 2026-10-20: the cap OFF stayed at one frame per
-     * vblank there) */
+     * vblank there), or in a replay's slow motion on any display (one frame
+     * a tick would be 7.5 frames a second at 1/8) */
     const double cap = cap_period();
-    int on = s_request != 0 && (cap > 0.0 || pacing::high_refresh() || settings::vsync() == 0);
+    int on = s_request != 0 && (cap > 0.0 || pacing::high_refresh() || settings::vsync() == 0 || replay_speed() < 1.0);
 
     if (on == s_interpolating && (!on || cap == s_loggedCap))
         return;
@@ -153,7 +215,7 @@ void pc_frame_render_begin(int tick)
     /* the shown time: the frame clock one tick behind, so that it lies
      * between the last two ticks' states (whatever the frame rate: the
      * ticks due by the clock have run) */
-    double f = (s_frameClock - s_tickTime) / sched::vblank_period();
+    double f = s_speedOn != 0 ? s_speedFrac : (s_frameClock - s_tickTime) / sched::vblank_period();
     if (f < 0.0)
         f = 0.0;
     if (f > 1.0)
@@ -229,10 +291,11 @@ void pc_frame_wait(void)
 
 /* The tick step's pause (platform/frame_step.h): no tick and no drawing -
  * the picture shown presented again about every vblank (its overlays alive),
- * the game's other threads running - until a step or F6.  1: a step. */
+ * the game's other threads running - until a step, F6 or the debug camera
+ * coming on (it needs frames: pc_debugcam_step_frames).  1: a step. */
 static int step_hold(void)
 {
-    while (frame_step::paused()) {
+    while (frame_step::paused() && !pc_debugcam_step_frames()) {
         if (frame_step::take_step())
             return 1;
         gfx_present_again();
@@ -241,15 +304,44 @@ static int step_hold(void)
     return 0;
 }
 
+/* The whole ticks a replay at `speed' has due by the clock, the fraction left
+ * in s_speedFrac.  From the normal speed it goes on from the tick's fraction
+ * as it is: at the new rate that part of a tick moved the shown time back,
+ * or on by several ticks.  More than a frame's most: the rest is lost. */
+static int replay_ticks(double clock, double speed)
+{
+    const double period = sched::vblank_period();
+
+    if (s_speedOn == 0) {
+        s_speedOn = 1;
+        s_speedFrac = (clock - s_tickTime) / period;
+        if (s_speedFrac > 1.0)
+            s_speedFrac = 1.0;                  /* (a stall: not caught up) */
+        s_speedClock = clock;
+    }
+    s_speedFrac += (clock - s_speedClock) * speed / period;
+    s_speedClock = clock;
+    if (s_speedFrac < 0.0)
+        s_speedFrac = 0.0;
+    const int whole = (int)s_speedFrac;
+    s_speedFrac -= (double)whole;
+    return whole > PC_REPLAY_MAX_TICKS ? PC_REPLAY_MAX_TICKS : whole;
+}
+
 int pc_frame_ticks(void)
 {
     if (frame_step::paused()) {
         double t = 0.0;
-        /* (the debug camera flying: frames drawn as a race's between ticks,
-         * at one a vblank without interpolation; game/app/pc_debugcam.h) */
-        const int drawing = s_interpolating || pc_debugcam_on();
-        int step = 0;
-        if (drawing && !(step = frame_step::take_step() ? 1 : 0)) {
+        s_speedOn = 0;                          /* (the tick step's own ticks, at the last tick) */
+        /* (the debug camera, on now or earlier in this pause: frames drawn as
+         * a race's between ticks, at one a vblank without interpolation;
+         * game/app/pc_debugcam.h) */
+        int step;
+        if (s_interpolating || pc_debugcam_step_frames())
+            step = frame_step::take_step() ? 1 : 0;
+        else
+            step = step_hold();
+        if (!step && frame_step::paused()) {
             /* A race drawing frames between ticks: the frames go on at the
              * last tick (lag 0), as fast as before (or the cap), no tick.
              * Held instead, the GPU and the CPU fell to their idle clocks -
@@ -262,8 +354,6 @@ int pc_frame_ticks(void)
             s_lastTicksCall = now;
             return 0;
         }
-        if (!drawing)
-            step = step_hold();
         const double now = sched::now_seconds();
         const u64 due = sched::vblanks_at(now, &t);
         if (step) {
@@ -305,16 +395,33 @@ int pc_frame_ticks(void)
     double t = 0.0;
     const u64 due = sched::vblanks_at(clock, &t);
     u64 n = due > s_lastTick ? due - s_lastTick : 0;
-    if (n > PC_MAX_TICKS) {
-        s_statDropped += (u32)(n - 1);
-        n = 1;
-    }
-    if (due > s_lastTick) {
+    const double speed = replay_speed();
+    if (speed != 1.0) {
+        /* a replay at another speed: its own clock; the vblanks go on being
+         * counted, for the normal speed to go on from */
+        n = (u64)replay_ticks(clock, speed);
+        s_batchStep = sched::vblank_period() / speed;
+        t = clock - s_speedFrac * s_batchStep;  /* (its last tick's time) */
         s_lastTick = due;
         s_tickTime = t;
+    } else {
+        if (s_speedOn != 0) {
+            /* back at the normal speed: its fraction of a tick as it is */
+            s_speedOn = 0;
+            s_tickTime = clock - s_speedFrac * sched::vblank_period();
+        }
+        s_batchStep = sched::vblank_period();
+        if (n > PC_MAX_TICKS) {
+            s_statDropped += (u32)(n - 1);
+            n = 1;
+        }
+        if (due > s_lastTick) {
+            s_lastTick = due;
+            s_tickTime = t;
+        }
     }
     /* the ticks' own vblank times: the last due at t, the others before it */
-    s_batchFirst = t - (double)(n > 0 ? n - 1 : 0) * sched::vblank_period();
+    s_batchFirst = t - (double)(n > 0 ? n - 1 : 0) * s_batchStep;
     s_batchIdx = 0;
     s_frameClock = clock;
     /* the driver's vsync state, as gfx_vsync(-1) kept it - in one frame per

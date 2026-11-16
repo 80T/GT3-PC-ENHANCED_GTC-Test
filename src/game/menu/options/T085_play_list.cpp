@@ -45,6 +45,7 @@
 #include "game/save/T430_music_play_list.h"      /* MusicPlayList, MusicEntry, findMusicInfo */
 #include "game/sound/T464_bgm.h"                  /* bgm_play_if_changed, bgm_stop */
 #include "game/sound/T466_bgm_ads.h"              /* MusicInfo (= BgmTrack: title, artist) */
+#include "engine/pdi/T521_pdibgm.h"               /* PC: pdibgm_pc_music */
 #include "engine/pdistd/T534_sprintf.h"              /* sprintf */
 #include "engine/media/G002_mpeg_frameq.h"          /* intr_suspend, intr_resume */
 #include "game/menu/options/T085_play_list.h"            /* the play list classes: the last defined */
@@ -268,13 +269,15 @@ void PlayMusicBox::setEnabled(int enabled)
 }
 
 /* on: plays the row's song (its track of BGM group 0x14, the intro first,
- * volume 1.0) unless it already plays; off: stops the music. */
+ * volume 1.0) unless it already plays; off: stops the music.  PC: a song
+ * without an intro file plays from 32 % of it, faded in (T466 ads_play). */
 // FUNC 0x00169D48 gt2k_menu::PlayMusicBox::preview
 void PlayMusicBox::preview(int on)
 {
     if (on) {
         u32 track;
         findMusicInfo(&song.code, &track);
+        pdibgm_pc_music(PDIBGM_MUSIC_MENU);     /* PC: at the player's volume of the menus' music */
         bgm_play_if_changed(BGM_GROUP_PLAY_LIST, track | BGM_TRACK_INTRO, 1.0f, 1);
     } else {
         bgm_stop();
@@ -301,7 +304,9 @@ void PlayMusicBox::setSong(const MusicEntry *entry)
     song = *entry;
     setCheck(song.enabled != 0);
     MusicInfo *info = findMusicInfo(&song.code, NULL);
-    sprintf(text, "%s / %s", info->title, info->artist);   /* 0x003519F8 */
+    /* PC: bounded (was sprintf): a song added takes its title from a tag or
+     * a file's name, and text is followed by song */
+    snprintf(text, sizeof(text), "%s / %s", info->title, info->artist);   /* 0x003519F8 */
     setLabel(text);
 }
 

@@ -864,6 +864,15 @@ int MemorycardFileManager::readInfo(int line, int force)
         return MCFM_STEP_DONE;
 
     int id = order[line].id;
+    /* PC: a deleted line (id -1, updateFileIdForDelete) has no entry to read,
+     * as getFile knows.  The original goes on: getEntry(-1) is page 0's
+     * entries[-1] (-1 / 0x20 is 0, -1 % 0x20 passes the count check), the
+     * bytes before the array become a file of id -1 and no name, and its size
+     * lists "//*", the card's root (user report 2026-10-31: 20 entries into
+     * calcSize's 18 with 19 saves or more on the card, a crash after any
+     * delete). */
+    if (id < 0)
+        return MCFM_STEP_DONE;
     MemorycardFile *file = fileList.findById(id);
     if (file != NULL) {
         if (file->infoValid() != 0)

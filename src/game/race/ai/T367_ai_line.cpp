@@ -195,14 +195,17 @@ int ai_change_line(AIDriver *ai, int line, int now)
 /* The throttle before the start (count: DynamicsConductor::getCountDown or
  * the run state's pitTimer, car_input_ai, T358).  From 13 on: revving
  * between 3/4 and 15/16 of the rev limit (faster for the lower ranks); under
- * 13: holding the rev limit. */
+ * 13: holding the rev limit.
+ * PC: the rank at most 6 (ai_rank_capped, ai_internal.h): past rank 25 of a
+ * race of up to 32 cars (game/race/race_cars.h) the rates went to 0 or
+ * below and the car never revved. */
 // FUNC 0x001F8A00 ai_rev_engine
 void ai_rev_engine(AIDriver *ai, int count)
 {
     RaceCarState *car = ai->car;
     DynCarState *st = &car->st;
     CarDynamics *dyn = &car->params;
-    f32 rank = (f32)car->st.rank;
+    f32 rank = (f32)ai_rank_capped(car->st.rank);  /* PC: capped at 6 (above) */
 
     st->clutch = 0.0f;
     if (!(count < 13)) {

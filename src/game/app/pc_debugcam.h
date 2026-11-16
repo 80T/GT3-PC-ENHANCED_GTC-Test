@@ -5,7 +5,7 @@
  * While it is on, a race's view 0 (the single screen; player 1's of a split
  * screen) is seen from it: CameraManager::applyView puts its view matrix in
  * place of the camera's, getPositionX / Y / Z give its eye (so the course's
- * vision list, the levels of detail and the sound's listener follow it),
+ * vision list, the levels of detail and the sounds' listener follow it),
  * isDrawBackMirror says no, virtual_12 / F_00209370 show every car (the
  * bumper view's own car too, and a live race's player 1 is put in the chase
  * view meanwhile: pc_debugcam_mount); the race views' projection takes its
@@ -36,6 +36,12 @@
 int pc_debugcam_on(void);
 /* It is on and replaces view `view' (a CameraManager's current). */
 int pc_debugcam_owns(int view);
+/* It has been on in this tick step pause (pc_frame_ticks): the race's frames
+ * go on at the last tick until the pause ends, it off again too.  A race
+ * behind its pause menu draws no frames between ticks, so the pause's hold
+ * kept the camera's last picture, and the hotkey had no frames to act on: a
+ * softlock until F6 (user report 2026-10-31). */
+int pc_debugcam_step_frames(void);
 /* CameraManager::applyView of view `view': 1 and the view matrix to use in
  * place of the camera's `cam' (16 floats: the rotation's columns the axes, as
  * pgl_get_matrix gives it); the first call after it is turned on starts it
@@ -49,6 +55,13 @@ int pc_debugcam_eye(int view, f32 *xyz);
 void pc_debugcam_projection(int view);
 /* Once a frame (pc_frame_render_begin): the controls applied. */
 void pc_debugcam_frame(void);
+/* A race view is about to be drawn (RacePS2Base::drawView, drawSubView: the
+ * course then is sure to be there): with the ground collision on, the eye put
+ * at its height above the road under it.  That height starts as the eye's and
+ * the frame's vertical moves change it, 0.3 m at the least; off the road the
+ * last road's height stands (before any road, the eye flies freely).  The
+ * road is the one it is over: a bridge above is not its ground. */
+void pc_debugcam_ground(const struct Runway *runway);
 /* A race begins (1) / ends (0): off (RacePS2Base). */
 void pc_debugcam_race(int on);
 /* OnBoardCamera::update, once a tick: the mount camera `key' is to use.
@@ -58,15 +71,20 @@ void pc_debugcam_race(int on);
  * had (else `mount' as it is). */
 int pc_debugcam_mount(const void *key, int live, int mount, int chase);
 
-/* While one lives the camera manager answers with the game's camera, not
- * the debug camera: the race's sounds (RacePS2Base::virtual_29: each car's
- * and the ambient sound's listener, panning and Doppler at the camera the
- * game chose - the driver's head in the bumper view - not where the debug
- * camera flies; with its eye against the camera's last one the Doppler
- * swung wildly). */
-struct PcDebugcamBypass {
-    PcDebugcamBypass();
-    ~PcDebugcamBypass();
-};
+/* The race's sounds are heard at the debug camera (user, 2026-10-28; before,
+ * at the camera the game chose): RacePS2Base::virtual_29's listener, each
+ * car's (RaceEntryCar::updateSound: the view's matrix, CameraManager's
+ * isOwnCar 0 and getCameraKind 2 - outside every car) and the ambient
+ * sound's (RaceAmbientSound::update).  Their Doppler and the ambient's
+ * motion take the debug camera's own: its eye at the last sound tick
+ * (pc_debugcam_listener_prev; the game camera's last eye against the
+ * debug eye swung the Doppler wildly), the step held to 0.9 of the speed
+ * of sound (it flies up to 500 m/s: a negative pitch past it), none after
+ * a gap (a pause); the ambient's side axis its right axis
+ * (pc_debugcam_side).  1 while the debug camera owns view `view'. */
+int pc_debugcam_listener_prev(int view, f32 *xyz);
+int pc_debugcam_side(int view, f32 *xyz);
+/* After a sound tick (RacePS2Base::virtual_29): the eye remembered. */
+void pc_debugcam_listener_tick(void);
 
 #endif /* GAME_APP_PC_DEBUGCAM_H */

@@ -145,7 +145,7 @@ void RaceRoundTachometerBase::drawMeter(GSBuffer &buf)
 
     m->RaceRoundMeterBase::drawMeter(buf);
     g_002F1968.select("meter#1");
-    g_002F1968.setColor(METER_PANEL_COLOR);
+    g_002F1968.setColor(pc_hud_color(kHudMeterDial, METER_PANEL_COLOR));    /* PC */
     posX = race_align_pos(m->x, m->w, m->alignX) + (m->w >> 1) + markX;
     posY = race_align_pos(m->y, m->h, m->alignY) + (m->h >> 1) + markY;
     g_002F1968.setPos3(posX, posY, 0);
@@ -231,7 +231,7 @@ void RaceBattleTachometer::drawMeter(GSBuffer &buf)
 
     b->RaceBarMeter::drawMeter(buf);
     g_002F1968.select("meter#1");
-    g_002F1968.setColor(METER_PANEL_COLOR);
+    g_002F1968.setColor(pc_hud_color(kHudMeterDial, METER_PANEL_COLOR));    /* PC */
     posX = race_align_pos(b->x, b->w, b->alignX);
     posY = race_align_pos(b->y, b->h, b->alignY) + 5;
     g_002F1968.setPos3(posX, posY, 0);

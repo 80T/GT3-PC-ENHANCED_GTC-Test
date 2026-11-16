@@ -24,6 +24,7 @@
 #include "game/menu/framework/T024_mini_cursor.h"          /* gt2k_menu::MiniCursor */
 #include "game/menu/framework/T255_cross.h"                /* gt2k_menu::Cross (classBar) */
 #include "game/menu/framework/T249_mpeg_image.h"           /* gt2k_menu::MpegImage (mpegClass) */
+#include "game/app/pc_still.h"                             /* PC: PC_STILL_CLASS */
 #include "engine/pdi/T541_pdi1394.h"              /* pdi1394 (its type name: the inline destructor) */
 #include "engine/system/T473_link_session.h"         /* F_0022D3B8 (the i.LINK driver) */
 #include "game/save/T429_game_status.h"          /* getGameStatus, MenuStatus; the garage lists */
@@ -85,14 +86,18 @@ int ArcadeControl::isClassDisabled(int cls, int player)
 
 /* Stops the movie (stopAndWait) and shows player 1's class's still picture
  * (the picture named after the class label in courseIpic, through a stack
- * IpicArchive) in mpegClass. */
+ * IpicArchive) in mpegClass.
+ * PC: its movie's first picture, or a PNG, comes first (game/app/pc_still.h). */
 // FUNC 0x00108988 gt2k_menu::ArcadeControl::showClassPicture
 void ArcadeControl::showClassPicture()
 {
     g_002CDC10.stopAndWait();
+    const char *label = getClassLabel(class1.value);
+    /* PC (the Japanese menus may have no such item: their code has no still) */
+    if (mpegClass != NULL && mpegClass->setStill(PC_STILL_CLASS, label) != 0)
+        return;
     if (courseIpic == NULL)
         return;                             /* PC: no course stills (ArcadeControl::load) */
-    const char *label = getClassLabel(class1.value);
     IpicArchive archive(courseIpic);
     archive.find(&ipic, label);
     mpegClass->setIpic(&ipic);

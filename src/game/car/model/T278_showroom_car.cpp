@@ -6,6 +6,7 @@
 #include "game/car/model/T278_show_room_car.h"
 #include "game/enhanced.h"                  /* ENH_RENDER_SHOWROOM_TABLES */
 #include "game/app/pc_units.h"              /* PC: g_pcGameUnits (pcPowerGame, pcTorqueGame) */
+#include "engine/media/G002_mpeg_frameq.h"  /* PC: atan2f, sinf, cosf (pcRestLift) */
 
 #if defined(__GNUC__) && __GNUC__ >= 3
 #pragma GCC diagnostic ignored "-Wmultichar"    /* driveName()'s 'FR' .. 'RR' */
@@ -129,6 +130,23 @@ f32 ShowRoomCar::wheelCamber(int wheel, f32 steer, f32 stroke)
 }
 
 /* The table is a local array initialised from .rodata 0x0033C2F0. */
+#if ENH_PHYSICS_REAR_RIDE_HEIGHT
+/* PC (2026-11-12, no original): the header says what.  vu0_rotate_x turns
+ * the car's rows so that a point at height y and length z ends at y c - z s:
+ * the front axle (z = -wheelbase / 2) rises and the rear one drops by
+ * wheelbase / 2 x sin a each, which with tan a = (axleHeight[0] -
+ * axleHeight[1]) / wheelbase brings both tyres to the floor (with unequal
+ * tyre radii the rear is off by their difference x (1 - cos a): a few
+ * micrometres). */
+f32 ShowRoomCar::pcRestLift(f32 radius, f32 *pitch)
+{
+    const f32 a = atan2f(dyn.axleHeight[0] - dyn.axleHeight[1], dyn.wheelbase);
+    *pitch = a * (180.0f / 3.14159265f);
+    const f32 front = wheelHeight(0, 0.0f, 0.0f) * cosf(a) - wheelAxleX(0, 0.0f, 0.0f) * sinf(a);
+    return radius - front;
+}
+#endif
+
 // FUNC 0x001D9630 ShowRoomCar::driveName
 int ShowRoomCar::driveName()
 {

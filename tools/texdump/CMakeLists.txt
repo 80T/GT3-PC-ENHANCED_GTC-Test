@@ -12,7 +12,8 @@ set(GS_TEX_SOURCES
     ${GT3PC}/src/engine/pgl/native/gs_tex_layout.cpp
     ${GT3PC}/src/engine/pgl/native/gs_tex_space.cpp
     ${GT3PC}/src/engine/pgl/native/gs_tex_decode.cpp
-    ${GT3PC}/src/engine/pgl/native/gs_tex1.cpp)
+    ${GT3PC}/src/engine/pgl/native/gs_tex1.cpp
+    ${GT3PC}/src/engine/pgl/native/gs_imgs.cpp)
 
 add_executable(texdump main.cpp png_write.cpp inflate.cpp ${GS_TEX_SOURCES})
 target_include_directories(texdump PRIVATE ${GT3PC}/src)

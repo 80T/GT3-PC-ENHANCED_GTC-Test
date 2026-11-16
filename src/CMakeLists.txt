@@ -69,6 +69,7 @@ set(GT3_ENGINE_SOURCES
     engine/gfx/T513_vram_allocator.cpp
     engine/gfx/T514_gs_buffer.cpp
     engine/gfx/T515_tex_set.cpp
+    engine/gfx/pc_model_walk.cpp
     engine/input/T472_analog_curve.cpp
     engine/input/T474_control.cpp
     engine/input/T475_pad_manager.cpp
@@ -133,30 +134,60 @@ add_library(gt3_platform STATIC
     platform/window.cpp
     platform/disc.cpp
     platform/host_file.cpp
+    # the game files read straight from a disc image (the launcher's Play from
+    # disc...): the launcher's own readers of the image and its volume
+    platform/disc_image.cpp
+    launcher/iso9660.cpp
+    launcher/volume.cpp
+    launcher/inflate.cpp
+    launcher/util.cpp
+    platform/file_alert.cpp
     platform/pc_time.cpp
     platform/pad_pc.cpp
     platform/gamepad.cpp
     platform/input_map.cpp
     platform/wheel.cpp
+    platform/clutch_input.cpp
     platform/debug_camera.cpp
     platform/memcard.cpp
+    platform/save_folders.cpp
     platform/heap_arena.cpp
+    platform/memstat.cpp
     platform/gpu.cpp
     platform/frame_monitor.cpp
     platform/frame_step.cpp
     platform/overlay.cpp
+    platform/osd.cpp
+    platform/hotkey_hint.cpp
+    platform/song_osd.cpp
+    platform/cockpit_osd.cpp
+    platform/challenge_osd.cpp
+    platform/texture_menu.cpp
+    platform/sample_prof.cpp
     platform/settings_menu.cpp
     platform/system_menu.cpp
     platform/audio.cpp
     platform/audio_ks.cpp
     platform/crash.cpp
+    platform/gcf_tables.cpp
+    platform/param_db.cpp
+    platform/param_schema.cpp
+    platform/sqlite_file.cpp
+    platform/play_time.cpp
+    platform/png_image.cpp
+    platform/screenshot.cpp
 )
 target_include_directories(gt3_platform PUBLIC ${GT3PC_ROOT}/include ${GT3PC_ROOT}/src)
-target_link_libraries(gt3_platform PUBLIC winmm d3d11 dxgi d3dcompiler dbghelp)
+target_link_libraries(gt3_platform PUBLIC winmm d3d11 dxgi d3dcompiler dbghelp windowscodecs)
 
 # ---- the controllers: SDL3, delay-loaded (cmake/sdl3.cmake) -----------------------
 include(${GT3PC_ROOT}/cmake/sdl3.cmake)
 target_link_libraries(gt3_platform PUBLIC gt3_sdl3)
+
+# ---- the game configs' and the database folder's tables: SQLite, a static
+# library (cmake/sqlite.cmake) ----------------------------------------------------
+include(${GT3PC_ROOT}/cmake/sqlite.cmake)
+target_link_libraries(gt3_platform PUBLIC gt3_sqlite)
 
 # ---- the sound: the native SPU2 / BGM player (standard C++, its own options:
 # not the decomp's prelude, guarded statics) and the output above (kernel
@@ -180,11 +211,16 @@ add_library(gt3_render STATIC
     engine/pgl/native/pgl_exec.cpp
     engine/pgl/native/pgl_targets.cpp
     engine/pgl/native/pgl_textures.cpp
+    engine/pgl/native/pgl_host_image.cpp
+    engine/pgl/native/pgl_movie.cpp
+    engine/pgl/native/pgl_vfont.cpp
     engine/pgl/native/pgl_flicker.cpp
+    engine/pgl/native/pgl_capture.cpp
     engine/pgl/native/pgl_models.cpp
     engine/pgl/native/pgl_d3d.cpp
     engine/pgl/native/pgl_queue.cpp
     engine/pgl/native/pgl_prewarm.cpp
+    engine/pgl/native/pgl_texrepl.cpp
     engine/pgl/native/pgl_math.cpp
     engine/pgl/native/pgl_state_gs.cpp
     engine/pgl/native/pgl_state_prim.cpp
@@ -193,10 +229,11 @@ add_library(gt3_render STATIC
     engine/pgl/native/gs_tex_format.cpp
     engine/pgl/native/gs_tex_layout.cpp
     engine/pgl/native/gs_tex_space.cpp
+    engine/pgl/native/gs_imgs.cpp
     engine/pgl/native/vif_model.cpp
 )
 target_include_directories(gt3_render PUBLIC ${GT3PC_ROOT}/src)
-target_link_libraries(gt3_render PUBLIC gt3_platform dbghelp)
+target_link_libraries(gt3_render PUBLIC gt3_platform dbghelp dwrite)
 
 # ---- the executable -------------------------------------------------------------
 add_executable(gt3pc WIN32

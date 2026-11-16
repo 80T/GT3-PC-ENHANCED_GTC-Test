@@ -3,6 +3,7 @@
 #include "platform/gamepad.h"
 #include "platform/input_map.h"
 #include "platform/log.h"
+#include "platform/settings.h"
 #include "platform/settings_menu.h"
 #include "platform/system_menu.h"
 #include "platform/window.h"
@@ -21,6 +22,7 @@ std::atomic<bool> g_inRace{false};
 std::atomic<bool> g_active{false};
 std::atomic<bool> g_locked{false};
 bool g_lockHeld;                            /* the Lock control down at the last read (a press: its edge) */
+bool g_yLookHeld, g_groundHeld;             /* the Y-axis look and Ground collision controls', the same */
 /* the mouse wheel's notches and the mouse's movement seen (window::
  * mouse_wheel, mouse_motion) */
 uint32_t g_wheelUp, g_wheelDown, g_motionX, g_motionY;
@@ -106,7 +108,12 @@ void read(Controls *out)
     const bool pad = gamepad::read_raw(0, &raw);
     if (pad)
         apply_deadzones(&raw);
-    const Sources s = {pad ? &raw : nullptr, nullptr, window::key_down, 0};
+    gamepad::Devices devs;                  /* (the devices bindings name: `@<name>') */
+    gamepad::read_devices(&devs);
+    for (int d = 0; d < devs.count; d++)
+        if (devs.src[d].pad != nullptr)
+            apply_deadzones(&devs.pad[d]);
+    const Sources s = {pad ? &raw : nullptr, nullptr, window::key_down, 0, devs.src, devs.count};
     /* a control: the larger of its slots' (a mouse wheel binding: its
      * notches, counted in *steps; the mouse's movement: its counts that way,
      * in *counts) */
@@ -140,6 +147,20 @@ void read(Controls *out)
     g_lockHeld = lockHeld;
     if (g_locked.load())
         return;
+    /* the toggles: a press each way, kept in the settings */
+    auto toggle = [&](int c, bool *held, bool (*now)(), void (*set)(bool), const char *textOn, const char *textOff) {
+        const bool down = get(c, nullptr) >= 0.5f;
+        if (down && !*held) {
+            const bool on = !now();
+            set(on);
+            settings_menu::notice(on ? textOn : textOff, 2.0);
+        }
+        *held = down;
+    };
+    toggle(DEBUG_Y_LOOK, &g_yLookHeld, settings::debug_camera_y_look, settings::set_debug_camera_y_look,
+           "DEBUG CAMERA Y-AXIS LOOK ON", "DEBUG CAMERA Y-AXIS LOOK OFF");
+    toggle(DEBUG_GROUND, &g_groundHeld, settings::debug_camera_ground, settings::set_debug_camera_ground,
+           "DEBUG CAMERA GROUND COLLISION ON", "DEBUG CAMERA GROUND COLLISION OFF");
     int lookR = 0, lookL = 0, lookU = 0, lookD = 0;
     out->lookRight = get(DEBUG_LOOK_RIGHT, nullptr, &lookR) - get(DEBUG_LOOK_LEFT, nullptr, &lookL);
     out->lookUp = get(DEBUG_LOOK_UP, nullptr, &lookU) - get(DEBUG_LOOK_DOWN, nullptr, &lookD);

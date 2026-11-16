@@ -17,19 +17,26 @@
 #include "game/menu/framework/T262_menu_bgm.h"             /* own declarations */
 #include "game/save/T429_game_status.h"          /* getGameStatus, GameStatus::getGameOptions (T428: menuBgm) */
 #include "game/sound/T464_bgm.h"                  /* bgm_play_if_changed, bgm_play */
+#include "engine/pdi/T521_pdibgm.h"               /* PC: pdibgm_pc_music */
 
-/* 12 callers (the menu pages).  0.8 is the .sdata literal gp-0x7944. */
+/* 12 callers (the menu pages).  0.8 is the .sdata literal gp-0x7944.
+ * PC: the music plays straight (1.0) at the player's volume of the menus'
+ * music ([Audio] MenuBgm: pdibgm_pc_music), not at 0.8. */
 // FUNC 0x001D27F0 menu_bgm_play_if_changed
 void menu_bgm_play_if_changed(int group, int track, int arg)
 {
-    if (getGameStatus()->getGameOptions()->menuBgm != 0)
-        bgm_play_if_changed(group, track, 0.8f, arg);
+    if (getGameStatus()->getGameOptions()->menuBgm != 0) {
+        pdibgm_pc_music(PDIBGM_MUSIC_MENU);
+        bgm_play_if_changed(group, track, 1.0f, arg);
+    }
 }
 
-/* The same through bgm_play (0.8: the literal gp-0x7940). */
+/* The same through bgm_play (0.8: the literal gp-0x7940; PC: as above). */
 // FUNC 0x001D2858 menu_bgm_play
 void menu_bgm_play(int group, int track, int arg)
 {
-    if (getGameStatus()->getGameOptions()->menuBgm != 0)
-        bgm_play(group, track, 0.8f, arg);
+    if (getGameStatus()->getGameOptions()->menuBgm != 0) {
+        pdibgm_pc_music(PDIBGM_MUSIC_MENU);
+        bgm_play(group, track, 1.0f, arg);
+    }
 }

@@ -16,12 +16,20 @@
  * Controller 1's J / L / I / K, none on a wheel) from two slots:
  *   slot 0  the device: Controller N's SDL gamepad (the Nth connected; buttons
  *           and axes by their position, Xbox-style: south = A / Cross), or
- *           Wheel N's SDL joystick (raw buttons, axes and hats);
+ *           Wheel N's SDL joystick (raw buttons, axes and hats); or another
+ *           device the binding names (`@<name>', below: a wheel's pedals of
+ *           their own, a shifter, a button box, pedals beside a gamepad);
  *   slot 1  the keyboard and the mouse.
  * The control's value is the larger of the two (0..1).  A fifth profile,
  * Debug camera, maps the debug camera's controls (DebugControl) the same way
  * from the first gamepad (Controller 1's) and the keyboard / mouse, with a
- * controller's dead zones (platform/debug_camera.h).
+ * controller's dead zones (platform/debug_camera.h).  PC (2026-11-09): each
+ * controller and wheel profile maps a Clutch too (`Clutch=', none by
+ * default), and two more profiles, H-Shifter 1 / 2 ([HShifter1] /
+ * [HShifter2]: Neutral, Gear1 .. Gear9), map the players' H-pattern
+ * shifters, one binding a gate, from any device or the keyboard / mouse
+ * (`Gear3=joy:button10@<shifter>;') - the realistic gear shift's clutch
+ * mode (game/app/pc_clutch.h).
  *
  * In gt3pc.ini each control is `Key=slot0;slot1', a binding or nothing in
  * each (a missing key: the default; `Key=;' none at all):
@@ -42,14 +50,21 @@
  *   mouse:left / right / middle / x1 / x2 / wheelup / wheeldown
  *   mouse:moveleft / moveright / moveup / movedown   the mouse's movement
  *                          (the Debug camera's look only)
+ * A slot 0 binding may end in `@<name>': read from the connected joystick
+ * SDL names so (the first of that name; button: / axis: through SDL's
+ * gamepad mapping of it, joy: raw) instead of the profile's own device -
+ * `Gas=joy:axis2+full@Fanatec ClubSport Pedals V3;', `Cross=joy:axis1+full@
+ * <pedals>;key:Z'.  Without it, the profile's own (the line splits at its
+ * last `;', so a name may hold one).  A joystick a wheel's binding names is
+ * that wheel's device, never an automatic wheel itself (Device=auto).
  * Besides, per profile:
  *   Controller:  LeftStickDeadzone=0, RightStickDeadzone=0, TriggerDeadzone=0
  *                (percent, 0..50: the sticks' radially, the triggers' at the
  *                start of their travel; the rest rescaled to the full range)
  *   Wheel:       Device=auto (the joystick's name; auto: the Nth joystick
  *                SDL knows as a wheel), SteeringDeadzone=0, GasDeadzone=0,
- *                BrakeDeadzone=0 (percent, 0..50, on the virtual steering and
- *                pedals), Input=wheel | controller (what the player - 1 for
+ *                BrakeDeadzone=0, ClutchDeadzone=0 (PC 2026-11-10) (percent,
+ *                0..50, on the virtual steering and pedals), Input=wheel | controller (what the player - 1 for
  *                Wheel 1, 2 for Wheel 2 - plays with while both the wheel and
  *                the controller are connected; with one of them, that one:
  *                engine/input T478)
@@ -57,11 +72,36 @@
  * [Hotkeys]: the game window's own keys (platform/window.cpp), each a key
  * with exactly the modifiers held with it:
  *   SettingsMenu=F2  SystemMenu=Escape  FrameMonitor=F3  Fullscreen=Alt+Enter
- *   Pause=F5  Resume=F6  FlickerCapture=F8  Trace=F9  DebugCamera=F7
+ *   Pause=F5  Resume=F6  FlickerCapture=F8  Trace=F9  DebugCamera=F7  FrameCapture=F11
+ *   SongMenu=M;button:back  PreviousSong=Comma;button:dpup
+ *   NextSong=Period;button:dpdown   (the race's song changer: platform/song_osd.h)
+ *   CalibrationUp=Up  CalibrationDown=Down  CalibrationLeft=Left  CalibrationRight=Right
+ *   CalibrationSave=F4  CalibrationCancel=Delete  CalibrationReset=0
+ *                        (the cockpit camera's calibration: platform/cockpit_osd.h;
+ *                        these act only while it is on, so their keys may be a
+ *                        control's too - the arrows are the D-pad's: hotkey_shares_keys)
+ *   TextureMenu=F10      (PC 2026-11-13: the texture replacement interface,
+ *                        platform/texture_menu.h)
+ *   TextureRefresh=Ctrl+F10   (the texture folders read again: the files
+ *                        that changed loaded anew)
+ *   TextureToggle=F12    (the replacement textures on / off: a replacement
+ *                        compared with the game's own)
+ *   Screenshot=F1        (PC 2026-11-15: the picture at the game's own
+ *                        resolution as a PNG in screenshots\, platform/
+ *                        screenshot.h; F12 was taken, and Windows 11 gives
+ *                        Print Screen to its Snipping Tool)
  * `Key=Ctrl+Shift+F5': Ctrl+, Alt+, Shift+ before a key's name (key:<name>'s;
  * not a modifier alone); `Key=none' (or empty) none; a missing or unreadable
  * value the default.  A hotkey's key does not reach the game, and the
- * launcher keeps the controls' bindings off the hotkeys' keys. */
+ * launcher keeps the controls' bindings off the hotkeys' keys.
+ * PC (2026-11-02): after a `;' a device's binding too (a slot 0 binding's
+ * text: `SettingsMenu=F2;button:misc1', `Pause=F5;joy:button9@<name>'): a
+ * gamepad's button or axis on any connected controller, a joystick's
+ * (button: / axis: / joy:) on the device it names, else on either wheel;
+ * pressed (an axis past half) it is the hotkey too.  Without the `;' the
+ * default (none but the song changer's: Select, D-pad up / down); `Key=F2;'
+ * none.  A device's press also reaches the game.  A new hotkey's default key
+ * that a control's keyboard slot has (gt3pc.ini written before it) is none. */
 #pragma once
 
 #include <stddef.h>
@@ -71,8 +111,15 @@ namespace input_map {
 
 /* ---- the profiles and their controls ---------------------------------- */
 
-enum { kController1, kController2, kWheel1, kWheel2, kDebugCamera, kProfileCount };
+/* PC (2026-11-09): H-Shifter 1 / 2 ([HShifter1], [HShifter2]): the players'
+ * H-pattern shifters, virtual devices of their own - Neutral, 1st .. 9th and
+ * Reverse (HShifterControl), one binding each from any device (a joystick's, a
+ * gamepad's, a key, the mouse: slot 0 takes them all, slot 1 is not used;
+ * a device's binding always names it, `@<name>'); the realistic gear shift's
+ * clutch mode reads them (game/app/pc_clutch.h, platform/clutch_input.h). */
+enum { kController1, kController2, kWheel1, kWheel2, kDebugCamera, kHShifter1, kHShifter2, kProfileCount };
 inline bool is_wheel(int profile) { return profile == kWheel1 || profile == kWheel2; }
+inline bool is_hshifter(int profile) { return profile == kHShifter1 || profile == kHShifter2; }
 const char *profile_section(int profile);   /* "Controller1" .. "Wheel2", "DebugCamera" */
 const char *profile_name(int profile);      /* "Controller 1" .. "Wheel 2", "Debug camera" */
 
@@ -86,6 +133,9 @@ enum PadControl {
     PAD_SELECT, PAD_START,
     PAD_LSTICK_UP, PAD_LSTICK_DOWN, PAD_LSTICK_LEFT, PAD_LSTICK_RIGHT,
     PAD_RSTICK_UP, PAD_RSTICK_DOWN, PAD_RSTICK_LEFT, PAD_RSTICK_RIGHT,
+    /* PC (2026-11-09): the clutch (not the DualShock 2's: the realistic gear
+     * shift's clutch mode, game/app/pc_clutch.h; a pedal, 0 released) */
+    PAD_CLUTCH,
     PAD_CAM_LEFT, PAD_CAM_RIGHT, PAD_CAM_UP, PAD_CAM_DOWN,
     kPadControlCount
 };
@@ -98,9 +148,23 @@ enum WheelControl {
     WHEEL_R1, WHEEL_L1, WHEEL_R2, WHEEL_L2,
     WHEEL_SELECT, WHEEL_START, WHEEL_R3, WHEEL_L3,
     WHEEL_UP, WHEEL_DOWN, WHEEL_LEFT, WHEEL_RIGHT,
+    WHEEL_CLUTCH,                           /* PC (2026-11-09): the clutch (PAD_CLUTCH's) */
     WHEEL_CAM_LEFT, WHEEL_CAM_RIGHT, WHEEL_CAM_UP, WHEEL_CAM_DOWN,
     kWheelControlCount
 };
+/* PC (2026-11-09): an H-Shifter's gates (is_hshifter); the reverse's last
+ * (added after: the launcher lists it after Neutral, control_in_order). */
+enum HShifterControl {
+    HS_NEUTRAL, HS_GEAR1, HS_GEAR2, HS_GEAR3, HS_GEAR4, HS_GEAR5, HS_GEAR6, HS_GEAR7, HS_GEAR8, HS_GEAR9,
+    HS_REVERSE,
+    kHShifterControlCount
+};
+/* A profile's clutch control (-1: none, the debug camera's and the
+ * H-Shifters'). */
+inline int clutch_control(int profile)
+{
+    return profile <= kController2 ? PAD_CLUTCH : profile <= kWheel2 ? WHEEL_CLUTCH : -1;
+}
 /* A profile's chase camera controls: left, right, up, down from this one. */
 inline int camera_control(int profile) { return is_wheel(profile) ? WHEEL_CAM_LEFT : PAD_CAM_LEFT; }
 constexpr int kCameraControls = 4;
@@ -111,11 +175,13 @@ enum DebugControl {
     DEBUG_LOOK_UP, DEBUG_LOOK_DOWN, DEBUG_LOOK_LEFT, DEBUG_LOOK_RIGHT,
     DEBUG_FASTER, DEBUG_SLOWER, DEBUG_FOV_UP, DEBUG_FOV_DOWN,
     DEBUG_LOCK,                             /* the camera held, the car the player's again (a press each way) */
+    DEBUG_Y_LOOK,                           /* forward and back follow the pitch (a press each way) */
+    DEBUG_GROUND,                           /* the height kept above the road (a press each way) */
     kDebugControlCount
 };
 constexpr int kWheelButtons = 12;
 constexpr int kMaxControls = kPadControlCount > kWheelControlCount ? kPadControlCount : kWheelControlCount;
-static_assert(kDebugControlCount <= kMaxControls, "a profile's controls");
+static_assert(kDebugControlCount <= kMaxControls && kHShifterControlCount <= kMaxControls, "a profile's controls");
 
 /* What a control takes: a button (pressed or not; an analog source counts
  * from halfway, its travel as the pressure), a direction of a stick or the
@@ -128,8 +194,11 @@ struct ControlInfo {
 };
 int control_count(int profile);
 const ControlInfo &control(int profile, int i);
-/* The control in the launcher's row `row' (0 .. control_count - 1): the
- * chase camera's first, then the others in their order. */
+/* The control in the launcher's row `row' (0 .. control_count - 1): a
+ * controller's Clutch, then its chase camera's, then the others in their
+ * order; a wheel's chase camera's, then the others in their order with the
+ * Clutch after the Brake pedal (PC 2026-11-10); an H-Shifter's: Neutral,
+ * Reverse, 1st .. 9th. */
 int control_in_order(int profile, int row);
 
 /* ---- bindings -------------------------------------------------------- */
@@ -150,16 +219,28 @@ struct Binding {
     Source source = Source::none;
     uint8_t index = 0;
     int8_t dir = 0;
+    uint8_t device = 0;                     /* pad_* / joy_*: the device it names (device_name), 0 the profile's own */
 };
 constexpr int kSlots = 2;                   /* 0 the device, 1 the keyboard / mouse */
 bool slot_takes(int slot, Source s);        /* slot 0: pad_* / joy_*; slot 1: key / mouse_wheel / mouse_motion */
+/* Slot `slot' of profile `profile' takes source s: slot_takes's; PC
+ * (2026-11-09) an H-Shifter's slot 0 any source (no mouse movement), its
+ * slot 1 none. */
+bool slot_takes(int profile, int slot, Source s);
 
-/* The ini text of a binding ("" for none) and back (false: not a binding;
- * "" and "none" are none). */
+/* The devices bindings name (`@<name>'), numbered from 1 in the order met,
+ * for the whole process (Binding::device). */
+int device_id(const char *name);            /* found (case aside) or added; 0 for "" or too many */
+const char *device_name(int id);            /* "" for 0 or an unknown id */
+int device_count();                         /* the ids 1 .. device_count() */
+
+/* The ini text of a binding ("" for none; `@<name>' after it for a device it
+ * names) and back (false: not a binding; "" and "none" are none). */
 void format(const Binding &b, char *out, size_t n);
 bool parse(const char *text, Binding *out);
 /* A label for the launcher ("Left stick up", "Button 3", "Axis 2 (whole, +
- * pressed)", the key's name in the keyboard's layout; "" for none). */
+ * pressed)", the key's name in the keyboard's layout; " on <name>" after it
+ * for a device it names; "" for none). */
 void describe(const Binding &b, char *out, size_t n);
 
 /* The gamepad buttons / axes SDL3 has (Source::pad_*'s index range). */
@@ -174,14 +255,22 @@ bool capture_axis(bool joy, int axis, int rest, int now, Binding *out);
 
 /* ---- a profile ------------------------------------------------------- */
 
-constexpr int kDeadzones = 3;               /* controller: left stick, right stick, triggers; wheel: steering, gas, brake */
+/* controller: left stick, right stick, triggers; wheel: steering, gas, brake
+ * and (PC 2026-11-10) clutch - a controller's fourth not used */
+constexpr int kDeadzones = 4;
+constexpr int kWheelClutchDeadzone = 3;     /* PC (2026-11-10): a wheel's ClutchDeadzone */
 constexpr int kDeadzoneMax = 50;
+/* The profile's dead zones: a wheel's four, a controller's and the debug
+ * camera's three, an H-Shifter's none (PC 2026-11-09 / 10). */
+inline int deadzone_count(int profile) { return is_hshifter(profile) ? 0 : is_wheel(profile) ? 4 : 3; }
+inline bool has_deadzones(int profile) { return deadzone_count(profile) > 0; }
+constexpr int kStickDeadzoneDefault = 15;   /* Controller 1 / 2: both sticks' (the others 0) */
 const char *deadzone_key(int profile, int i);
 const char *deadzone_name(int profile, int i);      /* the launcher's / settings menu's label */
 
 struct Profile {
     Binding map[kMaxControls][kSlots];
-    int deadzone[kDeadzones] = {0, 0, 0};
+    int deadzone[kDeadzones] = {0, 0, 0, 0};    /* (defaults: kStickDeadzoneDefault for a controller's sticks) */
     char device[128] = "";                  /* wheels: the joystick's name ("": auto) */
     bool controller = false;                /* wheels: Input=controller (else wheel) */
 };
@@ -190,6 +279,8 @@ void defaults(int profile, Profile *out);
 void load(const char *ini, int profile, Profile *out);
 /* All of it written (the launcher). */
 void save(const char *ini, int profile, const Profile &p);
+/* A binding of the profile names the device `name' (case aside). */
+bool names_device(const Profile &p, const char *name);
 
 /* ---- the sources ----------------------------------------------------- */
 
@@ -205,11 +296,23 @@ struct JoySource {
     const int16_t *axes;
     const uint8_t *hats;                    /* SDL_HAT_* bits */
 };
-struct Sources {
+/* A device bindings name (Binding::device): its gamepad mapping (nullptr
+ * when SDL maps it as none) and its joystick; both nullptr while it is not
+ * connected. */
+struct DeviceSource {
     const PadSource *pad;
+    const JoySource *joy;
+};
+/* The devices the game opens for the bindings (ids 1 .. kMaxDevices; a later
+ * id reads nothing). */
+constexpr int kMaxDevices = 16;
+struct Sources {
+    const PadSource *pad;                   /* the profile's own device */
     const JoySource *joy;
     bool (*key)(int vk);                    /* the key (or mouse button) is down; nullptr: none */
     int wheel;                              /* mouse wheel notches since the last read: bit 0 up, bit 1 down */
+    const DeviceSource *devices;            /* [Binding::device - 1]; nullptr: none */
+    int deviceCount;
 };
 /* The binding's value 0..1 (a button 0 / 1). */
 float value(const Binding &b, const Sources &s);
@@ -240,6 +343,17 @@ void set_plays_with_controller(int player, bool on);
 enum Hotkey {
     kHotSettingsMenu, kHotSystemMenu, kHotFrameMonitor, kHotFullscreen,
     kHotPause, kHotResume, kHotFlickerCapture, kHotTrace, kHotDebugCamera,
+    kHotSongMenu, kHotPreviousSong, kHotNextSong,           /* PC: the race's song changer */
+    kHotFrameCapture,                                       /* PC (2026-11-06): the frame capture (pgl_capture.h) */
+    /* PC (2026-11-08): the cockpit camera's calibration (cockpit_osd.h): the
+     * axis before / after, a step down / up, save, cancel, the axis to 0;
+     * they act only while it is on (hotkey_shares_keys) */
+    kHotCalibrationUp, kHotCalibrationDown, kHotCalibrationLeft, kHotCalibrationRight,
+    kHotCalibrationSave, kHotCalibrationCancel, kHotCalibrationReset,
+    kHotTextureMenu,                                        /* PC (2026-11-13): the texture interface (texture_menu.h) */
+    kHotTextureRefresh,                                     /* PC (2026-11-13): its refresh, the panel shown or not */
+    kHotTextureToggle,                                      /* PC (2026-11-13): the replacements on / off */
+    kHotScreenshot,                                         /* PC (2026-11-15): a screenshot (screenshot.h) */
     kHotkeyCount
 };
 struct KeyCombo {
@@ -253,6 +367,11 @@ inline bool operator==(const KeyCombo &a, const KeyCombo &b)
 const char *hotkey_key(int h);              /* the ini key: "SettingsMenu" .. */
 const char *hotkey_name(int h);             /* the launcher's label */
 KeyCombo hotkey_default(int h);
+/* PC (2026-11-08): hotkey h acts only while its mode is on (the cockpit
+ * camera's calibration), so its key may be a control's too: load_hotkeys
+ * keeps its default then, and the launcher lets a control and it share a
+ * key. */
+bool hotkey_shares_keys(int h);
 /* A modifier key (Shift, Ctrl, Alt, either side's): never a combo's key. */
 bool is_modifier(int vk);
 /* The ini text of a combo ("Alt+Enter"; "none") and back (false: not one;
@@ -262,13 +381,18 @@ bool parse_combo(const char *text, KeyCombo *out);
 /* A label for the launcher: the key's name in the keyboard's layout after
  * the modifiers ("Ctrl+Esc"; "" for none). */
 void describe_combo(const KeyCombo &k, char *out, size_t n);
+/* Hotkey h's device default (none: Binding's source none). */
+Binding hotkey_device_default(int h);
 /* gt3pc.ini at `ini': all of them (a missing or unreadable one the
- * default); one written. */
-void load_hotkeys(const char *ini, KeyCombo out[kHotkeyCount]);
-void save_hotkey(const char *ini, int h, const KeyCombo &k);
+ * default; a missing one whose default key, without modifiers, a control's
+ * keyboard slot has in any profile: none), their devices in dev (unless
+ * nullptr); one written. */
+void load_hotkeys(const char *ini, KeyCombo out[kHotkeyCount], Binding dev[kHotkeyCount] = nullptr);
+void save_hotkey(const char *ini, int h, const KeyCombo &k, const Binding &dev);
 
 /* The game's (read by init). */
 const KeyCombo &hotkey(int h);
+const Binding &hotkey_device(int h);
 /* The key vk going down with those modifiers is hotkey h. */
 bool is_hotkey(int h, int vk, bool ctrl, bool alt, bool shift);
 /* Hotkey h for the overlays: its ini text, Escape as "Esc" ("F2",

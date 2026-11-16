@@ -24,12 +24,19 @@
  * The plan put four globals of other translation units here: the start
  * cameras g_00351F94 and __tit9UnitArena1Ui64 (T153),
  * __ti20RaceDisplayDiffEvent (T194) and __ti14_UnitArenaBase (T471) are
- * declared by their owners now. */
+ * declared by their owners now.
+ *
+ * PC (ROADMAP 35): a championship of up to PC_RACE_CARS_MAX cars (the
+ * organization's entries->count: 6, or [Game] RaceCars).  entries[] holds
+ * PC_RACE_CARS_MAX; the orders run over the race's cars, the player last
+ * (count - 1); suspend / resume keep 8 entries in the save's
+ * ChampionshipSave and the rest in its extension (T422 pcSetEntrant). */
 #ifndef GAME_T151_RACE_CHAMPIONSHIP_H
 #define GAME_T151_RACE_CHAMPIONSHIP_H
 
 #include "game/game.h"
 #include <stddef.h>                             /* size_t */
+#include "game/race/race_cars.h"                /* PC: PC_RACE_CARS_MAX (entries, icons) */
 #include "game/race/core/T152_race_gtmode_information.h"  /* base RaceGTmodeInformation */
 #include "game/data/T482_car_equipments.h"           /* CarEquipments (held by value) */
 #include "game/race/modes/T133_race_single_player.h"       /* base RaceSinglePlayer */
@@ -66,12 +73,13 @@ EGCS_SIZE(ChampionshipEntry, 0x1F8);
 
 /* vtable 0x0032D6E0 (15 slots; 0, 9 and 11 its own), typeinfo
  * __tf27RaceChampionshipInformation 0x0018F390.  vptr +0x54
- * (RaceInformation's); 0x1258 bytes.  The accessors from getSessionNumber
+ * (RaceInformation's); 0x1258 bytes (PC 0x4198: entries[PC_RACE_CARS_MAX];
+ * polymorphic, not checked).  The accessors from getSessionNumber
  * on are named by the symbols (? isLastSession); they are inline. */
 class RaceChampionshipInformation : public RaceGTmodeInformation {
 public:
     /* The 8 entries (no points, no order); the counters cleared.  Caller:
-     * run_championship (T053). */
+     * run_championship (T053).  (PC: every entry, PC_RACE_CARS_MAX.) */
     RaceChampionshipInformation();              /* 0x0018DD80 */
     virtual ~RaceChampionshipInformation();     /* [ 0] +0x0C 0x0018DEB0 */
     /* The points of entry i (RaceInformation's slot 9 takes the int too:
@@ -81,7 +89,8 @@ public:
      * take the last order. */
     virtual void setupOrganization(RaceOrganization *org);  /* [11] +0x64 0x0018DF38 */
 
-    /* (descriptive names, u050; u017's descriptions in quotes) */
+    /* (descriptive names, u050; u017's descriptions in quotes; PC: "0..5" /
+     * "6th" are the race's cars, 0..count - 1 / the last) */
     void applyEntryOrder(RaceOrganization *org);    /* 0x0018DF70 the order of entries 0..5 into the race cars */
     /* entries 0..5 ordered by the cars' best lap (car_best_lap, unsigned,
      * ascending; equal times share a place): "after a free run with a time" */
@@ -124,6 +133,20 @@ public:
      * (setChampionship).  No callers. */
     int  isLastSession() { return !(session < sessions); }      /* 0x0018F358 */
     int  getSessionNumber() { return session; }                 /* 0x0018F350 */
+    /* PC (no original): once its opponents are chosen (selectEnemies), the
+     * cars it was drawn with - the player and the entries with a car - so
+     * its later sessions and a resumed save keep them whatever [Game]
+     * RaceCars says now; 0 before (race_organization_create,
+     * game/app/pc_race_cars.h). */
+    int  pcChosenCars()
+    {
+        if (selectEnemies == 0)
+            return 0;
+        int n = 1;
+        while (n < PC_RACE_CARS_MAX && entries[n].car.carCode != 0)
+            n++;
+        return n;
+    }
 
     char globalRaceCode[0x20];                  /* 0x248 the championship's code (u017: champName) */
     char currentRaceCode[0x20];                 /* 0x268 the race of the current session */
@@ -132,9 +155,11 @@ public:
      * session's index (isLastSession: session >= sessions) */
     int  sessions;                              /* 0x28C */
     int  selectEnemies;                         /* 0x290 the opponents are chosen */
-    ChampionshipEntry entries[8];               /* 0x298 [0]: the player (8-byte aligned) */
+    ChampionshipEntry entries[PC_RACE_CARS_MAX];    /* 0x298 [0]: the player (8-byte aligned; PC: was
+                                                   [8], the race's cars; an entry past them has no
+                                                   car, carCode 0) */
 };
-EGCS_SIZE(RaceChampionshipInformation, 0x1258);
+EGCS_SIZE(RaceChampionshipInformation, 0x4198);     /* (polymorphic: not checked; GT3 0x1258) */
 
 /* vtable 0x0032D518 (56 slots; 0, 8, 24 and 43 its own), typeinfo
  * __tf16RaceChampionship 0x0018F300.  vptr +0x00 (GameObject's); 0x34600
@@ -169,7 +194,8 @@ public:
      * the result board and to the race display. */
     virtual void virtual_43();                  /* [43] +0x164 0x0018F278 */
 
-    CarIcon            icons[7];                /* 0x16EC0 */
+    CarIcon            icons[PC_RACE_CARS_MAX]; /* 0x16EC0 (PC: was [7]: every car of the race;
+                                                   the offsets below are GT3's) */
     ResultChampionship result;                  /* 0x2509C the points board */
     RacePause          pause;                   /* 0x25A44 the pause menu of a race */
     ReplayPause        replayPause;             /* 0x25CF0 (mode 0) */
@@ -180,8 +206,10 @@ public:
  * 0x34600). */
 /* (Wave 1: the hud's RaceDisplay (0xA8E8, GT3 0xA47C) and the embedded race classes' growth; the size
  * from tools/sizeprobe.py, the member offsets above stay
- * GT3's.) */
-EGCS_SIZE(RaceChampionship, 0x34C80);
+ * GT3's.)  PC (ROADMAP 35): icons[PC_RACE_CARS_MAX] (+25 x 0x2044) and
+ * ResultChampionship (+0x1F4) make it 0x674C0 in egcs's layout (64-byte
+ * aligned); polymorphic: not checked, sizeof is the compiler's. */
+EGCS_SIZE(RaceChampionship, 0x674C0);
 
 /* RaceClassInfo::create of "RaceChampionship": new RaceChampionship. */
 RaceBase *RaceChampionship_create(void);                    /* 0x0018EF00 */

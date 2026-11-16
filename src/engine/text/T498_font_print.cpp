@@ -25,6 +25,7 @@ void Font::begin()
         return;
     g_002F4250.loadTex1(face->tex);
     font_set(face, &face->tex->tex[palette]);
+    font_set_palette(palette);              /* PC: the vector glyphs' (ROADMAP 36) */
     font_set_kanji(kanjiFont, kanjiCluts + palette * 0x10, g_002F4230.unkB70);
     font_begin();
     active = 1;

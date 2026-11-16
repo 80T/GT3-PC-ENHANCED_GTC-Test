@@ -32,7 +32,10 @@ struct CarIcon;                             /* T184 */
  * disqualified cars (menus_b.md 14 a): size 0x96C, so the members of
  * ResultChampionship / ResultLinkBattle / Result2PBattle move by +0x20 and
  * the race modes that hold one (RaceArcade, RaceChampionship,
- * RaceSplitBattle, RaceLinkBattle) grow by 0x20. */
+ * RaceSplitBattle, RaceLinkBattle) grow by 0x20.  PC (ROADMAP 35): finished
+ * and disqualified hold PC_RACE_CARS_MAX cars (egcs layout 0xA34: the
+ * offsets below past finished are GT3's); the board shows the top 6 of a
+ * bigger race. */
 class ResultArcade : public RaceResultBase {
 public:
     /* [0] +0x0C 0x00175368 ~ResultArcade: implicit (~board, flags 2; the
@@ -77,7 +80,8 @@ public:
      * own): goal's store of finished[number] does not hold back the load of
      * the entries' count, which retail schedules after the constant 1 (u040
      * notes; ints: 99.0%).  ResultChampionship (u041) is exact either way. */
-    bool        finished[7];                /* 0x924 entry i reached the goal (is on the board) */
+    bool        finished[PC_RACE_CARS_MAX]; /* 0x924 entry i reached the goal (is on the board;
+                                               PC: of up to PC_RACE_CARS_MAX, was [7]) */
     bool        allFinished;                /* 0x940 every entry reached the goal */
     f32         timer;                      /* 0x944 seconds left before the end (15.0) */
     int         lapsOnly;                   /* 0x948 a time-limit race: the rows show laps */
@@ -86,10 +90,10 @@ public:
      * named by RACE_EVENT_CAR_DISQUALIFIED (the Pod race's lap check) and
      * their count.  Each gets the board's last free row, "Disqualified",
      * and no time of its own. */
-    bool        disqualified[7];            /* 0x94C car i is disqualified */
+    bool        disqualified[PC_RACE_CARS_MAX]; /* 0x94C car i is disqualified (PC: was [7]) */
     int         disqualifiedCount;          /* 0x968 */
 };
-EGCS_SIZE(ResultArcade, 0x96C);
+EGCS_SIZE(ResultArcade, 0xA34);              /* (polymorphic: not checked; the enhanced engine 0x96C) */
 
 
 #endif /* GAME_T117_RESULT_ARCADE_H */

@@ -17,6 +17,7 @@
  * the VIF1 list WAITs for the GIF list to pass the end of the upload. */
 #include "engine/gfx/vram_internal.h"
 #include "engine/gfx/T513_vram_allocator.h"
+#include "engine/pgl/native/pgl_bridge.h"     /* PC (2026-11-13): pglr_buffer_freed / _alloc */
 
 /* The list operations (inlined everywhere in the binary: the list's address
  * stays in a register, as an inline function's argument). */
@@ -165,6 +166,9 @@ int VramAllocator::alloc(int size, const void *tag)
         blk->prev = NULL;
         blk->tag = tag;
         vram_push_front(&usedList, blk);
+        /* PC (2026-11-13): the block is a buffer's again (pglr_buffer_freed
+         * below) */
+        pglr_buffer_alloc((u32)blk->addr >> 6);
     }
     if (!wasLocked)
         unlock();
@@ -191,6 +195,11 @@ void VramAllocator::dealloc(int addr)
         if (blk->addr == addr) {
             vram_unlink(blk);
             release(blk);
+            /* PC (2026-11-13): tell the renderer: what was drawn there is
+             * dead (a GSBuffer's VRAM given back: the smoke's, the tyres'
+             * blur buffers, every frame; its render target need not wait
+             * 600 frames - docs/renderer.md 5, "Buffers the game frees") */
+            pglr_buffer_freed((u32)addr >> 6);
             break;
         }
     }

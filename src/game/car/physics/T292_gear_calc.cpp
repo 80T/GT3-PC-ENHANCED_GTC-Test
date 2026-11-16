@@ -146,6 +146,7 @@ void gear_calc(CarSpec *spec, GearCalc *g, EngineCurve *e, int a3)
      * 8 gears or more become 7; the electric box has one gear; a CVT needs
      * two (else the stock box).  GT3's cars: type 0, up to 6 gears. */
     g->gearboxType = spec->gearboxType;
+    g->gearKind = spec->gearKind;           /* PC (2026-11-08): the gear part's category (game/app/pc_shift.h) */
     if (!(g->gearCount < 8))
         g->gearCount = 7;
     else if (g->gearboxType == GEARBOX_ELECTRIC) {

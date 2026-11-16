@@ -152,6 +152,32 @@ int vifmodel_send_lighting(GsContext *ctx, u32 mode, int resend)
     return resend;
 }
 
+/* PC (2026-11-07): the hide box (vifmodel_pc_hide; the game thread's, set
+ * round the draws it is for): every part recorded carries it. */
+static float g_pcHideC[3], g_pcHideH[3];
+static int g_pcHideOn;
+static const VifPartRef *g_pcSkip;          /* the parts not drawn at all (hideOn 2) */
+static int g_pcSkipCount;
+
+void vifmodel_pc_hide(const float *centre, const float *half, const VifPartRef *skip, int n)
+{
+    g_pcHideOn = centre != NULL && half != NULL;
+    for (int k = 0; k < 3; k++) {
+        g_pcHideC[k] = g_pcHideOn ? centre[k] : 0.0f;
+        g_pcHideH[k] = g_pcHideOn ? half[k] : 0.0f;
+    }
+    g_pcSkip = n > 0 ? skip : NULL;
+    g_pcSkipCount = n > 0 ? n : 0;
+}
+
+static int pc_skipped(const VifModel *m, int index)
+{
+    for (int k = 0; k < g_pcSkipCount; k++)
+        if (g_pcSkip[k].model == m && g_pcSkip[k].part == index)
+            return 1;
+    return 0;
+}
+
 /* Records one part of a model for the renderer. */
 static void put_part(GsContext *ctx, const VifModel *m, int index, u32 flags)
 {
@@ -182,6 +208,13 @@ static void put_part(GsContext *ctx, const VifModel *m, int index, u32 flags)
     part.flareStripBlock = 0;               /* PC: (no GPU texel: vif_model_draw's) */
     part.flareStripH = 0;
     part.flareQ = 0;
+    /* PC (2026-11-07): the hide box (vifmodel_pc_hide); 2: the part whole */
+    part.hideOn = g_pcSkipCount != 0 && pc_skipped(m, index) ? 2.0f : g_pcHideOn ? 1.0f : 0.0f;
+    part.hidePad = 0.0f;
+    for (int k = 0; k < 3; k++) {
+        part.hideC[k] = g_pcHideC[k];
+        part.hideH[k] = g_pcHideH[k];
+    }
     g_pglVu1Sent.prog = ctx->vu1Prog;
     pglr_model_part(&g_pglVu1Sent, &part, flags);
 }
@@ -461,11 +494,12 @@ void pgl_build_light_list(GsContext *ctx)
     ctx->lightFlags = (u8)flags;
 }
 
-/* The modelview's rigid inverse (vf20..vf23 after U115_VU_INVERT_VF20). */
+/* The modelview's rigid inverse (vf20..vf23 after U115_VU_INVERT_VF20).
+ * PC: an affine one under the course scale (pgl::g_worldScale). */
 static void modelview_inverse(Vec4 out[4])
 {
     pgl_modelview(out);
-    pgl::invertRigid(out);
+    pgl::invertModelview(out);
     for (int r = 0; r < 4; r++)
         VU0.vf[20 + r] = out[r];
 }
@@ -623,6 +657,16 @@ void pgl_build_env_matrix(GsContext *ctx)
         row3.y = row3.y * pgl::vu::div(1.0f, ctx->scale.y);
         row3.z = row3.z * pgl::vu::div(1.0f, ctx->scale.z);
     }
+    if (pgl::g_worldScale.w != 0.0f) {
+        /* PC: under the course scale the eye from the affine inverse, the
+         * normals' rows normalised (pgl::g_worldScale) */
+        Vec4 inv[4] = {mv[0], mv[1], mv[2], mv[3]};
+        pgl::invertAffine(inv);
+        row3.x = inv[3].x;
+        row3.y = inv[3].y;
+        row3.z = inv[3].z;
+        pgl::normalizeModelviewRows(mv);
+    }
     if (ctx->normalMtxEnable != 0) {
         Vec4 n[3] = {vec4_of(ctx->normalMtx[0]), vec4_of(ctx->normalMtx[1]), vec4_of(ctx->normalMtx[2])};
         for (int r = 0; r < 3; r++)
@@ -721,6 +765,28 @@ void pgl_envmap_set_basis(f32 ax, f32 ay, f32 az, f32 bx, f32 by, f32 bz)
 
     pgl_modelview(mv);
     pgl::envmapSetBasis(VU0, pgl::g_envMap, mv, ax, ay, az, bx, by, bz);
+}
+
+/* PC (no original): the course scale's world scale (G001_flare.h).  Its
+ * mirroring changing, the culling program is chosen again (gs_select_vu1_prog
+ * turns the front face while mirrored). */
+void pgl_set_world_scale(int on, f32 x, f32 y, f32 z)
+{
+    const int was = pgl_world_scale_mirrored();
+    pgl::g_worldScale = on != 0 ? Vec4{x, y, z, 1.0f} : Vec4{1.0f, 1.0f, 1.0f, 0.0f};
+    if (pgl_world_scale_mirrored() != was)
+        gs_select_vu1_prog(GS_SPR_CTX);
+}
+
+int pgl_world_scale_on(void)
+{
+    return pgl::g_worldScale.w != 0.0f ? 1 : 0;
+}
+
+int pgl_world_scale_mirrored(void)
+{
+    const Vec4 &w = pgl::g_worldScale;
+    return w.w != 0.0f && w.x * w.y * w.z < 0.0f ? 1 : 0;
 }
 
 /* ======================================================================== */

@@ -4,6 +4,7 @@
 #include "game/data/car_equipments_internal.h"
 #include "game/data/T481_car_data_base.h"
 #include "platform/language.h"                  /* PC: language::car_database (the run's language's files) */
+#include "game/app/pc_param_db.h"               /* PC: pc_param_db_file (the files from database/paramdb<r>.sqlite3) */
 
 /* 0x002EBD88 (.data): the car database, defined here (u106: egcs's
  * _GLOBAL_$I$ / $D$ of it are the retail static constructor / destructor,
@@ -108,8 +109,10 @@ void CarDataBase::loadStrings()
     if (this->strings != NULL)
         free(this->strings);
     /* PC: the run's language's (database/paramstr_us.db in English (US);
-     * platform/language.h) */
-    this->strings = (StringsDataBase *)readFile(language::car_database(1));
+     * platform/language.h), from its database when converted */
+    this->strings = (StringsDataBase *)pc_param_db_file(1);
+    if (this->strings == NULL)
+        this->strings = (StringsDataBase *)readFile(language::car_database(1));
 }
 
 // FUNC 0x002313B8 CarDataBase::loadUniStrings
@@ -117,7 +120,11 @@ void CarDataBase::loadUniStrings()
 {
     if (this->uniStrings != NULL)
         free(this->uniStrings);
-    this->uniStrings = (StringsDataBase *)readFile(language::car_database(2));   /* PC: was database/paramunistr_us.db */
+    /* PC: from the run's database when converted, else the language's file
+     * (was database/paramunistr_us.db) */
+    this->uniStrings = (StringsDataBase *)pc_param_db_file(2);
+    if (this->uniStrings == NULL)
+        this->uniStrings = (StringsDataBase *)readFile(language::car_database(2));
 }
 
 /* The whole file (unpacked) in a 64-byte-aligned buffer of its size rounded
@@ -149,6 +156,13 @@ void CarDataBase::loadDataBase()
 
     if (this->db != NULL)
         free(this->db);
+    /* PC: from the run's database when converted (game/app/pc_param_db.h) */
+    buf = pc_param_db_file(0);
+    if (buf != NULL) {
+        this->db = (CarDataBaseHeader *)buf;
+        getVersion();
+        return;
+    }
     path = language::car_database(0);   /* PC: was database/paramdb_us.db (platform/language.h) */
     size = file_size_retry(path, 0, &vol_device_object);       /* PC: was 1, as readFile's */
     size = (size + 0x3F) & ~0x3F;

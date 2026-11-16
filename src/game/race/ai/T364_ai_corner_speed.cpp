@@ -9,13 +9,17 @@
 #include "game/race/core/T153_race_course.h"          /* (seen: UnitArena<64>) */
 #include "game/race/ai/T364_ai_corner_speed.h"
 #include "game/race/ai/ai_internal.h"
+#include "game/app/pc_car_tuning.h"                 /* PC: the grip multiplier */
 // DATA_START 0x0033DCB0
 
 /* The speed for node idx of the current line: the grip of the front and
  * rear tyres on its surface (weighted by gripBalance; with tyre wear, by
  * each wheel's wearGrip), times the radius, over the bank, then v =
  * sqrt(grip r / (1 + downforce v^2)) by three fixed-point steps, the
- * driver's scale and offsets; at most the top speed, at least 20 km/h. */
+ * driver's scale and offsets; at most the top speed, at least 20 km/h.
+ * PC: the grip x the car's grip multiplier (game/app/pc_car_tuning.h; the
+ * surfaces' grips are in surfaceGrip): the driver takes the corners at the
+ * grip the car has. */
 
 /* The fixed-point steps: an inline helper (its own p': GCSE does not hoist
  * the loads of cornerScale / cornerOffset after it into the loop's
@@ -63,6 +67,7 @@ f32 ai_corner_speed(AIDriver *ai, int idx)
     } else {
         grip = axleGrip[0] + axleGrip[1];
     }
+    grip *= pc_car_tuning(car, PC_TUNE_GRIP);    /* PC */
     /* A roll of the other sign than the radius raises the speed (grip / (1 -
      * |sin roll|): banked into the turn); a roll of the same sign is
      * ignored. */

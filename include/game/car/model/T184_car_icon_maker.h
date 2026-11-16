@@ -8,6 +8,8 @@
  * downloads it into the icon; update() counts the frames and from the third
  * one hands the render thread back and wakes the caller.  The race modes
  * keep 7 icons (RaceArcade +0x16EC0 ...); ResultBoard (T200) shows them.
+ * PC (ROADMAP 35): the race modes keep PC_RACE_CARS_MAX icons (game/race/
+ * race_cars.h), and car_icons_make makes at most that many.
  *
  * GsTexPacket (the plan put it here) is the texture register block the car
  * models reflect: u045 / u061's stack objects. */
@@ -15,6 +17,7 @@
 #define GAME_T184_CAR_ICON_MAKER_H
 
 #include "game/game.h"
+#include "game/race/race_cars.h"            /* PC: PC_RACE_CARS_MAX (the icon arrays' size) */
 #include "game/app/T002_render_thread.h"        /* base GameObject */
 #include "engine/pgl/G001_flare.h"                /* GsTexRegs (held by value) */
 
@@ -37,7 +40,8 @@ struct GsTexPacket {
 EGCS_SIZE(GsTexPacket, 0x50);
 
 /* One car icon: a 64 x 32 RGBA image, 64-byte aligned inside the object.
- * Not polymorphic.  Size 0x2044 (the race modes' arrays of 7). */
+ * Not polymorphic.  Size 0x2044 (the race modes' arrays of 7; PC:
+ * PC_RACE_CARS_MAX). */
 struct CarIcon {
     CarIcon();                              /* 0x001ADA68 pixels = (this + 0x3F) & ~0x3F */
 
@@ -78,7 +82,9 @@ public:
 EGCS_SIZE(CarIconMaker, 0x18);
 
 /* The icons of the race's cars (as many as there are, at most 7).
- * Callers: the race modes' virtual_43. */
+ * Callers: the race modes' virtual_43.  PC (ROADMAP 35): icons is an array
+ * of PC_RACE_CARS_MAX CarIcons (the race modes' icons[PC_RACE_CARS_MAX]);
+ * at most PC_RACE_CARS_MAX are made. */
 void car_icons_make(CarIcon *icons, RaceOrganization *org);    /* 0x001AE3F8 */
 
 #endif /* GAME_T184_CAR_ICON_MAKER_H */

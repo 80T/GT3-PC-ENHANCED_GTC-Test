@@ -27,8 +27,9 @@
  * IOP's chunk granularity.  The file is read through a byte-source callback
  * (offset-based, so a loop re-reads from the body start) into per-channel
  * FIFOs, by a feeder thread of the player's own (or by pump() for offline
- * rendering).  Only ADPCM is supported (GT3 has no PCM stream; pdispu2 sent
- * PCM through the core's ADMA input instead of voices).
+ * rendering).  Only ADPCM is supported (pdispu2 sent PCM through the core's
+ * ADMA input instead of voices; the JP disc's movies carry PCM, which the
+ * movie service plays through sound_native.h's PCM output instead).
  *
  * Plain C++, no Windows or game dependency. */
 #ifndef GT3PC_ADS_STREAM_H
@@ -40,30 +41,10 @@
 #include <thread>
 #include <vector>
 
+#include "engine/sound/native/bgm_files.h"      /* AdsHeader, ads_parse_header, AdsReadFn */
 #include "engine/sound/native/spu2.h"
 
 namespace spu2 {
-
-constexpr uint32_t ADS_HEAD_BYTES = 0x28;
-constexpr uint32_t ADS_TYPE_PCM   = 0x01;
-constexpr uint32_t ADS_TYPE_ADPCM = 0x10;
-
-struct AdsHeader {
-    uint32_t type = 0;
-    uint32_t rate = 0;
-    uint32_t channels = 0;
-    uint32_t interleave = 0;
-    int32_t  loopStart = -1;
-    int32_t  loopEnd = -1;
-    uint32_t bodySize = 0;
-};
-
-/* Parses the 0x28-byte head; false if it is not one. */
-bool ads_parse_header(const uint8_t *head, uint32_t size, AdsHeader *out);
-
-/* Reads up to `size' bytes at byte `offset' of the file into dst: the
- * number read (0 past the end, < 0 on error). */
-typedef int (*AdsReadFn)(void *user, uint32_t offset, void *dst, uint32_t size);
 
 /* The stream status the IOP answered 'PBGM' function 6 with. */
 struct AdsClock {

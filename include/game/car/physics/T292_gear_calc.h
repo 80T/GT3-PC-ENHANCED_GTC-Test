@@ -55,7 +55,11 @@ public:
      * type-3 tachometer shows the motor rpm: physics feeds it).  Lupo 2
      * Transmission+0x12 (car+0x208+0x12). */
     u8  gearboxType;                        /* 0x12 */
-    u8  unk_13;                             /* 0x13 */
+    /* PC (2026-11-08): the gear part's category (TransmissionRecord.kind
+     * through CarSpec.gearKind; 0 stock, 1 close, 2 super close, 3 fully
+     * customisable), padding no GT3 code touches.  Writer: gear_calc;
+     * reader: the realistic gear shift (game/app/pc_shift.h). */
+    u8  gearKind;                           /* 0x13 */
     f32 diffA[2];                           /* 0x14 per axle (u080: the LSD's initial torque) */
     f32 diffB[2];                           /* 0x1C (u080: the LSD's accel factor) */
     f32 diffC[2];                           /* 0x24 (u080: the LSD's decel factor) */

@@ -17,6 +17,7 @@
 
 #include "game/game.h"
 #include "engine/pdistd/T531_random.h"               /* Random (held by value) */
+#include "game/race/race_cars.h"            /* PC: PC_RACE_CARS_MAX (car[]'s size) */
 
 class CameraTargetInfo;                     /* T377 (pointers only) */
 class CameraTargetSelector;                 /* T392 */
@@ -40,18 +41,20 @@ EGCS_SIZE(TargetScore, 0xC);
  * around `pending = 0' as retail does (a u8 orders them, 77.4%), while
  * F_0020E1F0's test of it stays after the score loops (an `unsigned : 8'
  * field is hoisted above them).  The layout is the same under both
- * compilers (bool is 1 byte in GCC 14; the field takes the byte 0x5E). */
+ * compilers (bool is 1 byte in GCC 14; the field takes the byte 0x5E).
+ * PC (ROADMAP 35): car[PC_RACE_CARS_MAX] (7 on the PS2): size 0x18C, the
+ * PC offsets below, the PS2's in brackets. */
 class TargetChooser {
 public:
-    TargetScore car[7];                     /* 0x00 */
-    Random      rng;                        /* 0x54 */
-    int         frames;                     /* 0x58 frames since the last switch */
-    s8          next;                       /* 0x5C the car chosen */
-    s8          shown;                      /* 0x5D the car shown */
-    bool        pending : 8;                /* 0x5E 1: next changed and was not taken yet */
-    u8          unk_5F;                     /* 0x5F */
+    TargetScore car[PC_RACE_CARS_MAX];      /* 0x000 [0x00] PC: was [7] (the races of up to 32 cars) */
+    Random      rng;                        /* 0x180 [0x54] */
+    int         frames;                     /* 0x184 [0x58] frames since the last switch */
+    s8          next;                       /* 0x188 [0x5C] the car chosen */
+    s8          shown;                      /* 0x189 [0x5D] the car shown */
+    bool        pending : 8;                /* 0x18A [0x5E] 1: next changed and was not taken yet */
+    u8          unk_5F;                     /* 0x18B [0x5F] */
 };
-EGCS_SIZE(TargetChooser, 0x60);
+EGCS_SIZE(TargetChooser, 0x18C);            /* PC: PS2 0x60 (car[7]) */
 
 /* T393 .data 0x002DF108 (defined in T393; retail's is in .data, so not
  * const): per 0-based place (5 = 6th and below) {400, 1/60, 1.5},

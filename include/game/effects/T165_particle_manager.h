@@ -1,8 +1,9 @@
 /* T165_particle_manager.h - ParticleManager, the sparks and wheel debris of
  * a race (translation unit T165, unit u056), 0x0019E6F0..0x0019F898.
  *
- * 128 particles (pool) on an active and a free list.  A particle moves with
- * drag, gravity and an occasional lift early in its life (the parameters
+ * 128 particles (pool; PC (ROADMAP 35): 512, T165's PARTICLE_POOL_SIZE, for
+ * the races of up to 32 cars) on an active and a free list.  A particle
+ * moves with drag, gravity and an occasional lift early in its life (the parameters
  * g_002C03B0, T166), bounces off its ground plane (a bounce shortens its
  * life) and dies when its life runs out.  It is drawn as a streak from last
  * frame's screen position to this one's, coloured by its remaining life
@@ -19,7 +20,8 @@ struct Tex1Image;                           /* G001 (pointers only: forward decl
 class type_info;                            /* T548 */
 
 
-/* One particle, 0x54 bytes (ParticleManager::pool[128], new[] 0x2A00). */
+/* One particle, 0x54 bytes (ParticleManager::pool[128], new[] 0x2A00; PC:
+ * [512], 0xA800). */
 struct Particle {
     Particle() : next(0) {}                 /* inline (the pool's new[]) */
 
@@ -76,8 +78,8 @@ EGCS_SIZE(ParticleSourceType, 0xC);
  * (user).  0x10 bytes of data, egcs vptr +0x10.  Size 0x14. */
 class ParticleManager {
 public:
-    /* The pool (new Particle[128]), the texture "race/particle.img" (read
-     * whole, relocated), clear(). */
+    /* The pool (new Particle[128]; PC: [512]), the texture
+     * "race/particle.img" (read whole, relocated), clear(). */
     ParticleManager();                                      /* 0x0019EEF8 */
     /* free(tex), delete[] pool. */
     virtual ~ParticleManager();                             /* [0] +0x0C 0x0019EF90 */
@@ -103,7 +105,7 @@ public:
     void draw();                                            /* 0x0019F738 */
     void resetTrails();                                     /* 0x0019F820 ? name */
 
-    Particle  *pool;                        /* 0x00 new Particle[128] */
+    Particle  *pool;                        /* 0x00 new Particle[128] (PC: [512]) */
     Particle  *active;                      /* 0x04 the live list (newest first) */
     Particle  *freeList;                    /* 0x08 */
     Tex1Image *tex;                         /* 0x0C "race/particle.img" */

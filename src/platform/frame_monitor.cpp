@@ -41,6 +41,8 @@ struct Frame {
     float d3d;                                  /* the D3D thread's busy ms (exec_d3d_thread; -1: none) */
     float d3dWait;                              /* the game thread's ms waiting for it */
     float execThread;                           /* the executor thread's busy ms (exec_thread; -1: none) */
+    float sub;                                  /* PC: the submit thread's busy ms (exec_submit_thread; -1: none) */
+    float subWait;                              /* the executor's ms waiting for it */
 };
 
 /* The renderer's executor thread reports too (EXECUTE's profile, the GPU
@@ -62,6 +64,8 @@ bool g_curHasExec;
 float g_curD3d = -1.0f;
 float g_curD3dWait;
 float g_curExecThread = -1.0f;
+float g_curSub = -1.0f;                     /* PC (2026-11-05): the submit thread (exec_submit_thread) */
+float g_curSubWait;
 
 std::atomic<int> g_mode{MODE_OFF};
 Frame g_frames[kFrames];
@@ -140,41 +144,81 @@ Frame *recorded_frame(uint32_t seq)
     return &g_frames[((g_next - (int)back) % kFrames + kFrames) % kFrames];
 }
 
-/* A table of AVG / MAX, two to a line, under its title from y (names in
- * capitals); the y after it */
-float draw_table(float x, float y, float colW, float lineH, int s, const char *title, const char *const *names,
-                 const float *avg, const float *mx, int n)
+/* PC (2026-11-07): the longest of n names (characters, at least `least'):
+ * the tables' name columns are as wide as their names.  The columns were a
+ * fixed 11 / 9 characters: TARGET COPIES and FLARE QUERIES ran into the next
+ * column, the counts' column into the next and past the panel. */
+constexpr int kNameMax = 31;
+int names_width(const char *const *names, int n, int least)
+{
+    int w = least;
+    for (int k = 0; k < n; k++)
+        if (names[k] != nullptr)
+            w = std::max(w, (int)strnlen(names[k], kNameMax));
+    return w;
+}
+
+/* A table of AVG / MAX, two to a line (the columns colW apart, the names
+ * nameW wide), under its title from y (names in capitals); the y after it */
+float draw_table(float x, float y, float colW, float lineH, int s, int nameW, const char *title,
+                 const char *const *names, const float *avg, const float *mx, int n)
 {
     text(x, y, s, title, kGrey);
     for (int k = 0; k < n; k++) {
-        char name[16], line[64];
+        char name[kNameMax + 1], line[64];
         int c = 0;
         for (const char *p = names[k]; p != nullptr && *p && c < (int)sizeof(name) - 1; p++)
             name[c++] = (char)(*p >= 'a' && *p <= 'z' ? *p - 32 : *p);
         name[c] = 0;
-        snprintf(line, sizeof(line), "%-11s %5.2f / %5.2f", name, avg[k], mx[k]);
+        snprintf(line, sizeof(line), "%-*s %5.2f / %5.2f", nameW, name, avg[k], mx[k]);
         text(x + (k & 1) * colW, y + lineH * (float)(1 + (k >> 1)), s, line, kWhite);
     }
     return y + lineH * (float)(1 + (n + 1) / 2);
 }
 
-/* The verbose panel's lines (its height) */
+/* The tables' panel's lines (its height): the GPU table's (a title and two
+ * sections a line), a gap, the CPU table's (the kinds and the six thread
+ * lines, two a line).  PC (2026-11-07): the CPU table counted one line
+ * short (its last line sat on the panel's edge). */
 int verbose_lines()
 {
-    return (1 + (g_secCount + 1) / 2) + 1 + (1 + (g_execKinds + 5) / 2) + 1 + (1 + (g_execCounts + 2) / 3);
+    return (1 + (g_secCount + 1) / 2) + 1 + (1 + (g_execKinds + 6 + 1) / 2);
 }
 
-/* The verbose panel at (px, py), w wide: the GPU sections, EXECUTE's CPU
- * profile (and what the profile does not hold of it), the counts */
-void draw_verbose(float px, float py, float w, float pad, float lineH, int s)
+/* The verbose panels, at least w wide: at (px, py) the GPU sections and
+ * EXECUTE's CPU profile (and what the profile does not hold of it: the
+ * threads apart); the counts in a panel of their own to the right of it, in
+ * as many columns as the screen (bw x bh) has room for there (two at least),
+ * else below it.  PC (2026-11-05): two panels - the one tall panel ran past
+ * the bottom of a 1080 screen once the counts passed 60 (user report), and
+ * the submit thread's lines sat far down it.  PC (2026-11-07): the columns
+ * sized by their names (names_width), the panels by their columns; the
+ * counts' columns by the room. */
+void draw_verbose(float px, float py, float w, float pad, float lineH, int s, int bw, int bh)
 {
+    (void)bh;
+    const float cw = 6.0f * s;                  /* a character cell (overlay.h) */
+    /* the tables' names: the sections', the kinds' and the threads' */
+    const char *names[kExecKinds + 6];
+    for (int k = 0; k < g_execKinds; k++)
+        names[k] = g_execNames[k];
+    names[g_execKinds] = "OUTSIDE";
+    names[g_execKinds + 1] = "D3D THREAD";
+    names[g_execKinds + 2] = "D3D WAIT";
+    names[g_execKinds + 3] = "EXEC THREAD";
+    names[g_execKinds + 4] = "SUBMIT THR";
+    names[g_execKinds + 5] = "SUBMIT WAIT";
+    const int nameW = std::max(names_width(g_secNames, g_secCount, 11), names_width(names, g_execKinds + 6, 11));
+    /* a column: the name, " 12.34 / 12.34", two blanks to the next */
+    const float colW = (float)(nameW + 15 + 2) * cw;
+    const float pw = std::max(w, 2.0f * colW - 2.0f * cw + 2.0f * pad);
     const float ph = pad + (float)verbose_lines() * lineH + pad;
-    rect(px, py, w, ph, rgba(0, 0, 0, 175));
-    const float x = px + pad, colW = (w - 2.0f * pad) * 0.5f;
+    rect(px, py, pw, ph, rgba(0, 0, 0, 175));
+    const float x = px + pad;
     float y = py + pad;
 
     /* the GPU sections */
-    float avg[kExecKinds + 4] = {}, mx[kExecKinds + 4] = {};
+    float avg[kExecKinds + 6] = {}, mx[kExecKinds + 6] = {};
     int n = 0;
     for (int i = 0; i < g_count; i++) {
         const Frame &f = shown_frame(i);
@@ -188,8 +232,8 @@ void draw_verbose(float px, float py, float w, float pad, float lineH, int s)
     }
     for (int k = 0; k < g_secCount; k++)
         avg[k] = n ? avg[k] / n : 0.0f;
-    y = draw_table(x, y, colW, lineH, s, n ? "GPU SECTIONS, MS (AVG / MAX)" : "GPU SECTIONS: WAITING", g_secNames,
-                   avg, mx, g_secCount) + lineH;
+    y = draw_table(x, y, colW, lineH, s, nameW, n ? "GPU SECTIONS, MS (AVG / MAX)" : "GPU SECTIONS: WAITING",
+                   g_secNames, avg, mx, g_secCount) + lineH;
 
     /* EXECUTE's CPU profile, and the rest of EXECUTE without its wait (the
      * execution's set-up and end: targets, the flush, queries) */
@@ -197,7 +241,7 @@ void draw_verbose(float px, float py, float w, float pad, float lineH, int s)
     memset(mx, 0, sizeof(mx));
     double counts[kExecCounts] = {};
     n = 0;
-    int nD3d = 0, nExec = 0;
+    int nD3d = 0, nExec = 0, nSub = 0;
     for (int i = 0; i < g_count; i++) {
         const Frame &f = shown_frame(i);
         if (!f.hasExec)
@@ -225,6 +269,15 @@ void draw_verbose(float px, float py, float w, float pad, float lineH, int s)
             mx[g_execKinds + 3] = std::max(mx[g_execKinds + 3], f.execThread);
             nExec++;
         }
+        if (f.sub >= 0.0f) {
+            /* PC (2026-11-05): the submit thread (alongside the executor; the
+             * kinds above are both stages' together) and the executor's waits */
+            avg[g_execKinds + 4] += f.sub;
+            mx[g_execKinds + 4] = std::max(mx[g_execKinds + 4], f.sub);
+            avg[g_execKinds + 5] += f.subWait;
+            mx[g_execKinds + 5] = std::max(mx[g_execKinds + 5], f.subWait);
+            nSub++;
+        }
         for (int k = 0; k < g_execCounts; k++)
             counts[k] += f.counts[k];
         n++;
@@ -234,23 +287,36 @@ void draw_verbose(float px, float py, float w, float pad, float lineH, int s)
     avg[g_execKinds + 1] = nD3d ? avg[g_execKinds + 1] / nD3d : 0.0f;
     avg[g_execKinds + 2] = nD3d ? avg[g_execKinds + 2] / nD3d : 0.0f;
     avg[g_execKinds + 3] = nExec ? avg[g_execKinds + 3] / nExec : 0.0f;
-    const char *names[kExecKinds + 4];
-    for (int k = 0; k < g_execKinds; k++)
-        names[k] = g_execNames[k];
-    names[g_execKinds] = "OUTSIDE";
-    names[g_execKinds + 1] = "D3D THREAD";
-    names[g_execKinds + 2] = "D3D WAIT";
-    names[g_execKinds + 3] = "EXEC THREAD";
-    y = draw_table(x, y, colW, lineH, s, n ? "EXECUTE CPU, MS (AVG / MAX)" : "EXECUTE CPU: WAITING", names, avg, mx,
-                   g_execKinds + 4) + lineH;
+    avg[g_execKinds + 4] = nSub ? avg[g_execKinds + 4] / nSub : 0.0f;
+    avg[g_execKinds + 5] = nSub ? avg[g_execKinds + 5] / nSub : 0.0f;
+    draw_table(x, y, colW, lineH, s, nameW, n ? "EXECUTE CPU, MS (AVG / MAX)" : "EXECUTE CPU: WAITING", names, avg,
+               mx, g_execKinds + 6);
 
-    /* what a frame executed */
-    text(x, y, s, "PER FRAME (AVG)", kGrey);
-    const float countW = (w - 2.0f * pad) / 3.0f;
+    /* what a frame executed: a panel of its own.  A column: the name, a
+     * blank, six digits, two blanks to the next.  Beside the tables' panel
+     * in the columns the screen has room for there, two at least; else
+     * below it, up to four. */
+    const int countNameW = names_width(g_countNames, g_execCounts, 9);
+    const float countW = (float)(countNameW + 1 + 6 + 2) * cw;
+    float cx = px + pw + 4.0f * s, cy = py;
+    int columns = (int)(((float)bw - cx - 2.0f * pad) / countW);
+    if (columns < 2) {
+        cx = px;
+        cy = py + ph + 4.0f * s;
+        columns = std::min(4, (int)(((float)bw - cx - 2.0f * pad) / countW));
+    }
+    columns = std::max(1, std::min(columns, std::max(1, g_execCounts)));
+    const int rows = (g_execCounts + columns - 1) / columns;
+    const float chw = (float)columns * countW - 2.0f * cw + 2.0f * pad;
+    const float chh = pad + (float)(1 + rows) * lineH + pad;
+    rect(cx, cy, chw, chh, rgba(0, 0, 0, 175));
+    const float tx = cx + pad, ty = cy + pad;
+    text(tx, ty, s, "PER FRAME (AVG)", kGrey);
     for (int k = 0; k < g_execCounts; k++) {
-        char line[48];
-        snprintf(line, sizeof(line), "%-9s %6.0f", g_countNames[k] ? g_countNames[k] : "", n ? counts[k] / n : 0.0);
-        text(x + (float)(k % 3) * countW, y + lineH * (float)(1 + k / 3), s, line, kWhite);
+        char line[64];
+        snprintf(line, sizeof(line), "%-*s %6.0f", countNameW, g_countNames[k] ? g_countNames[k] : "",
+                 n ? counts[k] / n : 0.0);
+        text(tx + (float)(k % columns) * countW, ty + lineH * (float)(1 + k / columns), s, line, kWhite);
     }
 }
 
@@ -286,7 +352,6 @@ void graph_line(float gx, float gy, float gw, float gh, float topMs, float ms, c
 
 void build(int bw, int bh)
 {
-    (void)bw;
     const int mode = g_mode.load();
     const bool detailed = mode >= MODE_DETAILED;
     const bool verbose = mode == MODE_VERBOSE;
@@ -468,7 +533,7 @@ void build(int bw, int bh)
         graph_line(gx, gy, gw, gh, topMs, (float)(1000.0 / hz), label, true, kRefreshLine, s);
     }
     if (verbose)
-        draw_verbose(px + pw + 4.0f * s, py, pw, pad, lineH, s);
+        draw_verbose(px + pw + 4.0f * s, py, pw, pad, lineH, s, bw, bh);
 }
 
 } // namespace
@@ -558,6 +623,13 @@ void exec_thread(float ms)
     g_curExecThread = std::max(g_curExecThread, 0.0f) + ms;
 }
 
+void exec_submit_thread(float busyMs, float waitMs)
+{
+    std::lock_guard<std::recursive_mutex> hold(g_lock);
+    g_curSub = busyMs < 0.0f ? -1.0f : std::max(g_curSub, 0.0f) + busyMs;
+    g_curSubWait += waitMs;
+}
+
 void gpu_section_names(const char *const *names, int n)
 {
     std::lock_guard<std::recursive_mutex> hold(g_lock);
@@ -610,6 +682,8 @@ void presented()
         f.d3d = g_curD3d;
         f.d3dWait = g_curD3dWait;
         f.execThread = g_curExecThread;
+        f.sub = g_curSub;
+        f.subWait = g_curSubWait;
         g_next = (g_next + 1) % kFrames;
         if (g_count < kFrames)
             g_count++;
@@ -622,6 +696,8 @@ void presented()
     g_curD3d = -1.0f;
     g_curD3dWait = 0.0f;
     g_curExecThread = -1.0f;
+    g_curSub = -1.0f;
+    g_curSubWait = 0.0f;
     g_last = now;
 }
 

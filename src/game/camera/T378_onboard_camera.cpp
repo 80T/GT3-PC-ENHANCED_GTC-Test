@@ -33,6 +33,8 @@
 #include "game/app/pc_freecam.h"            /* PC: the chase camera's free orbit (update) */
 #include "game/app/pc_detail.h"             /* PC: pc_rear_view_bumper / _chase (update) */
 #include "game/app/pc_debugcam.h"           /* PC: pc_debugcam_mount (update) */
+#include "game/app/pc_headcam.h"            /* PC: the cockpit camera (applyMountView, update) */
+#include "game/app/pc_customcam.h"          /* PC: the user's own cameras (applyMountView, update, pcNextView) */
 #include "game/save/T426_controller_config.h"   /* PC: ControllerConfig::keyAxis (update) */
 #include <string.h>                         /* PC: memset (pc_freecam_ground) */
 
@@ -161,6 +163,32 @@ static int pc_freecam_ground(void *ctx, f32 x, f32 y, f32 z, f32 *groundY)
     return 1;
 }
 
+/* PC: the player's camera stick for the chase camera's orbit and the cockpit
+ * camera's look (game/app/pc_freecam.h): the chase camera controls (the
+ * launcher's; by default the right stick), from the device the player drives
+ * with - the pad's on the axes the controller settings leave the right stick
+ * free (throttle / brake can be put on it), or the wheel's; 0 without. */
+static void pc_camera_stick(RaceInput *input, f32 *stickX, f32 *stickY)
+{
+    *stickX = 0.0f;
+    *stickY = 0.0f;
+    const int padType = input != NULL ? input->rawPSType() : PS_PAD_NONE;
+    if (padType == PS_PAD_ANALOG || padType == PS_PAD_DUALSHOCK || padType == PS_PAD_DUALSHOCK2) {
+        int takenX = 0, takenY = 0;
+        ControllerConfig *cfg = input->getControllerConfig();
+        for (int f = 0; cfg != NULL && f < KEY_FUNC_COUNT; f++) {
+            const int axis = cfg->keyAxis(CONFIG_ANALOG, input->port, f);
+            if (axis < 0)
+                continue;
+            takenX |= (axis & 0xFF) == CHAN_RSTICK_X;
+            takenY |= (axis & 0xFF) == CHAN_RSTICK_Y;
+        }
+        pc_freecam_stick(input->port, 0, takenX, takenY, stickX, stickY);
+    } else if (input != NULL && padType == PS_PAD_NONE && input->rawUSBType() != USB_WHEEL_NONE) {
+        pc_freecam_stick(input->port, 1, 0, 0, stickX, stickY);
+    }
+}
+
 // FUNC 0x001FF8E8 OnBoardCamera::OnBoardCamera
 /* VariableCameraBase::VariableCameraBase(), rng (Random's inline
  * constructor: 0x87654321), the vptr; then type 0 (setType inline) */
@@ -172,6 +200,8 @@ OnBoardCamera::OnBoardCamera()
     mount = 0;
     type = 0;
     trueType = 0;
+    pcCockpit = 0;                          /* PC */
+    pcCustom = 0;                           /* PC (2026-11-14) */
 }
 
 // FUNC 0x001FF948 OnBoardCamera::~OnBoardCamera
@@ -191,6 +221,8 @@ void OnBoardCamera::virtual_8(CameraTargetInfo *target)
     car = NULL;
     changeable = 1;
     mount = 0;
+    pcCockpit = 0;                          /* PC */
+    pcCustom = 0;                           /* PC (2026-11-14) */
     reverse = 0;
     drawMirror = 0;
     mountFlag2 = 0;
@@ -209,6 +241,46 @@ void OnBoardCamera::virtual_8(CameraTargetInfo *target)
     shakeY.reset();
 }
 
+/* PC (2026-11-08, user report: "Some of Player 1's camera data is fed to
+ * player 2's camera.  I see the slight bounces from player 1's car get
+ * copied to player 2's camera and player 2's camera is much stiffer because
+ * it's not getting its own movement data").  The original's: CameraManager::
+ * init(org, 0) (T129) gives every view car 0 and attaches every view's
+ * onboard camera to it (virtual_8: `car'); RaceSplitBattle::virtual_8 (T137)
+ * then moves view 2's target to car 1 with CameraTargetInfo::setCar alone.
+ * The view follows the target (applyMountView(target->car[0])), but update
+ * read the springs, the head shake and the sway from `car''s state - player
+ * 1's car - and the mount list, the view button's mounts and the cockpit
+ * camera's head count from its model.  Here a camera whose target car is
+ * not its car takes that car: its springs, shakes and sways start again from
+ * the car's state (update's first-tick resets, without making this tick a
+ * cut), its mount stays unless the car has no such mount (the bumper view
+ * then), a second cockpit becomes the first on a car with one driver. */
+void OnBoardCamera::pcFollowTarget(CameraTargetInfo *target)
+{
+    RaceEntryCar *viewed = target->car[0];
+    if (viewed == NULL || viewed == car || viewed->state == NULL)
+        return;
+    car = viewed;
+    carIndex = target->index[0];
+    RaceCarState *st = car->state;
+    springX.reset(0.0f, st->st.accelY * 0.5f);
+    springY.reset(0.0f, st->st.heaveAccel + st->st.heaveAccel);
+    shakeX.reset();
+    shakeY.reset();
+    swayY.reset(0.0f, 0.0f);
+    swayX.reset(0.0f, 0.0f);
+    pc_customcam_shake_reset(this);         /* PC (2026-11-14) */
+    if (mount >= 2 && mount >= car->model.data->info->mountCount)
+        setMount(MOUNT_SWAY);
+    if (pcCockpit == 2 && pc_headcam_count(car) < 2)
+        pcCockpit = 1;
+    /* PC (2026-11-14): a custom camera this car has not (the other car's
+     * model's own): the bumper view; one it has keeps its type's mount */
+    if (pcCustom != 0)
+        pcSetCustom(pcCustom <= pc_customcam_count(car) ? pcCustom : 0);
+}
+
 /* The update: springs, shake and sway from the car's state and the
  * target's speed; the mount buttons; look-back; then the view matrix
  * (applyMountView into `matrix').  0 on the first update (no interpolation).
@@ -217,6 +289,7 @@ void OnBoardCamera::virtual_8(CameraTargetInfo *target)
 int OnBoardCamera::update(RaceOrganization *org, RaceInput *input, CameraTargetInfo *target,
                               CarProgress *progress)
 {
+    pcFollowTarget(target);                 /* PC (2026-11-08): the view's own car (above) */
     f32 vx, vy, vz;                         /* sp+0x00 the saved position, then the velocity */
     f32 nx, ny, nz;                         /* sp+0x0C (scalars: retail packs them 4-aligned) */
     f32 speedSq = 1.0f;
@@ -234,6 +307,14 @@ int OnBoardCamera::update(RaceOrganization *org, RaceInput *input, CameraTargetI
         lookBack = (int)input->getButtons() >> 16;         /* ONBOARD_BTN_LOOK_BACK (sra; */
         lookBack &= 1;                                      /* the shifted word is stored first) */
     }
+    /* PC (2026-11-14): a custom camera (game/app/pc_customcam.h) is a live
+     * race's view: a replay's onboard camera shows the car's mounts, and a
+     * camera the car has no more (deleted from the other player's view) is
+     * left for the bumper view */
+    if (pcCustom != 0 && ((input != NULL && replayMode != 0) || pcCustom > pc_customcam_count(car))) {
+        pcSetCustom(0);
+        doppler = 0;
+    }
     if (target->getSavedPosition(&vx, &vy, &vz)) {
         target->getCarPosition(0, &nx, &ny, &nz);
         vx = (nx - vx) * 60.0f;
@@ -250,11 +331,57 @@ int OnBoardCamera::update(RaceOrganization *org, RaceInput *input, CameraTargetI
         shakeY.reset();
         swayY.reset(0.0f, 0.0f);
         swayX.reset(0.0f, 0.0f);
+        pc_customcam_shake_reset(this);     /* PC (2026-11-14) */
     }
     springX.update(st->st.accelY * 0.5f);
     springY.update(st->st.heaveAccel + st->st.heaveAccel);
     speedFactor = 0.0f;
-    if (getMount() == MOUNT_SWAY) {
+    if (pcCustom != 0) {
+        /* PC (2026-11-14): a custom camera (game/app/pc_customcam.h) takes a
+         * share of every way the fixed views move with the car - its
+         * rigidities - so all of them run for it: the bumper view's sway and
+         * speed factor (below, as mount 0's), the in-car mounts' shake by the
+         * speed (shakeX / shakeY, as the other mounts'), and the shake by
+         * the wheels' slip - the bumper view's gain, which the cockpit
+         * camera shows - in a pair of its own (pc_customcam_shake) */
+        f32 slip = 0.0f;
+        f32 speed;
+        f32 excess;
+        int w;
+
+        for (w = 0; w < 4; w++) {
+            slip += boot_fabsf(st->st.wheel[w].slip * 0.3f);
+            slip += boot_fabsf(st->st.tyreForce[w].slipAngle / 1.5707964f);
+        }
+        if (slip < 0.0f)
+            slip = 0.0f;
+        if (slip > 3.0f)
+            slip = 3.0f;
+        pc_customcam_shake(this, &rng, (slip * 115.0f) / 3.0f);
+        speed = boot_sqrtf_v(speedSq);
+        if (speed < KMH_10)
+            speed = KMH_10;
+        if (speed > KMH_120)
+            speed = KMH_120;
+        speedFactor = speed / KMH_120;
+        rng.next();
+        if (rng.next01() < 0.5f) {
+            rng.next();
+            swayY.update((rng.next01() - 0.5f) * slip * 250.0f);
+            rng.next();
+            swayX.update((rng.next01() - 0.5f) * slip * 250.0f);
+        } else {
+            swayY.update(0.0f);
+            swayX.update(0.0f);
+        }
+        excess = speedSq - KMH_10_SQ;
+        if (excess < 0.0f)
+            excess = 0.0f;
+        if (excess > KMH_80_SQ)
+            excess = KMH_80_SQ;
+        shakeX.update(&rng, (excess * 115.0f) / KMH_80_SQ);
+        shakeY.update(&rng, (excess * 115.0f) / KMH_80_SQ);
+    } else if (getMount() == MOUNT_SWAY) {
         f32 slip = 0.0f;                    /* the wheels' slip ratios and angles, 0..3 */
         f32 gain;
         f32 speed;
@@ -300,19 +427,61 @@ int OnBoardCamera::update(RaceOrganization *org, RaceInput *input, CameraTargetI
         shakeY.update(&rng, gain);
     }
 
+    /* PC (2026-11-14): the custom cameras' editor and the F2 menu's requests
+     * (game/app/pc_customcam.h; a live race): a new camera is put in view, a
+     * deleted one leaves it for the bumper view, a changed type takes its
+     * mount; while a camera is edited the camera controls are the editor's
+     * and the view button leaves it in view */
+    int pcEdit = 0;
+    if (replayMode == 0 && input != NULL) {
+        f32 editX = 0.0f, editY = 0.0f;
+        PcCustomSource shown;
+        const int editing = pc_customcam_editing();
+        if (editing) {
+            pc_camera_stick(input, &editX, &editY);
+            if (pcCustom == 0)
+                pcDescribeView(&shown);
+        }
+        int index = pcCustom;
+        pcEdit = pc_customcam_edit(this, car, input->port, &index, editing && pcCustom == 0 ? &shown : NULL, editX,
+                                   editY);
+        if (index != pcCustom || (pcEdit & PC_CUSTOM_TYPE)) {
+            pcSetCustom(index);
+            doppler = 0;
+        }
+    }
+
     switch (replayMode) {
     case 0:
-        if (pressed & ONBOARD_BTN_VIEW) {
+        if ((pressed & ONBOARD_BTN_VIEW) && !(pcEdit & PC_CUSTOM_LOCK)) {
+            /* PC (the cockpit camera too: pc_headcam.h; 2026-11-14: a car
+             * with custom cameras too) */
+            if (pc_extra_cameras() || pc_headcam_on() || pcCustom != 0 || pc_customcam_count(car) > 0) {
+                pcNextView();
+            } else {
             mount = mount + 1;
             if (mount >= 2)
                 mount = MOUNT_SWAY;
+            pcCockpit = 0;                      /* PC (the setting turned off in a race) */
+            }
             doppler = 0;
         }
         break;
     case 1:
     case 2:
     case 3:
-        if (changeable) {
+        /* PC (2026-11-14): never under a custom camera, a live race's view
+         * (a replay's input drops it above).  A race's first update runs
+         * before the race gives the view its input (RaceBase::virtual_8:
+         * cm->update, then views[0].input), as replay mode 1; in a race
+         * without a countdown (a licence test) the onboard camera is the
+         * view's then, and on a car of fewer than MOUNT_MIN_SELECTABLE mounts
+         * (12 of the US cars) this put mount 0 under a chase type custom
+         * camera: the bumper view's HUD, sounds and mirror (user report:
+         * "starting a license test while a custom camera was last selected
+         * can get the HUD style wrong").  The game's own views keep the
+         * original's: its chase view becomes the bumper view on that tick. */
+        if (changeable && pcCustom == 0) {
             if (car->model.data->info->mountCount < MOUNT_MIN_SELECTABLE) {
                 setMount(MOUNT_SWAY);
             } else if (pressed & ONBOARD_BTN_LEFT) {
@@ -367,28 +536,82 @@ int OnBoardCamera::update(RaceOrganization *org, RaceInput *input, CameraTargetI
      * pad's on the axes the controller settings leave the right stick free
      * (throttle / brake can be put on it), or the wheel's; the road under the
      * eye from the runway */
-    if (getMount() == MOUNT_CHASE && reverse == 0) {
+    PcCustomView pcView;
+    const int pcCustomOn = pcCustom != 0 && pc_customcam_view(target->car[0], pcCustom, &pcView);
+    if (pcCustomOn && reverse == 0) {
+        /* PC (2026-11-14): a custom camera (game/app/pc_customcam.h): its own
+         * angle is the swing's rest (user: "The existing chase cam angle
+         * setting should only apply to the base chase cam.  The user-made
+         * ones get their own"); the camera controls swing a chase type
+         * round the car as the chase camera's do, and look round from the
+         * eye of an onboard type as the cockpit camera's do - not while its
+         * editor has them */
         f32 stickX = 0.0f, stickY = 0.0f;
-        const int padType = input != NULL ? input->rawPSType() : PS_PAD_NONE;
-        if (padType == PS_PAD_ANALOG || padType == PS_PAD_DUALSHOCK || padType == PS_PAD_DUALSHOCK2) {
-            int takenX = 0, takenY = 0;
-            ControllerConfig *cfg = input->getControllerConfig();
-            for (int f = 0; cfg != NULL && f < KEY_FUNC_COUNT; f++) {
-                const int axis = cfg->keyAxis(CONFIG_ANALOG, input->port, f);
-                if (axis < 0)
-                    continue;
-                takenX |= (axis & 0xFF) == CHAN_RSTICK_X;
-                takenY |= (axis & 0xFF) == CHAN_RSTICK_Y;
-            }
-            pc_freecam_stick(input->port, 0, takenX, takenY, &stickX, &stickY);
-        } else if (input != NULL && padType == PS_PAD_NONE && input->rawUSBType() != USB_WHEEL_NONE) {
-            pc_freecam_stick(input->port, 1, 0, 0, &stickX, &stickY);
+        if (!(pcEdit & PC_CUSTOM_STICK))
+            pc_camera_stick(input, &stickX, &stickY);
+        RaceCarState *vs = target->car[0]->state;
+        const f32 pivot[3] = {car_view_x(vs, 0.0f), car_view_y(vs, 0.0f), car_view_z(vs, 0.0f)};
+        const int orbit = !pcView.onboard;
+        if (orbit || pcView.angle != 0.0f) {
+            PcFreecamGround ground = {org != NULL ? org->course : NULL, vs->st.sector};
+            /* (PC 2026-11-14: in the view's own axes - its ANGLE the same
+             * way on every car, above 0 looking down as the chase camera's;
+             * by the eye's side it flipped where the eye sat over the car's
+             * middle: user report, pc_freecam.h) */
+            pc_freecam_apply(&pcCustom, &matrix[0][0], pivot, orbit ? stickX : 0.0f, orbit ? stickY : 0.0f,
+                             orbit && ground.course != NULL ? pc_freecam_ground : NULL, &ground,
+                             car_ground_view_y(vs, 0.0f), pcView.angle, 1);
         }
+        if (!orbit)
+            pc_freecam_look(&fov, &matrix[0][0], stickX, stickY);
+    } else if (!pcCustomOn && getMount() == MOUNT_CHASE && reverse == 0) {
+        f32 stickX, stickY;
+        pc_camera_stick(input, &stickX, &stickY);
         RaceCarState *vs = target->car[0]->state;
         const f32 pivot[3] = {car_view_x(vs, 0.0f), car_view_y(vs, 0.0f), car_view_z(vs, 0.0f)};
         PcFreecamGround ground = {org != NULL ? org->course : NULL, vs->st.sector};
+        /* (PC 2026-11-14: [Graphics] ChaseAngle is this camera's alone) */
         pc_freecam_apply(this, &matrix[0][0], pivot, stickX, stickY, ground.course != NULL ? pc_freecam_ground : NULL,
-                         &ground, car_ground_view_y(vs, 0.0f));
+                         &ground, car_ground_view_y(vs, 0.0f), pc_freecam_chase_rest());
+    }
+    if (pcCustomOn) {
+        /* (the eye as shown, in the car's frame - the matrix from the world
+         * to it, the car's whole rotation: what of the car the eye sits in
+         * is not drawn, pc_customcam_hide) */
+        RaceCarState *vs = target->car[0]->state;
+        f32 frame[16];
+        intr = intr_suspend();
+        pgl_push_matrix();
+        vu0_load_identity_regs();
+        vu0_rotate_z(car_roll(vs, 0.0f) * RAD_TO_DEG);
+        vu0_rotate_x(-car_pitch(vs, 0.0f) * RAD_TO_DEG);
+        vu0_rotate_y(-car_yaw(vs, 0.0f) * RAD_TO_DEG);
+        pgl_translate(-car_view_x(vs, 0.0f), -car_view_y(vs, 0.0f), -car_view_z(vs, 0.0f));
+        pgl_get_matrix(frame);
+        pgl_pop_matrix();
+        intr_resume(intr);
+        pc_customcam_shown(this, &matrix[0][0], frame);
+    }
+    /* PC (2026-11-07): the cockpit camera's look round on the same controls
+     * (game/app/pc_headcam.h): the view turned about its eye, back to the
+     * front when let go; not while looking back (the view is turned round).
+     * PC (2026-11-08): calibrating (the F2 menu's CALIBRATE COCKPIT CAMERA,
+     * platform/cockpit_osd.h), the controls move the eye and tilt the view
+     * instead, the look back at the front. */
+    if (pcIsCockpit() && pc_headcam_on() && reverse == 0) {
+        f32 stickX, stickY;
+        pc_camera_stick(input, &stickX, &stickY);
+        /* (the calibrating player's camera alone: the other player of a
+         * split screen keeps the look round) */
+        if (pc_headcam_calibrating() &&
+            pc_headcam_calibrate(target->car[0], pcCockpit, input != NULL ? input->port : -1, stickX, stickY)) {
+            stickX = 0.0f;
+            stickY = 0.0f;
+        }
+        pc_freecam_look(&pcCockpit, &matrix[0][0], stickX, stickY);
+    } else if (pc_headcam_calibrating()) {
+        /* (the panel: not the cockpit view) */
+        pc_headcam_calibrate(NULL, 0, input != NULL ? input->port : -1, 0.0f, 0.0f);
     }
     return keep;
 }
@@ -402,6 +625,88 @@ void OnBoardCamera::applyMountView(RaceEntryCar *viewed)
     f32 x = car_view_x(s, 0.0f);
     f32 y = car_view_y(s, 0.0f);
     f32 z = car_view_z(s, 0.0f);
+
+    /* PC (2026-11-14): a custom camera (game/app/pc_customcam.h): its eye in
+     * the car's frame (minus the point, as a mount's), its pan (about the
+     * car's up axis) and then its tilt (about its own right axis: up
+     * positive, as the cockpit camera's), and of each way the fixed views
+     * move with the car the share its rigidity leaves (loose: 1 - the
+     * rigidity) - the in-car mounts' shake (by the speed) and the cockpit
+     * camera's (by the wheels' slip: pc_customcam_shake) and the bumper
+     * view's sway, turned about the eye; the chase view's lag behind the
+     * car's turn and pitch taken out of the car's rotation, and its level
+     * horizon (the car's roll by the rigidity); the in-car mounts' springs
+     * on the car's place.  Looking back turns it round as the fixed views
+     * are. */
+    PcCustomView cv;
+    if (pcCustom != 0 && pc_customcam_view(viewed, pcCustom, &cv)) {
+        f32 slipX, slipY;
+        f32 yaw, pitch, roll;
+
+        pc_customcam_shake_get(this, &slipX, &slipY);
+        vu0_rotate_x(shakeX.getValue() * cv.loose[PC_RIGID_SPEED_SHAKE] + slipX * cv.loose[PC_RIGID_SLIP_SHAKE]);
+        vu0_rotate_y((shakeY.getValue() * cv.loose[PC_RIGID_SPEED_SHAKE] + slipY * cv.loose[PC_RIGID_SLIP_SHAKE]) *
+                     0.8f);
+        vu0_rotate_x(swayX.clampedPos() * 8.0f * speedFactor * cv.loose[PC_RIGID_SWAY]);
+        vu0_rotate_y(swayY.clampedPos() * 2.0f * speedFactor * cv.loose[PC_RIGID_SWAY]);
+        vu0_rotate_x(-cv.tilt);
+        vu0_rotate_y(cv.pan);
+        pgl_translate(-cv.eye[0], -cv.eye[1], -cv.eye[2]);
+        yaw = car_yaw(s, 0.0f) - car_lag_yaw(s, 0.0f) * cv.loose[PC_RIGID_TURN];
+        pitch = car_pitch(s, 0.0f) - car_lag_pitch(s, 0.0f) * cv.loose[PC_RIGID_PITCH];
+        roll = car_roll(s, 0.0f) * (1.0f - cv.loose[PC_RIGID_ROLL]);
+        if (reverse) {
+            pitch = -pitch;
+            roll = -roll;
+            yaw += 3.1415927f;
+        }
+        vu0_rotate_z(roll * RAD_TO_DEG);
+        vu0_rotate_x(-pitch * RAD_TO_DEG);
+        vu0_rotate_y(-yaw * RAD_TO_DEG);
+        pgl_translate(-(x + springX.clampedPos() * cv.loose[PC_RIGID_SIDE]),
+                      -(y + springY.clampedPos() * cv.loose[PC_RIGID_BUMPS]), -z);
+        targetLength[0] = 100.0f;
+        zoom[0] = 1.0f / tanf((cv.fov * 0.5f * 6.2831855f) / 360.0f);
+        return;
+    }
+
+    /* PC (2026-11-07): the cockpit camera (game/app/pc_headcam.h): the eye in
+     * the driver's head (the car's frame: minus the point, as a mount's), the
+     * in-car mounts' head shake and springs, the car's whole rotation as
+     * mount 0's (the head rides with the car), its own field of view; looking
+     * back turns it round as the fixed views do */
+    if (pcIsCockpit() && pc_headcam_on()) {
+        f32 eye[3];
+        f32 yaw, pitch, roll;
+
+        pc_headcam_eye(viewed, pcCockpit, eye);     /* (the slot: 1 the driver, 2 a second driver; with the
+                                                       model's calibrated shift) */
+        /* PC (2026-11-08): the model's calibrated tilt, up positive: the
+         * view turns by the opposite of the camera's own turn (vu0RotateX
+         * rotates row vectors right-handed about x: nose up for a positive
+         * angle, as the car's pitch undone below by -pitch) */
+        vu0_rotate_x(-pc_headcam_tilt(viewed, pcCockpit));
+        vu0_rotate_x(shakeX.getValue());
+        vu0_rotate_y(shakeY.getValue() * 0.8f);
+        x += springX.clampedPos();
+        y += springY.clampedPos();
+        pgl_translate(-eye[0], -eye[1], -eye[2]);
+        yaw = car_yaw(s, 0.0f);
+        pitch = car_pitch(s, 0.0f);
+        roll = car_roll(s, 0.0f);
+        if (reverse) {
+            pitch = -pitch;
+            roll = -roll;
+            yaw += 3.1415927f;
+        }
+        vu0_rotate_z(roll * RAD_TO_DEG);
+        vu0_rotate_x(-pitch * RAD_TO_DEG);
+        vu0_rotate_y(-yaw * RAD_TO_DEG);
+        pgl_translate(-x, -y, -z);
+        targetLength[0] = 100.0f;
+        zoom[0] = 1.0f / tanf((pc_headcam_fov() * 0.5f * 6.2831855f) / 360.0f);
+        return;
+    }
 
     switch (getMount()) {
     case MOUNT_SWAY: {
@@ -528,9 +833,183 @@ void OnBoardCamera::setMount(int m)
 // FUNC 0x00200500 OnBoardCamera::setBasicMount
 void OnBoardCamera::setBasicMount(int m)
 {
+    /* PC: with the extra cameras the last race's view, whichever it was (the
+     * cockpit view with the cockpit camera too: pc_headcam.h) */
+    pcCockpit = 0;
+    pcCustom = 0;                           /* PC (2026-11-14) */
+    if (m >= MOUNT_PC_CUSTOM) {
+        /* PC (2026-11-14): the custom camera that was in view (its number
+         * among the car's: the global ones come first, the same for every
+         * car); the bumper view on a car without it */
+        pcSetCustom(m - MOUNT_PC_CUSTOM + 1);
+        if (pcCustom != 0)
+            return;
+        m = MOUNT_SWAY;
+    }
+    if ((pc_extra_cameras() || pc_headcam_on()) && m == MOUNT_PC_COCKPIT) {
+        pcCockpit = 1;
+        m = MOUNT_SWAY;
+    } else if (!pc_extra_cameras()) {
     if (!(m < 2))
         m = MOUNT_SWAY;
+    }
     setMount(m);
+}
+
+/* PC: the view button with the extra cameras on: bumper, chase, cockpit (the
+ * bumper's eye, the car file's "Driver"; with the cockpit camera on, the
+ * camera in the driver's head: pc_headcam.h), then the car's own mounts in
+ * its order, back to the bumper.  A car without mounts has the first three;
+ * the cockpit camera alone (the extra cameras off) has the first three.
+ * PC (2026-11-14): the car's custom cameras (pc_customcam.h) come after the
+ * cockpit view - after the chase view where neither setting gives a cockpit
+ * view - the global ones, then its model's. */
+void OnBoardCamera::pcNextView()
+{
+    const char *name;
+    const int customs = pc_customcam_count(car);
+    const int extras = pc_extra_cameras() && getMountCount() > MOUNT_PC_FIRST_EXTRA;
+
+    if (pcCustom != 0) {
+        if (pcCustom < customs) {
+            pcSetCustom(pcCustom + 1);
+        } else {
+            pcSetCustom(0);
+            setMount(extras ? (int)MOUNT_PC_FIRST_EXTRA : (int)MOUNT_SWAY);
+        }
+    } else if (pcCockpit == 1 && pc_headcam_on() && pc_headcam_count(car) >= 2) {
+        pcCockpit = 2;                      /* PC (2026-11-07): the second driver's (pc_headcam.h) */
+    } else if (pcCockpit) {
+        pcCockpit = 0;
+        if (customs > 0)
+            pcSetCustom(1);
+        else
+            setMount(extras ? (int)MOUNT_PC_FIRST_EXTRA : (int)MOUNT_SWAY);
+    } else if (mount == MOUNT_SWAY) {
+        mount = MOUNT_CHASE;
+    } else if (mount == MOUNT_CHASE) {
+        if (pc_extra_cameras() || pc_headcam_on()) {
+            mount = MOUNT_SWAY;
+            pcCockpit = 1;
+        } else if (customs > 0) {
+            pcSetCustom(1);
+        } else {
+            mount = MOUNT_SWAY;
+        }
+    } else {
+        setMount(mount + 1 < getMountCount() ? mount + 1 : MOUNT_SWAY);
+    }
+    if (pcCustom != 0)
+        name = pc_customcam_name(car, pcCustom);
+    else if (pcCockpit == 2)
+        name = "Cockpit 2";
+    else if (pcCockpit)
+        name = "Cockpit";
+    else if (mount == MOUNT_SWAY)
+        name = "Bumper";
+    else
+        name = g_0033E100[mount < 20 ? mount : 20].name;
+    pc_camera_notice(name);
+}
+
+int OnBoardCamera::pcSavedMount()
+{
+    if (pcCustom != 0)
+        return MOUNT_PC_CUSTOM + pcCustom - 1;  /* PC (2026-11-14) */
+    return pcCockpit ? (int)MOUNT_PC_COCKPIT : mount;
+}
+
+/* PC (2026-11-14): custom camera `index' of the car put in view, the mount
+ * its type's (0 onboard, 1 chase: the fixed view it is to the sounds, the
+ * HUD, the mirror and the car's drawing); 0, or one the car has not: out of
+ * a custom view to the bumper view. */
+void OnBoardCamera::pcSetCustom(int index)
+{
+    if (index > 0 && car != NULL && index <= pc_customcam_count(car)) {
+        pcCustom = index;
+        pcCockpit = 0;
+        mount = pc_customcam_onboard(car, index) ? MOUNT_SWAY : MOUNT_CHASE;
+        mountFlag2 = 0;
+        return;
+    }
+    if (pcCustom != 0) {
+        pcCustom = 0;
+        mount = MOUNT_SWAY;
+        mountFlag2 = 0;
+    }
+}
+
+/* PC (2026-11-14): the view shown as a custom camera would give it - where
+ * its eye is taken from, its type, turn, angle, field of view and the
+ * rigidities that leave it just the movement it has: what a new custom
+ * camera starts as (pc_customcam.h).  The field of view is the one shown: a
+ * fixed view's with the FIELD OF VIEW setting, which a custom camera's own
+ * does not take. */
+void OnBoardCamera::pcDescribeView(PcCustomSource *out)
+{
+    CarModelInfo *info = car->model.data->info;
+    int i;
+
+    memset(out, 0, sizeof(*out));
+    for (i = 0; i < PC_RIGID_COUNT; i++)
+        out->rigid[i] = 100;
+    out->fov = fov * pc_fov_percent() / 100.0f;
+    if (pcIsCockpit() && pc_headcam_on()) {
+        /* the cockpit camera: the head, its calibrated tilt, its own field
+         * of view; the wheels' slip shakes it, the springs move it */
+        out->from = 3;
+        out->onboard = 1;
+        out->tilt = pc_headcam_tilt(car, pcCockpit);
+        if (pcCockpit == 2) {               /* (a second driver's: from the first's head) */
+            f32 a[3], b[3];
+            pc_headcam_eye(car, 1, a);
+            pc_headcam_eye(car, 2, b);
+            for (i = 0; i < 3; i++)
+                out->pos[i] = b[i] - a[i];
+        }
+        out->fov = pc_headcam_fov();
+        out->rigid[PC_RIGID_SLIP_SHAKE] = 0;
+        out->rigid[PC_RIGID_SIDE] = 0;
+        out->rigid[PC_RIGID_BUMPS] = 0;
+    } else if (mount == MOUNT_SWAY) {
+        /* the bumper view (the other cockpit view too): it sways */
+        out->from = 1;
+        out->onboard = 1;
+        out->rigid[PC_RIGID_SWAY] = 0;
+    } else if (mount == MOUNT_CHASE) {
+        /* the chase view: it lags behind the car's turn and pitch and keeps
+         * the horizon level; its angle the setting's */
+        out->from = 2;
+        out->onboard = 0;
+        out->angle = pc_freecam_chase_rest();
+        out->rigid[PC_RIGID_TURN] = 0;
+        out->rigid[PC_RIGID_PITCH] = 0;
+        out->rigid[PC_RIGID_ROLL] = 0;
+    } else if (mount < info->mountCount) {
+        /* one of the car's own mounts: its point from the car's origin, its
+         * turn (rotZ, a bank, is left out), its field of view; the speed
+         * shakes it and the springs move it unless the mount says not */
+        CameraMount *mt = &info->mounts[mount];
+
+        out->from = 0;
+        out->onboard = 1;
+        out->pos[0] = -mt->x;
+        out->pos[1] = -mt->y;
+        out->pos[2] = -mt->z;
+        out->pan = mt->rotY;
+        while (out->pan > 180.0f)
+            out->pan -= 360.0f;
+        while (out->pan < -180.0f)
+            out->pan += 360.0f;
+        out->tilt = -mt->rotX;
+        if (mt->zoom > 0.0f)
+            out->fov = 2.0f * atan2f(1.0f, mt->zoom) * RAD_TO_DEG * pc_fov_percent() / 100.0f;
+        if (!(mt->flags & MOUNT_NO_SHAKE)) {
+            out->rigid[PC_RIGID_SPEED_SHAKE] = 0;
+            out->rigid[PC_RIGID_SIDE] = 0;
+            out->rigid[PC_RIGID_BUMPS] = 0;
+        }
+    }
 }
 
 // FUNC 0x00200520 OnBoardCamera::getMountCount

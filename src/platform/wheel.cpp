@@ -1,5 +1,6 @@
 /* wheel.cpp - the USB steering wheels of GT3 PC (wheel.h). */
 #include "platform/wheel.h"
+#include "platform/cockpit_osd.h"              /* PC (2026-11-08): the cockpit camera's calibration */
 #include "platform/debug_camera.h"
 #include "platform/gamepad.h"
 #include "platform/input_map.h"
@@ -49,7 +50,9 @@ bool read(int port, State *out)
     const int notches = (up != g_wheelUp[port] ? 1 : 0) | (down != g_wheelDown[port] ? 2 : 0);
     g_wheelUp[port] = up;
     g_wheelDown[port] = down;
-    const Sources s = {nullptr, &js, window::key_down, notches};
+    gamepad::Devices devs;                  /* (pedals of their own, a shifter...: `@<name>') */
+    gamepad::read_devices(&devs);
+    const Sources s = {nullptr, &js, window::key_down, notches, devs.src, devs.count};
 
     /* the steering: right - left, its dead zone about the centre */
     float steer = control_value(p, WHEEL_STEER_RIGHT, s) - control_value(p, WHEEL_STEER_LEFT, s);
@@ -66,6 +69,23 @@ bool read(int port, State *out)
     const int dy = (d ? 1 : 0) - (u ? 1 : 0), dx = (r ? 1 : 0) - (l ? 1 : 0);
     static const int kHat[3][3] = {{7, 0, 1}, {6, 8, 2}, {5, 4, 3}};    /* [dy + 1][dx + 1] */
     out->hat = kHat[dy + 1][dx + 1];
+    /* PC (2026-11-08): the cockpit camera's calibration (cockpit_osd.h) has
+     * the calibrating player's D-pad and Cross / Circle / Triangle while it
+     * is on (the other player's wheel takes it over with a press): their
+     * state to it, and - when they are its - released for the game */
+    if (cockpit_osd::active()) {
+        const unsigned held = (u ? cockpit_osd::kPadUp : 0) | (d ? cockpit_osd::kPadDown : 0) |
+                              (l ? cockpit_osd::kPadLeft : 0) | (r ? cockpit_osd::kPadRight : 0) |
+                              (out->buttons[WHEEL_CROSS - WHEEL_CROSS] ? cockpit_osd::kPadCross : 0) |
+                              (out->buttons[WHEEL_CIRCLE - WHEEL_CROSS] ? cockpit_osd::kPadCircle : 0) |
+                              (out->buttons[WHEEL_TRIANGLE - WHEEL_CROSS] ? cockpit_osd::kPadTriangle : 0);
+        if (cockpit_osd::pad_state(1, port, held)) {
+            out->hat = 8;
+            out->buttons[WHEEL_CROSS - WHEEL_CROSS] = 0;
+            out->buttons[WHEEL_CIRCLE - WHEEL_CROSS] = 0;
+            out->buttons[WHEEL_TRIANGLE - WHEEL_CROSS] = 0;
+        }
+    }
     return true;
 }
 

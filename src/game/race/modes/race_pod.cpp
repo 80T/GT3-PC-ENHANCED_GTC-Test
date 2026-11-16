@@ -28,6 +28,8 @@
 #include "game/race/dynamics/T305_dynamics_conductor.h"   /* DynamicsConductor */
 #include "game/car/physics/T302_car_state.h"            /* RaceCarState (contact, podParking), DynCarState */
 #include "game/car/physics/T331_dyn_car_message.h"      /* DynCar_setMessage, CARMSG_POD_STOP / _RETURN */
+#include "game/race/core/T153_race_course.h"            /* PC: RaceCourse (the course scale's lap remap) */
+#include "game/app/pc_course_scale.h"       /* PC: pc_course_lap_distance */
 
 /* T341's CTRL_STOP_ROLL request (declared in car/physics's
  * car_input_internal.h only): the car rolls to a stop on line 6. */
@@ -71,6 +73,14 @@ void pod_rules_init(DynamicsConductor *dc)
     lap = dc->getLapLength();
     if (!(0.0f < lap))
         return;
+    {
+        /* PC: the area where it went on a scaled course (game/app/
+         * pc_course_scale.h) */
+        const CourseData *cd = dc->lines.course->data;
+        const f32 end = pc_course_lap_distance(cd, start + length);
+        start = pc_course_lap_distance(cd, start);
+        length = end - start;
+    }
     while (start < 0.0f)
         start += lap;
     while (lap < start)
@@ -82,7 +92,7 @@ void pod_rules_init(DynamicsConductor *dc)
     r->on = 1;
     printf("[enhanced] pod race: on, stop area %d..%d m of a %d m lap\n",
            (int)start, (int)(start + length), (int)lap);
-    for (i = 0; i < 8; i++) {
+    for (i = 0; i < PC_RACE_CARS_MAX; i++) {    /* PC: was 8 (race_pod_rules.h) */
         r->stops[i] = 0;
         r->stopX[i] = 0.0f;
         r->stopY[i] = 0.0f;

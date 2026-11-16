@@ -76,9 +76,13 @@ void pc_aspect_frame_begin(void)
     s_menuHud.on = 0;
     /* the menus' stretch ([Display] MenuAspect): the 4:3 picture shown over
      * the window, its car models (pc_menu_squeeze_projection) and texts (the
-     * font's squeeze) squeezed back to their shape */
-    if (settings::menu_stretch()) {
-        const f32 a = window_aspect();
+     * font's squeeze) squeezed back to their shape.  PC (2026-11-15, user
+     * request: "Menu aspect: 16:9 option"): 16:9 the same over a 16:9
+     * picture, which the renderer fits into the window with bars (as a race
+     * frame held to its limits: pgl_targets picture_size) */
+    const settings::MenuAspect menuAspect = settings::menu_aspect();
+    if (menuAspect != settings::MenuAspect::original) {
+        const f32 a = menuAspect == settings::MenuAspect::wide ? 16.0f / 9.0f : window_aspect();
         s_frame.shown = a;
         s_frame.menuKx = a > PC_ASPECT_BASE ? PC_ASPECT_BASE / a : 1.0f;
         s_frame.menuKy = a < PC_ASPECT_BASE ? a / PC_ASPECT_BASE : 1.0f;
@@ -97,6 +101,35 @@ f32 pc_menu_kx(void)
 f32 pc_menu_ky(void)
 {
     return s_frame.menuKy;
+}
+
+void pc_aspect_movie_frame(void)
+{
+    const f32 a = window_aspect();
+    s_frame.shown = a;
+    gfx_set_menu_aspect(a);
+}
+
+int pc_movie_fit(f32 aspect, f32 *w, f32 *h)
+{
+    if (settings::movie_stretch())
+        return 0;
+    if (aspect <= 0.0f) {
+        if (*w < 600.0f || *h < 400.0f)
+            return 0;                           /* (a PSS in a box of a page: the box is its shape) */
+        aspect = PC_ASPECT_BASE;
+    }
+    /* the rectangle's shape as shown: its GS pixels are the picture's */
+    const f32 shown = (*w / *h) * s_frame.shown * (448.0f / 640.0f);
+    if (aspect > shown * 1.001f) {
+        *h *= shown / aspect;
+        return 1;
+    }
+    if (aspect < shown * 0.999f) {
+        *w *= aspect / shown;
+        return 1;
+    }
+    return 0;
 }
 
 void pc_menu_squeeze_projection(void)

@@ -63,6 +63,10 @@ enum { RACE_MENU_REPEAT_FIRST = 30, RACE_MENU_REPEAT_INTERVAL = 3 };
 /* T200 (only used here)                                                    */
 /* ======================================================================== */
 enum { RESULT_BOARD_ROWS = 7 };             /* ResultBoard::bars */
+/* PC (ROADMAP 35): the rows a board shows at most: a race of more than 6
+ * cars (up to PC_RACE_CARS_MAX) shows its top 6, as a 6-car race (setup
+ * clamps; the rows past them are not written). */
+enum { PC_RESULT_BOARD_SHOWN = 6 };
 /* ResultBoard::mode: RESULT_BOARD_* (T200). */
 
 /* The bars' operator scripts (T200 .rodata; RaceMenuLayer::startScript):

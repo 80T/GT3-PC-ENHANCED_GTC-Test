@@ -75,6 +75,9 @@
 #include "game/app/pc_frame.h"                  /* PC: the dynamic frame rate */
 #include "game/app/pc_aspect.h"                 /* PC: the dynamic aspect */
 #include "game/app/pc_detail.h"                 /* PC: the levels of detail, the render distance */
+#include "game/app/pc_course_scale.h"           /* PC: the course scale (the mirror's far clip) */
+#include "game/app/pc_headcam.h"                /* PC: the cockpit camera's own car (drawCars) */
+#include "game/app/pc_customcam.h"              /* PC: a custom camera's own car (drawCars) */
 #include "game/app/pc_debugcam.h"               /* PC: the debug camera */
 
 /* GSBufferPair's current / other buffer.  Retail takes the pair's address
@@ -119,7 +122,10 @@ static u32 pc_view_shot(CameraManager *cm)
     VariableCameraBase *cam = cm->F_00209BE0()->camera;
     if (cam == NULL)
         return 0;
-    return (u32)(size_t)cam * 31u + (u32)cam->getMount();
+    /* PC (2026-11-14): a custom camera is a shot of its own (its mount is
+     * the bumper's or the chase view's: game/app/pc_customcam.h) */
+    OnBoardCamera *custom = cm->pcCustom();
+    return (u32)(size_t)cam * 31u + (u32)cam->getMount() + (custom != NULL ? (u32)custom->pcCustom * 256u : 0u);
 }
 
 /* min.s / max.s: egcs's <? / >? operators (T131 has no -ffast-math, under
@@ -236,6 +242,7 @@ void RacePS2Base::drawView(GSBuffer *buf)
     CourseData *course = org->course->data;
     CourseEnv *env = course->env;
     CameraManager *cm = virtual_6();
+    pc_debugcam_ground(course->runway);     /* PC: before any pass's view (game/app/pc_debugcam.h) */
 
     GSBuffer screen(pair_current(&g_002F4230.unkAC4), SCE_GS_PSMCT32);   /* sp+0x00 */
     screen.setField(rc_field_mode(&g_002F4230) != 0 ? PGL_FIELD_FRAME_SHIFT : PGL_FIELD_FRAME);
@@ -258,7 +265,9 @@ void RacePS2Base::drawView(GSBuffer *buf)
     cm->setFarClip(env->farClip * pc_render_scale());  /* PC: the render distance (game/app/pc_detail.h) */
     cm->applyProjection();
     proj_y_scale(&g_002F4230);             /* implicit: F_00257EF0, vu0_scale (the helper's) */
-    pc_fov_apply(replayMode != RACE_LIVE);  /* PC: the field of view settings (game/app/pc_detail.h) */
+    /* PC: the field of view settings (game/app/pc_detail.h; PC 2026-11-09:
+     * not the cockpit camera's view, its own) */
+    pc_fov_apply(replayMode != RACE_LIVE, (cm->pcCockpit() != 0 && pc_headcam_on()) || cm->pcCustom() != NULL);
     pc_debugcam_projection(cm->current);    /* PC: the debug camera's (game/app/pc_debugcam.h) */
     modelset_set_projection_scale(1.0f);
     pgl_matrix_mode(PGL_MTX_MODELVIEW);
@@ -315,7 +324,11 @@ void RacePS2Base::drawView(GSBuffer *buf)
     gfx_gpu_section(GFX_SEC_COPY);          /* PC */
     GSBuffer depth(buf, SCE_GS_PSMZ24);                                     /* sp+0x80 */
     depth.blit(pair_current(&g_002F4230.unkAC4), PGL_FILTER_NEAREST, PGL_FILTER_NEAREST);
-    if (replayMode != RACE_LIVE && (((const u8 *)&env->flags)[1] & 1)) {    /* lbu +0x11: ENV_REPLAY_BLUR */
+    /* PC (2026-11-07): [Graphics] ReplayDepthOfField (game/app/pc_detail.h):
+     * the steps per doubling of the blur behind the focus (the original's 2),
+     * 0 for no depth of field - the plain copy below, as a live race. */
+    const int blurSteps = pc_replay_blur_steps();
+    if (replayMode != RACE_LIVE && (((const u8 *)&env->flags)[1] & 1) && blurSteps > 0) {    /* lbu +0x11: ENV_REPLAY_BLUR */
         gfx_gpu_section(GFX_SEC_REPLAY_BLUR);   /* PC */
         buf->setDrawBuffer();
         gfx_enable(PGL_CAP_DEPTH_TEST);
@@ -325,6 +338,7 @@ void RacePS2Base::drawView(GSBuffer *buf)
         buf_set_psm(&work, SCE_GS_PSMCT24);
         blur.setFilm(env->blurFilmDiag, 1.333f);
         blur_set_fnumber(&blur, env->blurFNumber);
+        blur.farSteps = blurSteps;          /* PC (2026-11-07): the setting's steps (the constructor's 2 otherwise) */
         f32 targetDist = cm->virtual_10();  /* the camera's distance to its target */
         blur_set_focus(&blur, (targetDist < env->blurFocusMin) ? env->blurFocusMin : targetDist);
         blur.setFromProjection();
@@ -439,6 +453,7 @@ void RacePS2Base::drawSubView(GSBuffer *buf, int sub, f32 zoom)
     CourseData *course = org->course->data;
     CourseEnv *env = course->env;
     CameraManager *cm = virtual_6();
+    pc_debugcam_ground(course->runway);     /* PC: before any pass's view (game/app/pc_debugcam.h) */
 
     GSBuffer screen;                                                        /* sp+0x00 */
     screen.psm = SCE_GS_PSMCT32;
@@ -497,7 +512,9 @@ void RacePS2Base::drawSubView(GSBuffer *buf, int sub, f32 zoom)
         aspect = (f32)buf->displayHeight() / (f32)buf->width;
     vu0_scale(aspect * PROJ_ASPECT * zoom, zoom, 1.0f);
     }
-    pc_fov_apply(replayMode != RACE_LIVE);  /* PC: the field of view settings (game/app/pc_detail.h) */
+    /* PC: the field of view settings (game/app/pc_detail.h; PC 2026-11-09:
+     * not the cockpit camera's view, its own) */
+    pc_fov_apply(replayMode != RACE_LIVE, (cm->pcCockpit() != 0 && pc_headcam_on()) || cm->pcCustom() != NULL);
     pc_debugcam_projection(cm->current);    /* PC: the debug camera's (game/app/pc_debugcam.h) */
     modelset_set_projection_scale(1.0f);
     pgl_matrix_mode(PGL_MTX_MODELVIEW);
@@ -599,6 +616,14 @@ int race_car_in_view(RaceCarState *car, f32 t)
 }
 
 static inline void model_set_lod_dist(RaceCarModel *m, f32 d) { F_00179460(&m->carModel)->callback.lodDist = d; }
+
+/* PC: the cockpit view (the extra cameras, OnBoardCamera::pcNextView) is the
+ * bumper view with the car drawn round the eye - but only below this part of
+ * the picture's height.  The body's cabin is flat painted cards, seen through
+ * the glass from outside; from the seat they stand between the eye and the
+ * road, on many cars across the whole windscreen. */
+#define PC_COCKPIT_CUT 0.60f
+
 // FUNC 0x0017F730 RacePS2Base::drawCars
 //   Draws the cars, farthest first (sortByDistance from the eye, then
 //   sortEnd .. sortPrev): the ones whose model is enabled, that the camera
@@ -635,6 +660,11 @@ void RacePS2Base::drawCars(GSBuffer *envBuf, int lod, int tyreBlur, f32 t)
     modelset_set_env_tex(&envRegs.regs);
 
     RaceEntryCar *target = cm->views[cm->current].targetInfo.car[0];
+    const int pcCockpit = lod != 2 ? cm->pcCockpit() : 0;   /* PC: not the mirror's (lod 2); 1 or 2: the slot */
+    /* PC (2026-11-14): a custom camera's view (game/app/pc_customcam.h; not
+     * the mirror's): its car is drawn whole, whichever fixed view its type
+     * makes it, but for what its eye sits in */
+    OnBoardCamera *pcCustom = lod != 2 ? cm->pcCustom() : NULL;
     if (lod > 0 && !pc_lod())
         lod = -1;                           /* PC: the levels of detail off: the real tyres (game/app/pc_detail.h) */
     /* PC: the cars, then the ghosts (pcPass 1).  A ghost is the mean of the
@@ -652,7 +682,9 @@ void RacePS2Base::drawCars(GSBuffer *envBuf, int lod, int tyreBlur, f32 t)
         int show = car_display_level(state);
         if ((show == CAR_SHOW_GHOST) != (pcPass == 1))
             continue;                       /* PC */
-        if (cm->F_00209370(org, car) == 0)
+        const int pcOwn = pcCockpit && car == target;   /* PC: the cockpit view's own car */
+        const int pcCustomOwn = pcCustom != NULL && car == target;  /* PC (2026-11-14): a custom camera's */
+        if (cm->F_00209370(org, car) == 0 && !pcOwn && !pcCustomOwn)
             continue;
         if (show < CAR_SHOW_GHOST)
             continue;
@@ -681,6 +713,17 @@ void RacePS2Base::drawCars(GSBuffer *envBuf, int lod, int tyreBlur, f32 t)
             lights.drawGlows(&envTex, envBuf, &cam, car == target);
             /* implicit: ~CameraBase (cam's implicit destructor) */
         }   /* cam's implicit destructor: CameraBase::~CameraBase (flags 2) */
+        /* PC (2026-11-07): the cockpit camera's own car is drawn whole, but
+         * for the driver's head the eye sits in (game/app/pc_headcam.h) */
+        const int pcHead = pcOwn && pc_headcam_on();
+        if (pcOwn && !pcHead) {
+            pgl_push_attrib(PGL_ATTR_SCISSOR);
+            gfx_scissor_below(PC_COCKPIT_CUT);
+        }
+        if (pcHead)
+            pc_headcam_hide(car, pcCockpit, 1);     /* (pcCockpit: the slot, 1 or 2) */
+        if (pcCustomOwn)
+            pc_customcam_hide(pcCustom, car, 1);    /* PC (2026-11-14) */
         for (int i = 0; i < lights.passes; i++) {
             lights.applyShadowPass(i);
             car->drawShadow(t);
@@ -690,7 +733,20 @@ void RacePS2Base::drawCars(GSBuffer *envBuf, int lod, int tyreBlur, f32 t)
         lights.applyDefault();
         car->F_001778E8(t);
         lights.apply();
+        /* PC (2026-11-11): the cockpit camera's car's body with its menu
+         * model (PC 2026-11-15: the car model's own setting, the
+         * calibrator's; pc_headcam.h): its glass shells left out, no head
+         * box (it has no driver); the race model's hiding back for the rest */
+        const int pcMenuBody = pcHead && car->model.pcMenuFile != NULL && pc_headcam_menu_model(car);
+        if (pcMenuBody) {
+            car->model.pcMenuDraw = 1;
+            pc_headcam_hide_file(car->model.pcMenuFile);
+        }
         car->drawBody(t);
+        if (pcMenuBody) {
+            car->model.pcMenuDraw = 0;
+            pc_headcam_hide(car, pcCockpit, 1);
+        }
         if (lod > 0) {
             car->drawTireCylinders(env->brakeGlowScale, t);
         } else if (car == target) {
@@ -699,6 +755,12 @@ void RacePS2Base::drawCars(GSBuffer *envBuf, int lod, int tyreBlur, f32 t)
             car->drawTires(tyreBlur != 0 ? 2 : 0, env->brakeGlowScale, t, lod);
         }
         car->F_00177988(0.0f);
+        if (pcHead)
+            pc_headcam_hide(car, pcCockpit, 0);     /* PC */
+        if (pcCustomOwn)
+            pc_customcam_hide(pcCustom, car, 0);    /* PC (2026-11-14) */
+        if (pcOwn && !pcHead)
+            pgl_pop_attrib();
         gs_set_scanmask_mode(PGL_SCANMASK_OFF);
         if (ghost)
             gfx_half_blend_end();           /* PC */
@@ -735,6 +797,18 @@ void RacePS2Base::drawReflections(GSBuffer *screen, GSBuffer *envBuf)
                     PGL_ATTR_VIEWPORT | PGL_ATTR_SCISSOR);                  /* 0x8C7 */
     GSBuffer refl(SCE_GS_PSMCT32, env->reflW, env->reflH);              /* sp+0x00 */
     GSBuffer reflZ(&refl, SCE_GS_PSMZ24);                                   /* sp+0x40 */
+    /* PC (2026-11-14): [Graphics] ReflectionResolution (game/app/pc_detail.h;
+     * user: "A graphics setting to increase the reflection resolution"): the
+     * buffer - 64 x 128 GS pixels stretched over the 640 x 448 screen, 10 x
+     * 3.5 times coarser - drawn by the renderer at half the screen's
+     * resolution or at the screen's, its GS size and the draws into it
+     * unchanged; the blur's half-texel steps below that much shorter (as the
+     * PS2's own with a buffer that much larger: the same blur, finer) */
+    f32 pcDetailX, pcDetailY;
+    pc_reflection_scale(screen->width, screen->displayHeight(), refl.width, refl.height, &pcDetailX, &pcDetailY);
+    const int pcDetail = pcDetailX != 1.0f || pcDetailY != 1.0f;
+    if (pcDetail)
+        gfx_pc_target_detail(refl.addr, refl.width, refl.height, pcDetailX, pcDetailY);
     refl.setDrawBuffer();
     reflZ.setZBuffer();
     modelset_set_projection_scale(1.0f);
@@ -768,8 +842,9 @@ void RacePS2Base::drawReflections(GSBuffer *screen, GSBuffer *envBuf)
             f32 x = 0.0f, y = 0.0f;
             f32 w = (f32)refl.width;
             f32 h = (f32)refl.displayHeight();
-            gs_draw_textured_sprite_strips_f(x, y, w, h, x + off, y + off,
-                                             (f32)refl.width + off, (f32)refl.height + off);
+            const f32 offX = off / pcDetailX, offY = off / pcDetailY;   /* PC (2026-11-14): (1, 1: the original's) */
+            gs_draw_textured_sprite_strips_f(x, y, w, h, x + offX, y + offY,
+                                             (f32)refl.width + offX, (f32)refl.height + offY);
             gfx_texflush();
         }
     }
@@ -791,8 +866,14 @@ void RacePS2Base::drawReflections(GSBuffer *screen, GSBuffer *envBuf)
         off = 0.0f;
     f32 w = (f32)screen->width;
     f32 h = (f32)screen->displayHeight();
-    gs_draw_textured_sprite_strips_f(0.0f, 0.0f, w, h, off + 0.0f, off + 0.0f,
-                                     (f32)refl.width + off, (f32)refl.height + off);
+    /* (PC 2026-11-14: the half texel the blur left, of the finer buffer) */
+    const f32 offX = off / pcDetailX, offY = off / pcDetailY;
+    gs_draw_textured_sprite_strips_f(0.0f, 0.0f, w, h, offX + 0.0f, offY + 0.0f,
+                                     (f32)refl.width + offX, (f32)refl.height + offY);
+    /* PC (2026-11-14): the block back to the output scale for the buffers
+     * after this one there (read as a texture above, before this) */
+    if (pcDetail)
+        gfx_pc_target_detail(refl.addr, refl.width, refl.height, 1.0f, 1.0f);
 }
 
 // FUNC 0x0017FFE8 RacePS2Base::drawCarReflections
@@ -818,9 +899,19 @@ void RacePS2Base::drawCarReflections(GSBuffer *envBuf, f32 t)
     GsTexPacket envRegs;                                                    /* sp+0x40 */
     envBuf->makeTexRegs(&envRegs.regs);
     modelset_set_env_tex(&envRegs.regs);
+    /* PC: the reflection's own detail ([Graphics] ReflectionDetail, game/app/
+     * pc_detail.h), whatever the levels of detail: the original's (LOD 2
+     * below, the tyre cylinders) or the full detail.  32 cars at the full
+     * detail were a third of a wet race's draws, into this small blurred
+     * buffer (user's choice: a setting of its own, 2026-11-03) */
+    modelset_pc_set_detail(pc_reflection_full() ? PC_DETAIL_FULL : PC_DETAIL_GAME);
+    /* PC (2026-11-14): a custom camera's own car is drawn (drawCars), so its
+     * reflection is too, an onboard type's as well (the bumper view's car
+     * has none) */
+    RaceEntryCar *pcCustomCar = cm->pcCustom() != NULL ? cm->views[cm->current].targetInfo.car[0] : NULL;
 
     for (RaceEntryCar *car = entries->sortEnd; car != NULL; car = car->sortPrev) {
-        if (cm->F_00209370(org, car) == 0)
+        if (cm->F_00209370(org, car) == 0 && car != pcCustomCar)
             continue;
         RaceCarState *state = car->state;
         if (state->st.noController != 0)
@@ -837,7 +928,7 @@ void RacePS2Base::drawCarReflections(GSBuffer *envBuf, f32 t)
         pgl_set_normal_matrix(&normal.m[0][0]);
         pgl_pop_matrix();
         lights.apply();
-        F_00179460(car->model.getCarModel())->callback.lod = 2;     /* (the levels of detail off: 0, T451) */
+        F_00179460(car->model.getCarModel())->callback.lod = 2;     /* (PC: the full detail: 0, T451) */
         car->drawBody(0.0f);
         if (pc_lod())
             car->drawTireCylinders(org->course->data->env->brakeGlowScale, 0.0f);
@@ -845,6 +936,7 @@ void RacePS2Base::drawCarReflections(GSBuffer *envBuf, f32 t)
             car->drawTires(0, org->course->data->env->brakeGlowScale, 0.0f, -1);  /* PC: the real tyres */
         pgl_pop_matrix();
     }
+    modelset_pc_set_detail(PC_DETAIL_SETTING);  /* PC: [Graphics] Lod again */
     modelset_set_env_tex(NULL);
     gfx_disable(PGL_CAP_NORMAL_MATRIX);
     gfx_front_face(PGL_FRONT_CCW);
@@ -863,9 +955,10 @@ void RacePS2Base::drawLampReflections(f32 t)
     RaceEntryBase *entries = org->entries;
     course_env_set_reflection(org->course->data->env, &flare);
     flare.beginReflections();
+    RaceEntryCar *pcCustomCar = cm->pcCustom() != NULL ? cm->views[cm->current].targetInfo.car[0] : NULL;  /* PC (as drawCarReflections) */
     for (RaceEntryCar *car = entries->sortEnd; car != NULL; car = car->sortPrev) {
         RaceCarState *state = car->state;
-        if (cm->F_00209370(org, car) == 0)
+        if (cm->F_00209370(org, car) == 0 && car != pcCustomCar)
             continue;
         if (state->st.noController != 0)
             continue;
@@ -930,7 +1023,8 @@ void RacePS2Base::drawMirror(GSBuffer *screen, int sub)
     vu0_load_identity_regs();
     /* PC: the levels of detail off (game/app/pc_detail.h): the split
      * screen's mirror as the single view's; the render distance */
-    cm->setFarClip((sub != 0 && pc_lod() ? 60.0f : 120.0f) * pc_render_scale());
+    cm->setFarClip((sub != 0 && pc_lod() ? 60.0f : 120.0f) * pc_render_scale() *
+                   pc_course_far_factor(course));  /* PC: and the course scale's (game/app/pc_course_scale.h) */
     cm->applyProjection();
     /* implicit: F_00257EF0, vu0_scale (proj_y_scale's).  PC: against the
      * rectangle squeezed above: x by kx / ky (its aspect below already took
@@ -982,10 +1076,32 @@ void RacePS2Base::drawMirror(GSBuffer *screen, int sub)
     int right = view.rectW - 1;
     int bottom = view.rectH - 1;
     pgl_color(0);
-    gs_draw_line(0, 0, 0, bottom);
-    gs_draw_line(0, bottom, right, bottom);
-    gs_draw_line(right, bottom, right, 0);
-    gs_draw_line(right, 0, 0, 0);
+    /* PC (2026-11-09): the frame as the GS pixels the PS2's lines covered -
+     * the rectangle's outermost ring, a GS pixel wide - in flat sprites
+     * (user: "The rearview mirror border gets slightly off the original
+     * alignment and gets thinner at higher resolutions").  A GS line is the
+     * GPU's one-pixel line at the window's resolution, on the first window
+     * pixel of its GS pixel: at a scale s the frame was one window pixel
+     * thin, and the right and bottom lines s - 1 window pixels inside the
+     * picture's edge (the mirror's view showing beyond them).  The sprites,
+     * in the same colour and state, cover the whole GS pixels (at 1:1 the
+     * PS2's picture), placed in the draw window as the lines were (a flat
+     * sprite takes no window origin; in a field buffer the window's y is in
+     * field lines, the sprite's in frame lines).  Retail:
+     *     gs_draw_line(0, 0, 0, bottom);
+     *     gs_draw_line(0, bottom, right, bottom);
+     *     gs_draw_line(right, bottom, right, 0);
+     *     gs_draw_line(right, 0, 0, 0); */
+    {
+        s32 wx, wy, ww, wh;
+        gfx_get_draw_area(&wx, &wy, &ww, &wh);
+        if (view.halfHeight != 0)
+            wy <<= 1;
+        gs_draw_flat_sprite(wx, wy, wx + 1, wy + bottom + 1);                          /* left */
+        gs_draw_flat_sprite(wx + right, wy, wx + right + 1, wy + bottom + 1);          /* right */
+        gs_draw_flat_sprite(wx + 1, wy, wx + right, wy + 1);                           /* top */
+        gs_draw_flat_sprite(wx + 1, wy + bottom, wx + right, wy + bottom + 1);         /* bottom */
+    }
     gfx_enable(PGL_CAP_DEPTH_TEST);
     gs_set_clear_depth(0.0f);
     gs_clear_buffers(PGL_CLEAR_DEPTH);

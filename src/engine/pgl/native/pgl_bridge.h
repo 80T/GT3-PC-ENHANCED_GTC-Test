@@ -92,6 +92,17 @@ enum {
     PGLR_SEC_SMOKE,         /* the tyre smoke */
     PGLR_SEC_FLARE,         /* the lens flare's glares */
     PGLR_SEC_POST,          /* colour correction, afterimage, frame effect */
+    /* PC (2026-11-03): the renderer's own, within the scene: the cars (the
+     * VU1 draws textured from a Tex1 set; the rest of the scene is the
+     * course) and the copies of a target for the draws that read it
+     * (DATE, C = Ad, a texture of it) */
+    PGLR_SEC_CARS,
+    PGLR_SEC_TARGET_COPY,
+    /* PC (2026-11-05): within the effects - the lens flare's occlusion
+     * queries (exec_flare_query) and FXAA (exec_post_aa) apart, so that the
+     * section holds the particles */
+    PGLR_SEC_FLARE_QUERY,
+    PGLR_SEC_POST_AA,
     PGLR_SEC_COUNT
 };
 void pglr_gpu_section(int id);
@@ -110,6 +121,24 @@ void pglr_ad(uint32_t gsReg, uint64_t value);
 /* The size of a render target pgl draws into (gfx_set_draw_buffer: target
  * A; gfx_set_target_b: target B), by its base block. */
 void pglr_target(uint32_t baseBlock, uint32_t fbw, uint32_t psm, int width, int height);
+/* PC (2026-11-14): the width x height buffer at baseBlock drawn at dx x dy
+ * times the output scale (finer render targets for it) from the next draw
+ * into it on; 1, 1: back to the output scale.  Its GS size and the game's
+ * draws are unchanged: only the native pixels per GS pixel (the road
+ * reflection, [Graphics] ReflectionResolution: T131 drawReflections). */
+void pglr_target_detail(uint32_t baseBlock, int width, int height, float dx, float dy);
+/* PC (2026-11-13): the game's VRAM allocator (T513) took a buffer's block
+ * back (VramAllocator::dealloc) / handed a block out as a buffer
+ * (VramAllocator::alloc).  A block freed and not handed out again by the
+ * frame's end goes to the executor with the frame (a CMD_TARGET of size -1
+ * at the list's end): the render targets at that block are dead, and go
+ * after a few frames instead of 600 (pgl_targets.cpp target_freed). */
+void pglr_buffer_freed(uint32_t baseBlock);
+void pglr_buffer_alloc(uint32_t baseBlock);
+/* PC (2026-11-13): the render targets alive, and since the start: the
+ * surfaces created, those taken from retired targets instead, the targets
+ * retired (the benchmark's check; any may be NULL). */
+void pglr_target_stats(int *alive, unsigned *created, unsigned *reused, unsigned *retired);
 
 /* ======================================================================== */
 /* Primitives                                                               */
@@ -131,7 +160,10 @@ void pglr_gif(const void *data, uint32_t qwc, uint32_t flags);
 
 /* The state a VU1 program ran with: the combined matrix vf24..vf27 (rows)
  * and the viewport vectors pgl_send_matrix sends, the program (vu1Prog:
- * 0x320 / 0x33E, + 0xA / + 0x14 culling; 0 draws nothing). */
+ * 0x320 / 0x33E, + 0xA / + 0x14 culling; 0 draws nothing).
+ * PC: projZ - the projection's clip z = A w + B as the matrix was sent (A,
+ * B, 1; 0 0 0: not of that form): the draws' depth from w (docs/renderer.md
+ * 4, "Precision"). */
 typedef struct PglrVu1 {
     float    m[16];
     float    viewScale[4];
@@ -139,13 +171,15 @@ typedef struct PglrVu1 {
     float    limits[4];
     float    vBB0[4];
     uint32_t prog;
+    float    projZ[3];
 } PglrVu1;
 
 /* A strip run of the VU1 primitive program (pgl_draw_strip, strip_batch_*,
  * strip_draw): n vertices of xyz (3 floats), optional st (2 floats) and
  * rgba (bytes, 0x80 = 1.0 for textured parts); without rgba every vertex
- * has constRgba.  The strip lengths: nStrips entries of lengths (NULL: one
- * strip of n).  prim: the GIF tag's PRIM (TRISTRIP | attributes). */
+ * has constRgba (PC: 0xFF = 1.0 under PRIM_FULL_COLOR, docs/renderer.md "Full
+ * colours").  The strip lengths: nStrips entries of lengths (NULL: one strip
+ * of n).  prim: the GIF tag's PRIM (TRISTRIP | attributes). */
 void pglr_strip(const PglrVu1 *vu, uint32_t prim, const float *xyz, const float *st,
                 const uint32_t *rgba, uint32_t constRgba, int n,
                 const uint8_t *lengths, int nStrips, uint32_t flags);
@@ -187,6 +221,18 @@ typedef struct PglrModelPart {
     uint32_t    flareStripBlock;
     int32_t     flareStripH;
     int32_t     flareQ;
+    /* PC (2026-11-07): the hide box (vifmodel_pc_hide, G001_flare.h: the
+     * cockpit camera's driver's head, the eye in it): hideOn 1, a box in the
+     * model's space, centre hideC and half sizes hideH, whose inside the
+     * pixel shader discards (vs_vu1's hide, ps_body); 2, the part's
+     * translucent texels (a glass shell facing the eye: its tint, not the
+     * pillars drawn with it); 0: nothing hidden.
+     * Part of the constants' head (CbVu1), so draws join only with the same
+     * box, and of the command's key (cmd_model_key). */
+    float       hideC[3];
+    float       hideOn;
+    float       hideH[3];
+    float       hidePad;
 } PglrModelPart;
 void pglr_model_part(const PglrVu1 *vu, const PglrModelPart *part, uint32_t flags);
 /* A VifModel was written at `model' (gfx_model_written: TStripBuilder::
@@ -197,6 +243,11 @@ void pglr_model_written(const void *model);
  * pglr_model_written, and its mesh is decoded ahead on a worker (from a copy
  * taken now).  The game thread. */
 void pglr_model_loaded(const void *model);
+/* PC: a ModelSet's n packets (VifModels, its draw list's order) were loaded
+ * (modelset_relocate): the overlays among them are found - a packet whose
+ * triangles lie on an earlier packet's (a lit lamp's glow on its lens),
+ * drawn a hair nearer (docs/renderer.md "Overlays").  The game thread. */
+void pglr_modelset_loaded(const void *const *packets, int n);
 
 /* ======================================================================== */
 /* VRAM transfers                                                           */
@@ -219,6 +270,48 @@ void pglr_tex1_loaded(void *tex1Image);
  * draws with that TEX0 sample the set itself, and the CLUT loads of its
  * CBP read the set.  NULL: the textures that follow are VRAM's again. */
 void pglr_texture_source(const void *tex1Image, uint32_t vramBase, uint64_t tex0);
+
+/* PC (vector fonts, pgl_vfont.h; docs/renderer.md "Host images"): a picture
+ * the game makes on the CPU at native resolution, standing for a GS texture
+ * no VRAM holds.  The draws whose TEX0 is the image's (pglr_host_image_add:
+ * PSMCT32, TBW 0 - a buffer width no texture of the game has - the image's
+ * number in TBP0, TCC 1, TFX MODULATE) sample it, bilinear: its gsW x gsH
+ * texels are its w x h pixels (RGBA bytes, GS units: alpha 0x80 = 1.0).  The
+ * game changes it between pglr_host_image_lock and _unlock: a new size or
+ * generation makes all of it new, else rows [dirtyY0, dirtyY1) changed; the
+ * executor takes what changed under the lock when a draw binds it.  Images
+ * are never released. */
+typedef struct PglrHostImage {
+    int32_t   id;               /* (pglr_host_image_add) */
+    int32_t   gsW, gsH;         /* the GS texels it holds, from (0, 0) of the TEX0's space */
+    int32_t   w, h;             /* its pixels */
+    uint32_t *pixels;           /* w x h */
+    uint32_t  generation;       /* bumped when all of it is new */
+    int32_t   dirtyY0, dirtyY1; /* rows changed since the executor took them (none: y1 <= y0) */
+} PglrHostImage;
+/* Registers img (the game thread; it stays registered): its TEX0, of a
+ * 2^tw x 2^th texel space; 0 when no more images fit (4096). */
+uint64_t pglr_host_image_add(PglrHostImage *img, uint32_t tw, uint32_t th);
+void pglr_host_image_lock(PglrHostImage *img);
+void pglr_host_image_unlock(PglrHostImage *img);
+/* The native pixels per GS pixel of the frames' height (the output scale:
+ * the window, the render scale; any thread). */
+float pglr_text_scale(void);
+/* ... of their width (the vector fonts' digits: whole output pixels). */
+float pglr_text_scale_x(void);
+
+/* PC (docs/movies.md "MP4 movies", pgl_movie.cpp): a movie decoded by the GPU.
+ * A draw whose TEX0 has TBP0 PGLR_MOVIE_TBP, TBW 0 and PSMCT32 samples the
+ * picture shown, its whole w x h over the 2^PGLR_MOVIE_TEXEL_LOG2 square of
+ * the TEX0's space.  attach: the movie's shared textures (keyed mutex, key
+ * 0), count 0 at its end.  stamp: the picture a slot now holds (0: being
+ * written); busy: a copy from the slot is queued.  show: the picture to draw
+ * from now on, by its number (any thread). */
+enum { PGLR_MOVIE_SLOTS = 10, PGLR_MOVIE_TBP = 0x3FFF, PGLR_MOVIE_TEXEL_LOG2 = 10 };
+void pglr_movie_attach(void *const *handles, int count, int w, int h);
+void pglr_movie_stamp(int slot, uint32_t seq);
+int  pglr_movie_busy(int slot);
+void pglr_movie_show(int slot, uint32_t seq);
 
 /* gs_download_image: w x h pixels at (sx, sy) of the buffer (sbp blocks,
  * sbw) read back as psm into dst, then callback(madr, arg) if set. */

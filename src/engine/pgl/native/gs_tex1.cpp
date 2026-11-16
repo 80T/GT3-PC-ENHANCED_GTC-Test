@@ -29,6 +29,9 @@ struct Resolver {
     size_t size = 0;
     size_t base = 0;
     bool memory = false;
+    /* (tex1_from_copy) the register blocks and upload records copied */
+    const uint8_t *texCopy = nullptr;
+    const uint8_t *xferCopy = nullptr;
 
     /* len bytes at ptr; nullptr for a NULL pointer or out of bounds */
     const uint8_t *at(uint32_t ptr, size_t len) const
@@ -81,7 +84,7 @@ bool parse(const uint8_t *h, const Resolver &r, Tex1Set &out, std::string *err)
     out.anims.clear();
 
     if (nTex != 0) {
-        const uint8_t *t = r.at(pTex, (size_t)nTex * 0x28);
+        const uint8_t *t = r.texCopy != nullptr ? r.texCopy : r.at(pTex, (size_t)nTex * 0x28);
         if (t == nullptr)
             return fail(err, "register blocks out of the buffer");
         for (uint32_t i = 0; i < nTex; i++, t += 0x28) {
@@ -95,7 +98,7 @@ bool parse(const uint8_t *h, const Resolver &r, Tex1Set &out, std::string *err)
         }
     }
     if (nXfer != 0) {
-        const uint8_t *x = r.at(pXfer, (size_t)nXfer * 0xC);
+        const uint8_t *x = r.xferCopy != nullptr ? r.xferCopy : r.at(pXfer, (size_t)nXfer * 0xC);
         if (x == nullptr)
             return fail(err, "upload records out of the buffer");
         for (uint32_t i = 0; i < nXfer; i++, x += 0xC) {
@@ -186,6 +189,18 @@ bool tex1_from_memory(const void *img, Tex1Set &out)
     r.memory = true;
     out.offset = 0;
     return parse(static_cast<const uint8_t *>(img), r, out, nullptr);
+}
+
+bool tex1_from_copy(const uint8_t *hdr, const uint8_t *tex, const uint8_t *xfer, Tex1Set &out)
+{
+    if (sizeof(void *) != 4 || hdr == nullptr)
+        return false;
+    Resolver r;
+    r.memory = true;
+    r.texCopy = rd32(hdr + 0x18) != 0 ? tex : nullptr;
+    r.xferCopy = rd32(hdr + 0x1C) != 0 ? xfer : nullptr;
+    out.offset = 0;
+    return parse(hdr, r, out, nullptr);
 }
 
 std::vector<Tex1Set> tex1_scan(const uint8_t *file, size_t size)

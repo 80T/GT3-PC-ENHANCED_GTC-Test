@@ -25,6 +25,7 @@ class CarProgress;                          /* T408 */
 class RaceEntryCar;                         /* T121 */
 class RaceInput;                            /* T413 */
 class RaceOrganization;                     /* T125 */
+struct PcCustomSource;                      /* PC: game/app/pc_customcam.h */
 
 /* ? name.  A random head shake, 0xC bytes: a spring (stiffness gain,
  * damping 10, 60 steps a second) pulled to a target that jumps to a new
@@ -91,6 +92,28 @@ public:
     int  isMountChangeable();               /* 0x002013B0 */
     RaceEntryCar *getCar();                 /* 0x002013B8 */
     void setFov(f32 deg);                   /* 0x002013C0 */
+    /* PC: the view button's extra cameras (game/app/pc_detail.h): the next
+     * of bumper, chase, cockpit, the car's own mounts; the mount to keep in
+     * GameOptions::onboardMount; the cockpit view is shown (mount 0 with the
+     * car drawn: RacePS2Base::drawCars) */
+    void pcNextView();
+    int  pcSavedMount();
+    /* PC (2026-11-08): the camera's car is its view's target car (update,
+     * first): a target changed without virtual_8 - the split screen's
+     * second view, set to car 1 after CameraManager::init attached every
+     * view to car 0 - re-attaches it, its springs and shakes started again
+     * from that car's state, its mount kept when the car has it. */
+    void pcFollowTarget(CameraTargetInfo *target);
+    /* 0, or the cockpit view's slot: 1, or 2 a second driver's (the cockpit
+     * camera, game/app/pc_headcam.h) */
+    int  pcIsCockpit() { return mount == 0 ? pcCockpit : 0; }
+    /* PC (2026-11-14): the user's own cameras (game/app/pc_customcam.h).
+     * pcSetCustom: custom camera `index' of the car in view (0: none, the
+     * mount kept), the mount its type's - 0 onboard, 1 chase: what it is to
+     * everything else; pcDescribeView: the view shown as a custom camera
+     * would give it (a new camera's start). */
+    void pcSetCustom(int index);
+    void pcDescribeView(PcCustomSource *out);
 
     int           mount;                    /* 0x100 the car's camera mount */
     f32           fov;                      /* 0x104 degrees (60) */
@@ -115,7 +138,10 @@ public:
     f32           speedFactor;              /* 0x158 speed / 120 km/h, clamped (mount 0) */
     RaceEntryCar *car;                      /* 0x15C */
     int           carIndex;                 /* 0x160 */
-    /*  0x164 .. 0x17F: alignment (64) */
+    int           pcCockpit;                /* 0x164 PC: the cockpit view (pcNextView): 1, or 2 a second driver's */
+    int           pcCustom;                 /* 0x168 PC (2026-11-14): the custom camera in view: its number among the
+                                               car's (pc_customcam.h), 0 none; mount is then 0 or 1 by its type */
+    /*  0x16C .. 0x17F: alignment (64) */
 };
 EGCS_SIZE(OnBoardCamera, 0x180);
 

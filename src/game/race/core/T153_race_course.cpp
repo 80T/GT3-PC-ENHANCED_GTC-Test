@@ -31,6 +31,7 @@
 #include "game/camera/T172_course_camera.h"        /* CourseCamera (relocate, loopCount, collect), CourseCameraRecord */
 #include "game/effects/T173_race_smoke.h"           /* RaceSmoke::emit (RaceCourse::smoke) */
 #include "game/course/T179_course_data.h"          /* CourseData, course_data_relocate / F_001A9178 / course_read */
+#include "game/app/pc_course_scale.h"              /* PC: pc_course_scale_apply */
 #include "game/effects/T334_tyre_smoke.h"           /* SmokeSource */
 #include "game/data/T481_car_data_base.h"        /* nameToCode */
 #include "engine/io/T503_vol_thread.h"           /* file_read_blocking, vol_device_object */
@@ -207,6 +208,7 @@ void RaceCourse::load(u64 code)
         u32 unit = race_course_fit_arena(code);     /* PC: the unit sized by the file */
         data = course_read(code, g_002BB5B8.alloc(0), unit);
         course_data_relocate(data);
+        pc_course_scale_apply(this, data);          /* PC: the course scale (game/app/pc_course_scale.h) */
     }
 }
 
@@ -270,6 +272,10 @@ f32 RaceCourse::getLapDistance(RunwayPos *pos)
 void RaceCourse::getContact(RunwayContact *c)
 {
     RunwayQuery query;                      /* sp+0x00 */
+    /* PC: off the road runway_query leaves the rest unchanged, and the
+     * contact takes it: stack garbage, kept by a wheel off the road
+     * (runway_query_contacts).  Only a car placed off the road meets it */
+    memset(&query, 0, sizeof(query));
     query.x = c->x;
     query.y = c->y;
     query.z = c->z;

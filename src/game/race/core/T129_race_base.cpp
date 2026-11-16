@@ -58,6 +58,12 @@ extern RaceBGMBase g_003521D0;              /* 0x003521D0 */
 #include "runtime/newlib/G007_stdio.h"                /* memset, strcpy, atexit, GetThreadId, SleepThread, WakeupThread */
 #include "game/enhanced.h"                  /* ENH_RACE_TIME_UP_ENDS */
 #include "game/race/modes/race_pod_rules.h" /* the Pod race's rules (pod_rules_init / _step) */
+#include "game/app/pc_course_scale.h"       /* PC: the course scale in the info block */
+#include "game/app/pc_course_pick.h"        /* PC: the laps run (pc_race_laps, in the info block) */
+#include "game/app/pc_car_tuning.h"         /* PC: the car multipliers (in the info block) */
+#include "game/app/pc_rev_cut.h"            /* PC (2026-11-08): the rev limiter (in the info block) */
+#include "game/app/pc_shift.h"              /* PC (2026-11-08): the gear shifts (in the info block) */
+#include "game/app/pc_race_cars.h"          /* PC: the slots of the cars past 8 (in the info block) */
 /* own translation units */
 #include "game/race/core/T125_race_organization.h"    /* RaceOrganization, RaceResult; T484 RaceDataBase / RaceEvent,
                                                T115 RaceOption, T122 RaceEventQueue, T127, T128 */
@@ -385,12 +391,19 @@ void RaceBase::virtual_7(RaceInfoBlock *blk)
     memset(name, 0, sizeof(blk->raceName));
     memset((void *)slot, 0, sizeof(blk->slots));
     memset(blk->unk_080, 0, sizeof(blk->unk_080));
-    blk->size = RACE_INFO_SIZE;
+    /* PC: a race of more than 8 cars: its slots 8.. after the block, counted
+     * by the size word (game/app/pc_race_cars.h); RACE_INFO_SIZE up to 8 */
+    blk->size = pc_race_info_size(org->entries->count);
     blk->magic = RACE_INFO_MAGIC;
     blk->version = RACE_INFO_VERSION;
     strcpy(name, virtual_24());
 
     o = org;
+    pc_course_scale_store(blk, o->course);  /* PC: the course scale in unk_080 (game/app/pc_course_scale.h) */
+    pc_race_run_store(blk, o);              /* PC: and the laps / time run, when not the record's (game/app/pc_course_pick.h) */
+    pc_car_tuning_store(blk, o);            /* PC: and the car multipliers, when not 100 % (game/app/pc_car_tuning.h) */
+    pc_rev_cut_store(blk, o);               /* PC (2026-11-08): and the rev limiter, when realistic (game/app/pc_rev_cut.h) */
+    pc_shift_store(blk, o);                 /* PC (2026-11-08): and the gear shifts, when realistic (game/app/pc_shift.h) */
     blk->option = o->option;
     blk->raceCode = o->raceCode;
     RaceLapTime *lapTime = &o->entries->cars[0]->lapTime;
@@ -401,6 +414,10 @@ void RaceBase::virtual_7(RaceInfoBlock *blk)
     blk->carCount = o->entries->count;
     for (i = 0; i < blk->carCount; i++, slot++) {
         RaceEntryCar *car = o->entries->cars[i];
+        if (i >= 8) {
+            slot = pc_race_info_slot(blk, i);   /* PC: past the block's 8 */
+            memset((void *)slot, 0, sizeof(*slot));
+        }
         /* the slot's CarSaveEquipments as a whole CarEquipments */
         /* PC: the CarSaveEquipments part only.  Retail copies a whole
          * CarEquipments (0x1E8 bytes) over the slot; egcs puts its
@@ -432,9 +449,10 @@ void RaceBase::virtual_7(RaceInfoBlock *blk)
 
 // FUNC 0x0017C1F0 RaceBase::virtual_10
 //   virtual_15() + 0x191C: the size of the info block with its extension.
+//   PC: the block of the race's cars (game/app/pc_race_cars.h).
 int RaceBase::virtual_10()
 {
-    return virtual_15() + RACE_INFO_SIZE;
+    return virtual_15() + pc_race_info_size(org->entries->count);
 }
 
 // FUNC 0x0017C220 RaceBase::virtual_11
@@ -487,9 +505,10 @@ int RaceBase::virtual_15()
 
 // FUNC 0x0017C330 RaceBase::virtual_16
 //   virtual_22() + 0x191C.
+//   PC: the block of the race's cars (game/app/pc_race_cars.h).
 int RaceBase::virtual_16()
 {
-    return virtual_22() + RACE_INFO_SIZE;
+    return virtual_22() + pc_race_info_size(org->entries->count);
 }
 
 // FUNC 0x0017C360 RaceBase::virtual_17
@@ -527,6 +546,9 @@ void RaceBase::virtual_18(gt2k_game::GameThumbnail *thumb)
 void RaceBase::virtual_19(RaceInfoBlock *blk)
 {
     RaceOrganization *o = org;
+    pc_course_scale_check_ghost(blk, o->course);   /* PC: a ghost of another course scale, logged */
+    pc_rev_cut_check_ghost(blk, o);                /* PC (2026-11-08): or of the other rev limiter */
+    pc_shift_check_ghost(blk, o);                  /* PC (2026-11-08): or of the other gear shifts */
     o->setupGhost(2, 0);
     RaceEntryCar *ghost = o->entries->cars[1];
     ghost->unloadModel();
@@ -866,7 +888,7 @@ void RaceBase::virtual_39()
 //   The race record's numberOfLaps (lbu).
 int RaceBase::getNumberOfLaps()
 {
-    return org->raceDB->event->numberOfLaps;
+    return pc_race_laps(org, org->raceDB->event->numberOfLaps);   /* PC: the laps run (game/app/pc_course_pick.h) */
 }
 
 /* Compiler-generated under egcs (the static object g_0049C378 above),

@@ -13,11 +13,16 @@
  * Relations (relation[i][j]): carRelation = the conductor's pair state of
  * (i, j) when it is 1..3 (CarPairStates, T305), else 1 when the cars are
  * within 10 m.  Slot states: 1 candidate (not active yet), 2 battle, 3 near.
+ *
+ * PC (ROADMAP 35): the per-car tables hold PC_RACE_CARS_MAX cars (game/race/
+ * race_cars.h; GT3's 7), so the offsets below are the PC's, the PS2's in
+ * brackets.
  */
 #ifndef GAME_T392_CAMERA_TARGET_SELECTOR_H
 #define GAME_T392_CAMERA_TARGET_SELECTOR_H
 
 #include "game/game.h"
+#include "game/race/race_cars.h"            /* PC: PC_RACE_CARS_MAX (the tables' size) */
 
 class CarPairStates;                        /* T305 (pointers only): DynamicsConductor +0xBA34 */
 class DynamicsConductor;                    /* T305 */
@@ -55,7 +60,10 @@ EGCS_SIZE(CameraTargetSlot, 0xC);
 /* Not polymorphic.  Declared size 0x178, the end of the data (u093's).  In
  * CameraView the next member is at +0x1A0 (+0x20 + 0x180), and nothing reads
  * or writes CameraView +0x198..+0x19F, so 0x180 is possible too; CameraView
- * declares the 8 bytes as its own unk_198. */
+ * declares the 8 bytes as its own unk_198.
+ * PC (ROADMAP 35): 0x130C, the tables sized by PC_RACE_CARS_MAX (7 on the
+ * PS2): a race of up to 32 cars has a slot, a hold timer, a relation row and
+ * a place for every car. */
 class CameraTargetSelector {
 public:
     void reset();                           /* 0x0020D840 (CameraManager::init) slots reset, ranks -1, holdTimer 40 */
@@ -68,16 +76,19 @@ public:
      * not allow a target change (!isEnableTargetChange()). */
     void update(RaceOrganization *org, DynamicsConductor *dc, int locked);         /* 0x0020DAC0 */
 
-    CameraTargetSlot slot[7];               /* 0x000 */
-    u8  unk_054[0xC];                       /* 0x054 (not accessed; ? an eighth slot) */
-    int holdTimer[7];                       /* 0x060 frames the slot is left alone (40 after reset) */
-    int relation[7][7];                     /* 0x07C [i][j]: -1 i == j, 0 none, 1 near, 2 / 3 the pair state */
-    s16 carAtRank[7];                       /* 0x140 the car at each place (0 = leading), -1 */
-    s16 rankOfCar[7];                       /* 0x14E the place of each car (0-based), -1 */
-    s16 prevCarAtRank[7];                   /* 0x15C last frame's carAtRank */
-    s16 prevRankOfCar[7];                   /* 0x16A last frame's rankOfCar (-1: none) */
+    /* PC: every table [PC_RACE_CARS_MAX], was [7] (ROADMAP 35, the races of
+     * up to 32 cars); the PS2 offsets in brackets */
+    CameraTargetSlot slot[PC_RACE_CARS_MAX];        /* 0x0000 [0x000] */
+    u8  unk_054[0xC];                               /* 0x0180 [0x054] (not accessed; ? an eighth slot) */
+    int holdTimer[PC_RACE_CARS_MAX];                /* 0x018C [0x060] frames the slot is left alone (40 after reset) */
+    int relation[PC_RACE_CARS_MAX][PC_RACE_CARS_MAX];   /* 0x020C [0x07C] [i][j]: -1 i == j, 0 none, 1 near,
+                                                       2 / 3 the pair state */
+    s16 carAtRank[PC_RACE_CARS_MAX];                /* 0x120C [0x140] the car at each place (0 = leading), -1 */
+    s16 rankOfCar[PC_RACE_CARS_MAX];                /* 0x124C [0x14E] the place of each car (0-based), -1 */
+    s16 prevCarAtRank[PC_RACE_CARS_MAX];            /* 0x128C [0x15C] last frame's carAtRank */
+    s16 prevRankOfCar[PC_RACE_CARS_MAX];            /* 0x12CC [0x16A] last frame's rankOfCar (-1: none) */
 };
-EGCS_SIZE(CameraTargetSelector, 0x178);
+EGCS_SIZE(CameraTargetSelector, 0x130C);    /* PC: PS2 0x178 (tables of 7) */
 
 f32 carDistanceSq(RaceEntryBase *entries, int a, int b);    /* 0x0020D5E8 the squared distance of cars a and b (t = 0) */
 int carRelation(RaceEntryBase *entries, CarPairStates *pairs, int a, int b);  /* 0x0020D6C8 pairs->state[a][b] if 1..3,

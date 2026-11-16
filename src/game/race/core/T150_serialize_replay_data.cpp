@@ -156,7 +156,15 @@ const void *Serialize::ReplayData::load(const void *data, void *dest)
 
     if (checkHeader(top, dest) == 2)
         return NULL;
-    memcpy(dest, data, REPLAY_DATA_LOAD_SIZE);
+    /* PC: the data's own bytes (at most REPLAY_DATA_LOAD_SIZE), the rest of
+     * the load size cleared: retail copied 0x41940 whatever the data's size,
+     * past the end of a shorter file's buffer.  The destinations hold
+     * REPLAY_DATA_LOAD_SIZE (play_saved_replay, run_replay_demo, the
+     * logger's: PC_REPLAY_DATA_SIZE, game/app/pc_race_cars.h). */
+    const u32 n = (u32)header.dataSize < (u32)REPLAY_DATA_LOAD_SIZE ? (u32)header.dataSize
+                                                                    : (u32)REPLAY_DATA_LOAD_SIZE;
+    memcpy(dest, data, n);
+    memset((u8 *)dest + n, 0, REPLAY_DATA_LOAD_SIZE - n);
     return (const u8 *)data + header.dataSize;
 }
 
@@ -332,7 +340,15 @@ const void *Serialize::TrackData::load(const void *data, void *dest)
 
     if (checkHeader(top, dest) == 2)
         return NULL;
-    memcpy(dest, data, REPLAY_DATA_LOAD_SIZE);
+    /* PC: the data's own bytes (at most REPLAY_DATA_LOAD_SIZE), the rest of
+     * the load size cleared: retail copied 0x41940 whatever the data's size,
+     * past the end of a shorter file's buffer.  The destinations hold
+     * REPLAY_DATA_LOAD_SIZE (play_saved_replay, run_replay_demo, the
+     * logger's: PC_REPLAY_DATA_SIZE, game/app/pc_race_cars.h). */
+    const u32 n = (u32)header.dataSize < (u32)REPLAY_DATA_LOAD_SIZE ? (u32)header.dataSize
+                                                                    : (u32)REPLAY_DATA_LOAD_SIZE;
+    memcpy(dest, data, n);
+    memset((u8 *)dest + n, 0, REPLAY_DATA_LOAD_SIZE - n);
     return (const u8 *)data + header.dataSize;
 }
 

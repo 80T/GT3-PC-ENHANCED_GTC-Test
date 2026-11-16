@@ -23,8 +23,24 @@ enum {
     PC_EXT_ARCADE,                              /* ArcadeRecords: ArcadeRecord past rec[144] */
     PC_EXT_FREE_RUN,                            /* FreeRunRecords: FreeRunTable past tables[44] */
     PC_EXT_PRIZE_SETS,                          /* PrizeSetFlags: s8 past won[200] */
-    PC_EXT_MUSIC                                /* MusicPlayList: MusicEntry past entries[64] */
+    PC_EXT_MUSIC,                               /* MusicPlayList: MusicEntry past entries[64] */
+    /* ROADMAP 35: ChampionshipSave: the entrants past entries[8] (a
+     * championship of up to PC_RACE_CARS_MAX cars), PC_REC_CHAMPIONSHIP
+     * bytes each; also the tag of their section of the 8.0 stream (below) */
+    PC_EXT_CHAMPIONSHIP,
+    /* PC (2026-11-14): the money decay's licence pause (game/app/
+     * pc_challenge.h): the tag of its section of the 8.0 stream (below) */
+    PC_EXT_CHALLENGE
 };
+
+/* The sections after the GameStatus 8.0 stream's body (its play list): each
+ * {u32 tag (PC_EXT_*), u32 bytes, the payload}, unaligned, little-endian; a
+ * section only when it has data (a save without any ends with the play list,
+ * as before); a load skips a tag it does not know and stops at a section
+ * that runs past the data.  PC_EXT_CHAMPIONSHIP: u32 n, then n entrants
+ * (ChampionshipSave::pcSaveSection).  PC_EXT_CHALLENGE (PC 2026-11-14): s32,
+ * the last day the money decay's licence pause frees, while it is ahead
+ * (pc_challenge_save_section). */
 
 /* The heap bytes of (owner, tag), grown to at least `bytes' (the new bytes
  * zeroed); *oldBytes (if given) = the size before, so the caller can reset
@@ -81,7 +97,8 @@ enum {
     PC_REC_ARCADE    = 1 + 0x14,                /* the difficulty, ArcadeRecord */
     PC_REC_FREE_RUN  = 0x300,                   /* FreeRunTable */
     PC_REC_PRIZE_SET = 1,                       /* the flag */
-    PC_REC_MUSIC     = 4                        /* played, enabled, order (s16) */
+    PC_REC_MUSIC     = 4,                       /* played, enabled, order (s16) */
+    PC_REC_CHAMPIONSHIP = 0x1D0 + 4             /* an entrant past 8: the car's save block, points (s32) */
 };
 
 #endif /* GAME_SAVE_PC_SAVE_EXT_H */

@@ -11,6 +11,8 @@
  */
 #include "game/car/model/tire_model_internal.h"
 #include "game/car/model/T450_menu_tire_model.h"
+#include "game/app/pc_menu_race_model.h"         /* PC (2026-11-12): a race wheel's face */
+#include "game/car/model/pc_brake_fit.h"         /* PC (2026-11-13): the brake behind the wheel */
 
 // FUNC 0x00224090 MenuTireModel::MenuTireModel
 //   TireModelBase(), the vptr 0x003410D0, TirePacket() of the packet, no
@@ -21,6 +23,8 @@ MenuTireModel::MenuTireModel()
     /* implicit: TireModelBase, ~TireModelBase, TirePacket (compiler-generated: bases, members,
      * deleting form) */
     wheelModel = NULL;
+    pcBrakePush = 0.0f;                     /* PC (2026-11-13): no brake fit yet */
+    pcBrakeFitted = 0;
 }
 
 // FUNC 0x00224100 MenuTireModel::~MenuTireModel
@@ -41,7 +45,49 @@ void *MenuTireModel::build(void *work, int segs)
 {
     TirePacket *p = &packet;
     p->setup(this, segs, 1, 1, 1, 0.001f);
+    pcBrakeFitted = 0;                      /* PC (2026-11-13): its files and size are new: draw fits the brake again */
     return p->TirePacket::virtual_1(work);
+}
+
+/* PC (2026-11-13, no original): see T450_menu_tire_model.h.  The wheel: its
+ * file's model, the part drawn for this position; the brake: the car's
+ * model set's part (none in a race model's, [Debug] MenuRaceModel: nothing
+ * to move).  (The rings are the game thread's, as the draws.)
+ * PC (2026-11-14; user: "A crash in the wheel shop.  Was scrolling through
+ * the wheel list at the maximum speed possible with the dpad"): not while
+ * the wheel file is not in (filesIn 0).  A menu car changes its wheel by
+ * reading the new file over the old one in the model's buffer (gt2k_menu::
+ * Car::loadStep, state 2: file->wheel), over several frames, with tiresReady
+ * 0 until Car::wheelLoaded has relocated it and built the tyres again;
+ * meanwhile draw still runs (withTire 0: no tyre, no rim, the brake part of
+ * the body alone) and the wheel file holds the new file's raw bytes - its
+ * `model' the offset 0x20.  A wheel chosen before the last one's first draw
+ * (its build left pcBrakeFitted 0) had the fit read that: the crash in
+ * stamp_of, reading 0x30.  The push stays the last wheel's until the new
+ * one's fit. */
+void MenuTireModel::pcFitBrake(int part, int filesIn)
+{
+    static PcRadial brake;
+    if (filesIn == 0)
+        return;
+    pcBrakePush = 0.0f;
+    pcBrakeFitted = 1;
+    if (!pc_brake_fit_on() || wheelFile == NULL || wheelFile->model == NULL || wheelModel == NULL || !(rim > 0.0f))
+        return;
+    pc_radial_clear(&brake, kPcRadialMax);
+    pc_radial_model(&brake, wheelModel, part, 0);
+    if (brake.triangles == 0)
+        return;
+    const PcRadial *wheel = pc_radial_wheel(wheelFile->model, wheel_file_lod(wheelFile, position), 0);
+    PcBrakeFit found;
+    pcBrakePush = pc_brake_fit(wheel, &brake, rim, width, &found);
+    /* the log: a brake moved (every fit with GT3PC_BRAKE_FIT_LOG=1), an
+     * axle's first tyre's line only */
+    if ((position & 1) == 0 && (pcBrakePush > 0.0f || pc_brake_fit_log()))
+        printf("PC: brake fit: a menu car's %s brake model (%d triangles): the wheel's back %+.1f mm from it, "
+               "moved back %.1f mm%s%s\n",
+               position / 2 ? "rear" : "front", brake.triangles, found.gap * 1000.0f, pcBrakePush * 1000.0f,
+               found.limited ? " (limited)" : "", found.own ? " (the wheel has a brake of its own there)" : "");
 }
 
 /* The origin (0, 0, 0, 1): T450's first .rodata item (0x003410C0, before its
@@ -74,6 +120,49 @@ int MenuTireModel::virtual_1()
     f32 cosine = ee_rsqrt(x, x * x + yy + zz);
     faceVisible = cosine < 0.05f ? 1 : 0;
     return 1;
+}
+
+/* PC (2026-11-12, no original): a race wheel in a menu ([Debug]
+ * MenuRaceModel, game/app/pc_menu_race_model.h).  Its model draws the face
+ * from the second texture table's TEX2_WHEEL_FACE slot (texture 0x1FF at
+ * base 1), which RaceTirePacket::drawWheelTexture fills in a race: here the
+ * still face of the wheel's texture set for `level' (set level + the
+ * wheel's part x 3, as there), its variation, made resident in `set' (alive
+ * through the draw) into table[TEX2_WHEEL_FACE], the table's environment entry copied to
+ * table[0], and table set as the second table.  Returns the table it
+ * replaced (texsel_set_table2 it back after the draw), NULL when nothing was
+ * done (no face, no table). */
+static GsTexRegs *pc_race_wheel_face(MenuTireModel *m, int level, TexSet *set, GsTexRegs *table)
+{
+    WheelFile2 *w = m->wheelFile;
+    GsTexRegs *env = texsel_get_table2();
+    if (w == NULL || w->model == NULL || env == NULL)
+        return NULL;
+    ModelSet *model = w->model;
+    Tex1Image *face = NULL;
+    if (model->texSets != NULL && model->nTexSets != 0) {
+        int texSet = level + wheel_file_lod(w, m->position) * RACE_TIRE_LEVELS;
+        if (texSet >= model->nTexSets)
+            texSet = model->nTexSets - 1;
+        face = model->texSets[texSet][WHEEL_TEX_FACE];
+    } else if (model->tex != NULL && model->nTex > WHEEL_TEX_FACE) {
+        face = model->tex[WHEEL_TEX_FACE];
+    }
+    if (face == NULL)
+        return NULL;
+    const int variation = wheel_file_variation(w, m->color, m->position);
+    if (variation >= 0)
+        tex1_select_variation(face, variation);
+    set->load(face);
+    table[0] = env[0];
+    memset(&table[TEX2_WHEEL_FACE], 0, sizeof(table[TEX2_WHEEL_FACE]));
+    table[TEX2_WHEEL_FACE].tex0 = face->tex->tex0;
+    table[TEX2_WHEEL_FACE].tex1 = face->tex->tex1;
+    table[TEX2_WHEEL_FACE].miptbp1 = face->tex->miptbp1;
+    table[TEX2_WHEEL_FACE].miptbp2 = face->tex->miptbp2;
+    table[TEX2_WHEEL_FACE].clamp = face->tex->clamp;
+    texsel_set_table2(table);
+    return env;
 }
 
 // FUNC 0x00224260 MenuTireModel::draw
@@ -125,6 +214,14 @@ void MenuTireModel::draw(f32 steer, f32 camber, f32 unused, int withTire, int wi
         vu0_scale(1.0f, 1.0f, -1.0f);
         gfx_cull_face(otherMode);
     }
+    /* PC (2026-11-12): a race wheel's face (pc_race_wheel_face) for the
+     * wheel TirePacket::draw draws */
+    alignas(16) GsTexRegs pcTable[1 + TEX2_WHEEL_FACE];
+    TexSet pcFace;
+    GsTexRegs *pcEnv = NULL;
+    const int pcLevel = pc_menu_race_wheel_level();
+    if (pcLevel >= 0 && withTire != 0 && faceVisible != 0)
+        pcEnv = pc_race_wheel_face(this, pcLevel, &pcFace, pcTable);
     if (withTire != 0) {
         TirePacket *p = &packet;
         if (p->built != 0) {
@@ -133,6 +230,8 @@ void MenuTireModel::draw(f32 steer, f32 camber, f32 unused, int withTire, int wi
             gfx_tex_param(PGL_TEXPARAM_TCC, PGL_TCC_RGBA);
         }
     }
+    if (pcEnv != NULL)
+        texsel_set_table2(pcEnv);           /* PC (2026-11-12): the menu's table back */
     if (faceVisible != 0 && wheelModel != NULL) {
         /* flipped again when the side and the mirroring differ: a ?: as
          * the condition (a jump from each arm, retail's sltu / xori) */
@@ -141,10 +240,24 @@ void MenuTireModel::draw(f32 steer, f32 camber, f32 unused, int withTire, int wi
             vu0_scale(1.0f, 1.0f, -1.0f);
             gfx_cull_face(otherMode);
         }
+        /* PC (2026-11-13): the brake model moved back along the axle until
+         * the wheel clears it (pcFitBrake; metres: PGL_CAP_SCALE scales the
+         * model, not this) */
+        /* (PC 2026-11-14: fitted once the wheel file is in - withTire, a
+         * menu car's tiresReady: not while the next wheel is read over it) */
+        const int pcPart = position / 2 != 0 ? 3 : 2;
+        if (pcBrakeFitted == 0)
+            pcFitBrake(pcPart, withTire);
+        if (pcBrakePush > 0.0f) {
+            pgl_push_matrix();
+            pgl_translate(pcBrakePush, 0.0f, 0.0f);
+        }
         if (position / 2 != 0)
             modelset_draw_part(wheelModel, 3);
         else
             modelset_draw_part(wheelModel, 2);
+        if (pcBrakePush > 0.0f)
+            pgl_pop_matrix();
     }
     gfx_cull_face(mode);
     gfx_disable(PGL_CAP_SCALE);

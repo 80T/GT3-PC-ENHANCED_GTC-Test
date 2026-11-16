@@ -30,6 +30,7 @@
 #include "game/game.h"
 #include "game/effects/T159_flare.h"                /* Vec3, Vec4 (held by value) */
 #include "game/car/physics/T376_car_box_walls.h"        /* CarBox (held by value) */
+#include "game/race/race_cars.h"                    /* PC: PC_RACE_CARS_MAX (CarBoxList::box) */
 
 class Gadget;                               /* T167's own (pointers only: forward declarations) */
 class ModelSet;                             /* T451 */
@@ -64,9 +65,10 @@ struct CarBoxList {
     DynamicsConductor *dc;                  /* 0x000 */
     int                count;               /* 0x004 dc->carCount */
     RaceCourse        *course;              /* 0x008 */
-    CarBox             box[8];              /* 0x00C (u057 cars[count], u089 cars) */
+    /* PC: PC_RACE_CARS_MAX (was 8), races of up to 32 cars (game/race/race_cars.h) */
+    CarBox             box[PC_RACE_CARS_MAX];   /* 0x00C (u057 cars[count], u089 cars) */
 };
-EGCS_SIZE(CarBoxList, 0x278C);
+EGCS_SIZE(CarBoxList, 0x960C);              /* PC: was 0x278C (32 boxes of 0x4B0, T376) */
 
 /* ? name (u057's; u059 CourseObj).  The shape of a gadget, 0xB0 bytes: the
  * objects of the course file (CourseData +0x90, T179; their model is an

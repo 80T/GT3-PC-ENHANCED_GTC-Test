@@ -39,6 +39,8 @@
 #include "game/menu/framework/T233_menu_sound.h"           /* menu_play_se */
 #include "runtime/newlib/G007_stdio.h"                /* strcmp */
 #include "game/menu/gtmode/gtmode_control_internal.h"
+#include "game/app/pc_wheel_shop.h"              /* PC (2026-11-13): [Game] UnrestrictedWheels */
+#include "game/app/pc_car_shop.h"               /* PC (2026-11-14): [Game] BuyNotForSale */
 
 using namespace gt2k_menu;
 
@@ -49,7 +51,8 @@ const char *check_cd_buy_sure(void *ctx, ButtonData *rec)
 {
     GarageCar *car = getGameStatus()->getMenuStatus()->car;
     s64 money = getGameStatus()->money;
-    if ((car->getShopFlags() >> CAR_SHOP_BIT_NOT_AT_DEALER) & 1) {
+    /* PC (2026-11-14): not with [Game] BuyNotForSale (game/app/pc_car_shop.h) */
+    if ((pc_buy_flags(car->getShopFlags()) >> CAR_SHOP_BIT_NOT_AT_DEALER) & 1) {
         menu_play_se(MENU_SE_REFUSED);
         return "00cmn/not_for_buy";
     }
@@ -70,7 +73,8 @@ const char *check_hm_buy_sure(void *ctx, ButtonData *rec)
 {
     GarageCar *car = getGameStatus()->getMenuStatus()->car;
     s64 money = getGameStatus()->money;
-    if ((car->getShopFlags() >> CAR_SHOP_BIT_NOT_USED) & 1) {
+    /* PC (2026-11-14): not with [Game] BuyNotForSale (game/app/pc_car_shop.h) */
+    if ((pc_buy_flags(car->getShopFlags()) >> CAR_SHOP_BIT_NOT_USED) & 1) {
         menu_play_se(MENU_SE_REFUSED);
         return "00cmn/not_for_buy";
     }
@@ -117,7 +121,9 @@ const char *check_ws(void *ctx, ButtonData *rec)
         menu_play_se(MENU_SE_REFUSED);
         return "00cmn/ride_car";
     }
-    if ((car->getShopFlags() >> CAR_SHOP_BIT_FIXED_WHEELS) & 1) {
+    /* PC (2026-11-13): not with [Game] UnrestrictedWheels (game/app/
+     * pc_wheel_shop.h) */
+    if (((car->getShopFlags() >> CAR_SHOP_BIT_FIXED_WHEELS) & 1) && !pc_wheels_unrestricted()) {
         menu_play_se(MENU_SE_REFUSED);
         return "00cmn/not_for_change_wheel";
     }
@@ -128,7 +134,8 @@ const char *check_ws(void *ctx, ButtonData *rec)
 // FUNC 0x0011BEA8 check_hm_wheel
 const char *check_hm_wheel(void *ctx, ButtonData *rec)
 {
-    if ((getGameStatus()->getMenuStatus()->car->getShopFlags() >> CAR_SHOP_BIT_FIXED_WHEELS) & 1) {
+    if (((getGameStatus()->getMenuStatus()->car->getShopFlags() >> CAR_SHOP_BIT_FIXED_WHEELS) & 1) &&
+        !pc_wheels_unrestricted()) {        /* PC (2026-11-13) */
         menu_play_se(MENU_SE_REFUSED);
         return "00cmn/not_for_change_wheel";
     }

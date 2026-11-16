@@ -34,8 +34,22 @@ enum : uint32_t {
     PRIM_POINT = 0, PRIM_LINE = 1, PRIM_LINE_STRIP = 2, PRIM_TRIANGLE = 3, PRIM_TRI_STRIP = 4,
     PRIM_TRI_FAN = 5, PRIM_SPRITE = 6,
     PRIM_IIP = 0x008, PRIM_TME = 0x010, PRIM_FGE = 0x020, PRIM_ABE = 0x040, PRIM_AA1 = 0x080,
-    PRIM_FST = 0x100, PRIM_CTXT = 0x200
+    PRIM_FST = 0x100, PRIM_CTXT = 0x200,
+    /* PC, no GS bit: the draw's colour is pgl_color's in full (fullColor), 0xFF
+     * = 1.0, not its x 129 / 256 (docs/renderer.md "Full colours").  The GS's
+     * 0x80 = 1.0 leaves a textured draw's colour 7 bits: 129 results of 256
+     * values, each odd one the same as an even neighbour (user report: HUD
+     * colours "only even values work").  Set per draw by what draws in one
+     * constant colour: colours of a draw's own stay in GS units. */
+    PRIM_FULL_COLOR = 0x800
 };
+
+/* pgl_color's colour whole, with the textured colour's alpha (which is GS
+ * units, and differs from color's until the first pgl_color). */
+template <class Ctx> inline uint32_t fullColor(const Ctx &c)
+{
+    return (c.color & 0x00FFFFFFu) | (c.colorTex & 0xFF000000u);
+}
 
 /* One vertex as the GS registers held it when its XYZ register was written. */
 struct GsVertex {

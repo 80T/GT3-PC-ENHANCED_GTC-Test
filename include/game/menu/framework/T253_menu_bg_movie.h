@@ -50,6 +50,11 @@ public:
      * field of an interlaced movie on its own lines (MpegImage::movieUV);
      * 0 for a progressive one. */
     f32  fieldOffset() const;
+    /* PC (no original; docs/movies.md "MP4 movies"): a frame the GPU decoded
+     * is drawn from the renderer's texture of the movie, not from buf:
+     * uploadGpu selects it, gpuFrame says the frame uploaded is one. */
+    void uploadGpu();
+    int  gpuFrame() const;
 
     GSBuffer buf;                           /* 0x00 the uploaded frame */
     int      uploaded;                      /* 0x38 */

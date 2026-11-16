@@ -4,7 +4,10 @@
  * picture (ipu_decode_image, 0x00264E58, called by gt2k_menu::Ipic::decode
  * T250 for MpegImage::setIpic T249).  GT3's only IPU pictures are the 42
  * course stills of stream/course.ipic (gt2k_menu::IpicArchive: "ipua",
- * count, {offset, name[0x1C]} entries; read by ArcadeControl, T010).
+ * count, {offset, name[0x1C]} entries; read by ArcadeControl, T010).  The
+ * launcher converts them to PNG files with this decoder (launcher/stills.h;
+ * docs/movies.md "Stills"); the game reads the archive only for a still that
+ * has none.
  *
  * The picture format (Sony's IPU stream, the IpuImageHeader record of
  * G002_mpeg_frameq.h):

@@ -1,4 +1,4 @@
-/* T374 - one car's collision box (CarBox, 0x4F0 bytes): an octagon (a
+/* T374 - one car's collision box (CarBox, 0x4F0 bytes; PC 0x4B0, T376): an octagon (a
  * rectangle with cut corners) in the car's frame, its pose over the frame
  * (pos at t, next at tEnd), the swept bounding box, the impact feedback
  * to the car, and save / restore of its corners. */
@@ -95,21 +95,27 @@ void car_box_init(CarBox *b, int index, RaceCourse *course, RaceCarState *car, f
     b->impactPeak = 0.0f;
     b->soundTimer = 0;
     b->soundLevel = 0.0f;
+    /* PC: car_box_slide_walls reads it before this run's first corner hit
+     * when a car starts against a wall (car_box_push_wall_cb's corners): it
+     * held the last run's hit, so a replay started otherwise than its race
+     * (the race before it left another) */
+    b->wallDir.x = 0.0f;
+    b->wallDir.y = 0.0f;
 }
 
 /* The other boxes and the pair reaches (the sum of the radii, squared).
- * Caller: boxes_link. */
+ * Caller: boxes_link.
+ * PC: only the other boxes.  Retail stored reach[j] = radius +
+ * boxes[j].radius and reach2[j] = reach x reach for the n boxes; the tables
+ * would be PC_RACE_CARS_MAX long (game/race/race_cars.h) in every box, so
+ * T375 computes reach2 from the two radii where it tests it (car_box_reach2),
+ * the same single-precision sum and product of the same radii (only
+ * car_box_init sets them, and boxes_link follows every car_box_init). */
 // FUNC 0x001FB0D8 car_box_link
 void car_box_link(CarBox *b, CarBox *boxes, int n)
 {
-    int j;
-
     b->boxes = boxes;
-    for (j = 0; j < n; j++) {
-        f32 reach = b->radius + boxes[j].radius;
-        b->reach[j] = reach;
-        b->reach2[j] = reach * reach;
-    }
+    (void)n;                                /* PC: no reach tables to fill (above) */
 }
 
 /* The frame's start: the pose and velocity from the car's state, the

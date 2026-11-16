@@ -13,7 +13,9 @@
 
 struct CourseLines;                         /* T368_enemy_lines.h (pointers only) */
 
-/* The node of slot `slot': count - (slot + 4); 0 without line 4. */
+/* The node of slot `slot': count - (slot + 4); 0 without line 4.  PC: a
+ * slot past the count - 6 boxes (nodes 3 .. count - 4) reuses them,
+ * slot % (count - 6): races of up to 32 cars. */
 int  pit_slot_node(struct CourseLines *cl, int slot);                           /* 0x001F9D90 */
 /* Node i's course distance, i < 0 counted from the end. */
 f32  pit_node_dist_wrapped(struct CourseLines *cl, int i);                      /* 0x001F9DB8 */

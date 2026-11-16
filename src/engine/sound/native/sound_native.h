@@ -157,8 +157,51 @@ uint32_t spu_memory_size(void);
 
 /* ---- 'PBGM' (pdibgm_*) ---- */
 /* Function 1: plays the .ads read through `read' (loop != 0: from the
- * start again at its end).  0, or -1 when it is not an ADPCM .ads. */
+ * start again at its end).  0, or -1 when it is not an ADPCM .ads.
+ * PC: a .wav (integer PCM of 8 to 32 bits or float; what the launcher
+ * converts the .ads to) or a 16-bit PCM .ads plays through the PCM output
+ * below instead (the 'PBGM' functions act on it alike); -1 for anything
+ * else. */
 int      snd_native_bgm_start(SndNativeReadFn read, void *user, int loop);
+/* PC: a BGM the caller decodes (an .mp3: Media Foundation, T521 pdibgm):
+ * read on the player's feeder thread, through the PCM output as a .wav. */
+typedef struct SndNativeBgmDecoder {
+    void *user;
+    int rate, channels;                 /* channels: 1 or 2 (none with open) */
+    uint64_t frames;                    /* its length (its true one is taken at its end) */
+    /* up to max frames of float (-1..1, interleaved) into out: how many; 0 at
+     * its end (or on an error) */
+    int (*read)(void *user, float *out, int max);
+    /* from its start again (the loop): 0 on an error */
+    int (*rewind)(void *user);
+    /* Optional: on the feeder thread, before the first read - the decoder
+     * opened (its slow work off the caller's thread), its rate, channels (1
+     * or 2) and length (0: unknown until its end); 0 when it cannot play
+     * (nothing plays, as a file that is no music).  The output stays silent
+     * and the status at 0 until then. */
+    int (*open)(void *user, int *rate, int *channels, uint64_t *frames);
+    /* Optional: on the feeder thread, before the first read, from frame
+     * `frame' on (a start's SndNativeBgmFrom): 0 when it cannot (it plays
+     * from its start). */
+    int (*seek)(void *user, uint64_t frame);
+} SndNativeBgmDecoder;
+/* Function 1 for it: as snd_native_bgm_start (0; -1 when it cannot play).
+ * The decoder must live until the next start or stop returns. */
+int      snd_native_bgm_start_decoded(const SndNativeBgmDecoder *dec, int loop);
+/* PC: where a start begins and how it comes in (the play list's preview of a
+ * song without an intro file: T466 ads_play): `at' of its length (0 .. 1, 0
+ * its start), its volume from 0 to full over `fadeIn' seconds (0: at once)
+ * in a straight line, as GT3's intro files fade in.  The PCM output's streams
+ * take it (a .wav, a 16-bit PCM .ads, a decoder with a seek and a length); the
+ * voices' ADPCM .ads plays from its start.  Its loop comes back to its start,
+ * at full volume; the status counts from the song's start. */
+typedef struct SndNativeBgmFrom {
+    float at;
+    float fadeIn;
+} SndNativeBgmFrom;
+/* snd_native_bgm_start / _decoded from there (from NULL: the same). */
+int      snd_native_bgm_start_from(SndNativeReadFn read, void *user, int loop, const SndNativeBgmFrom *from);
+int      snd_native_bgm_start_decoded_from(const SndNativeBgmDecoder *dec, int loop, const SndNativeBgmFrom *from);
 void     snd_native_bgm_stop(void);                 /* function 2 */
 /* Function 3: the value pdibgm_set_volume sends (volume * 32768). */
 void     snd_native_bgm_set_volume(int volume);
@@ -170,7 +213,9 @@ void     snd_native_bgm_get_status(SndNativeBgmStatus *out);   /* function 6 */
  * pdistr demuxed the PSS's audio (MPEG private stream 1, substream 0xFF
  * 0xA1: drop each packet payload's 4-byte prefix) and played it with the
  * BGM's stream player and voices: the payloads concatenated are an .ads
- * image (GT3's opening / ending: ADPCM 44.1 kHz stereo, interleave 0x400).
+ * image (GT3's opening / ending: ADPCM 44.1 kHz stereo, interleave 0x400;
+ * the JP disc's are 16-bit PCM, which mpg_service.cpp sends to the PCM
+ * output below instead).
  * The native movie player pushes them here; stop / volume / pause / status
  * are the BGM functions above (mpegif::feed sets the BGM volume to 1.0). */
 void     snd_native_bgm_open_push(void);
@@ -186,16 +231,21 @@ void     snd_native_bgm_push_end(void);
  * has started. */
 int64_t  snd_native_bgm_played_us(void);
 
-/* ---- PC: an MP4 movie's sound (no original; docs/movies.md "MP4 movies") ----
+/* ---- PC: an MP4 movie's sound (no original; docs/movies.md "MP4 movies");
+ * also a JP movie's 16-bit PCM and a .wav / PCM .ads BGM (function 1) ----
  * Decoded PCM (16-bit, interleaved, 1 or 2 channels at its own rate) mixed
  * into the output after the SPU2, resampled to 48 kHz, at the gain the BGM
- * voices would give it (the BGM volume, core 1's master volume): a .pss's
+ * voices would give it (the BGM volume, core 1's master volume; a music
+ * file's after the output stage's gain, snd_native_render_music): a .pss's
  * sound goes through the BGM voices as SPU2 ADPCM, an .mp4's is not
  * re-encoded.  open stops the BGM; the sound waits for start (the first
  * presentation window, as the pushed .ads waits for its first chunks). */
 void     snd_native_pcm_open(int rate, int channels);
 /* Frames taken (fewer when about 2 s are buffered: push the rest later). */
 int      snd_native_pcm_push(const int16_t *pcm, int frames);
+/* PC: the same of float frames (-1..1): a 24-bit or float .wav's or a
+ * decoded .mp3's samples as they are. */
+int      snd_native_pcm_push_f32(const float *pcm, int frames);
 int      snd_native_pcm_buffered(void);             /* frames not played yet */
 void     snd_native_pcm_end(void);                  /* no more data: plays out */
 void     snd_native_pcm_start(void);
@@ -220,8 +270,15 @@ void     snd_native_mix(int16_t *out, int frames);
 void     snd_native_set_scheduled(int on, double (*clock)(void));
 /* The audio thread, once per device period: `frames' frames of 48 kHz
  * stereo float (1.0 = 16-bit full scale; above it with headroom), the
- * period starting at `now' (the clock's seconds). */
+ * period starting at `now' (the clock's seconds).  PC: without the music
+ * files (below). */
 void     snd_native_render(float *out, int frames, double now);
+/* PC: the music files - a .wav, .mp3 or PCM .ads BGM through the PCM output
+ * (function 1) - added into out at their own level (the BGM volume alone),
+ * after the output stage's gain (platform/audio.h): played straight, as
+ * Windows plays them (docs/sound.md 2.4).  The audio thread, after
+ * snd_native_render; a movie's sound stays in snd_native_render. */
+void     snd_native_render_music(float *out, int frames);
 /* Not the IOP's (a diagnostic, GT3PC_AUDIO_TIMING): the longest a render
  * waited for the sound lock since the last call (ms). */
 double   snd_native_take_render_lock_wait(void);

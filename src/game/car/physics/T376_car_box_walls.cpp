@@ -126,9 +126,14 @@ void car_box_slide_walls(CarBox *b)
             vec2_add(&b->pos, &b->pos, &push);
 
             Vec2 lost = b->vel;
-            f32 velAlong = vec2_dot(&b->wallDir, &b->vel);
-            b->vel.x = velAlong * b->wallDir.x;
-            b->vel.y = velAlong * b->wallDir.y;
+            /* PC: the box's last hit's direction, as retail; before the
+             * run's first hit (car_box_init cleared it) the corner's own wall */
+            const Vec2 *slideDir = &b->wallDir;
+            if (slideDir->x == 0.0f && slideDir->y == 0.0f)
+                slideDir = &b->v[i].wallDir;
+            f32 velAlong = vec2_dot(slideDir, &b->vel);
+            b->vel.x = velAlong * slideDir->x;
+            b->vel.y = velAlong * slideDir->y;
             vec2_sub(&lost, &lost, &b->vel);
             Vec2 lever = b->v[i].pos;
             vec2_sub(&lever, &lever, &b->pos);

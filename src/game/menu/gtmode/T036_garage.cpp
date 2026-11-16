@@ -92,6 +92,8 @@
  * other polymorphic class) */
 #include "game/menu/gtmode/T036_decay_item.h"
 #include "game/menu/gtmode/garage_internal.h"                           /* the TU's constants and helpers */
+#include "game/app/pc_course_pick.h"            /* PC: the course randomizer's pictures */
+#include "game/app/pc_car_shop.h"               /* PC (2026-11-14): [Game] BuyNotForSale */
 
 // DATA_START 0x00310570
 
@@ -177,7 +179,9 @@ void text_focused_carname(GtmodeControl *ctl, char *buf, int size)
 void text_car_buy_price(GtmodeControl *ctl, char *buf, int size)
 {
     GarageCar *car = getGameStatus()->getMenuStatus()->car;
-    if (car->getShopFlags() & SHOP_FLAG_NOT_SOLD) {
+    /* PC (2026-11-14): the price with [Game] BuyNotForSale (game/app/
+     * pc_car_shop.h) */
+    if (pc_buy_flags(car->getShopFlags()) & SHOP_FLAG_NOT_SOLD) {
         strcpy(buf, "----");
         return;
     }
@@ -336,7 +340,7 @@ Transitive *make_goods_car_price(void *ctx, PageLayout *layout, Object *parent, 
         if (info.loadCar(nameToCode(code)) == 0)
             return 0;
         price   = info.getPrice();
-        notSold = info.getShopFlags() & SHOP_FLAG_NOT_SOLD;
+        notSold = pc_buy_flags(info.getShopFlags()) & SHOP_FLAG_NOT_SOLD;  /* PC (2026-11-14): BuyNotForSale */
     }
     Item *priceItem = new Item(item, layout);   /* Object::operator new; operator delete */ /* implicit: Object::operator delete (if the constructor throws) */
     if (notSold) {
@@ -1417,6 +1421,10 @@ Transitive *make_event_course_doc(void *ctx, PageLayout *layout, Object *parent,
         if (focused != NULL) {
             RaceDataBase db;                    /* sp+0x00 */
             if (db.select(nameToCode(focused->name)) != 0) {
+                /* PC (ROADMAP 24): the course randomizer hides the name
+                 * (game/app/pc_course_pick.h) */
+                if (pc_course_hidden(focused->name))
+                    return NULL;
                 /* the course name first: retail calls F_002389C8 before it
                  * computes name and the format (an argument call is not
                  * expanded first here) */
@@ -1447,6 +1455,13 @@ Transitive *make_event_course_logo(void *ctx, PageLayout *layout, Object *parent
             RaceDataBase db;                    /* sp+0x00 */
             if (db.select(nameToCode(focused->name)) != 0) {
                 const char *course = db.F_002389C8(db.course);  /* before Object::operator new */
+                /* PC (ROADMAP 24): the course randomizer's "?" on the item
+                 * (game/app/pc_course_pick.h) */
+                if (pc_course_hidden(focused->name)) {
+                    Item *question = pc_course_question(layout, course, item);
+                    if (question != NULL)
+                        return question;
+                }
                 /* implicit: Object::operator delete (if the constructor throws) */
                 return new Item(course, layout, item);  /* Object::operator new (0x100);
                                                            operator delete; then ~RaceDataBase */

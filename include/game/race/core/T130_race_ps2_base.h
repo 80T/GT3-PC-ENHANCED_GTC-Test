@@ -33,6 +33,7 @@
 
 #include "game/game.h"
 #include <stddef.h>                         /* size_t */
+#include "game/race/race_cars.h"            /* PC: PC_RACE_CARS_MAX */
 #include "game/race/core/T121_race_entry.h"           /* base RaceEntryBase */
 #include "game/race/core/T129_race_base.h"            /* base RaceBase */
 #include "game/sound/T175_race_bgm_base.h"        /* base RaceBGMBase */
@@ -109,7 +110,8 @@ public:
     RaceEntryPS2();                                     /* 0x0017CF80 capacity 7, cars = slots */
     virtual ~RaceEntryPS2();                            /* [0] +0x0C 0x0017CFC8 */
 
-    RaceEntryCar *slots[7];                 /* 0x20 RaceEntryBase::cars points here */
+    RaceEntryCar *slots[PC_RACE_CARS_MAX];  /* 0x20 RaceEntryBase::cars points here (PC: was 7,
+                                               game/race/race_cars.h) */
 };
 EGCS_SIZE(RaceEntryPS2, 0x3C);
 

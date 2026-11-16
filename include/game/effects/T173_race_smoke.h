@@ -1,8 +1,8 @@
 /* T173_race_smoke.h - RaceSmoke, the tyre smoke / dust particles of a race
  * (translation unit T173, unit u058), 0x001A45A8..0x001A6138.
  *
- * 256 particles of 0x40 bytes in one memalign'ed block, on two lists
- * (active, free) linked by s16 indices.  RacePS2Base holds it (+0xBC30,
+ * 256 particles (PC: 1024, below) of 0x40 bytes in one memalign'ed block,
+ * on two lists (active, free) linked by s16 indices.  RacePS2Base holds it (+0xBC30,
  * T130) and hands the course a pointer (RaceCourse::smoke, T153);
  * RacePS2Base::virtual_8 resets it and gives it the course's smoke texture
  * (CourseData::smokeTex) and environment (CourseData::env, T178: 16 smoke
@@ -27,6 +27,9 @@
  *
  * Names: u058's (u044 / u045 / u050 used the same ones for what they
  * declared: reset, setTexture, update, render, draw, emit, texture, env).
+ *
+ * PC (ROADMAP 35): 1024 particles (T173's SMOKE_PARTICLES; 0x10000 bytes),
+ * not 256: the wheels of a race of up to 32 cars emit into them.
  */
 #ifndef GAME_T173_RACE_SMOKE_H
 #define GAME_T173_RACE_SMOKE_H
@@ -61,7 +64,7 @@ struct SmokeParticle {
 };
 EGCS_SIZE(SmokeParticle, 0x40);
 
-/* A visible particle (draw's stack array, 256), 0x10 bytes. */
+/* A visible particle (draw's stack array, 256; PC: 1024), 0x10 bytes. */
 struct SmokeVis {
     Vec3 pos;                               /* 0x0 view space */
     int  index;                             /* 0xC of RaceSmoke::particles */
@@ -84,8 +87,8 @@ public:
     RaceSmoke();                            /* 0x001A45A8 */
     /* Frees the particle block. */
     ~RaceSmoke();                           /* 0x001A45E8 */
-    /* No active particle, the free list 0 .. 255, the emission counters
-     * cleared, the VU0 random seed 0.1.  Callers: RacePS2Base::virtual_8,
+    /* No active particle, the free list 0 .. 255 (PC: 1023), the emission
+     * counters cleared, the VU0 random seed 0.1.  Callers: RacePS2Base::virtual_8,
      * gt2k_menu::LoggerControl::runPage (T055), the constructor. */
     void reset();                           /* 0x001A4630 */
     /* NULL: nothing is drawn.  Caller: RacePS2Base::virtual_8. */
@@ -140,7 +143,7 @@ public:
     /* Quicksort of v[lo..hi] by the view z, ascending (the farthest first). */
     void sortByDepth(SmokeVis *v, int lo, int hi);      /* 0x001A5FB8 */
 
-    SmokeParticle *particles;               /* 0x00 [256] (memalign 0x40, 0x4000 bytes) */
+    SmokeParticle *particles;               /* 0x00 [256] (memalign 0x40, 0x4000 bytes; PC: [1024], 0x10000) */
     s16            activeHead;              /* 0x04 -1: none */
     s16            freeHead;                /* 0x06 -1: none */
     u32            emitCount[11];           /* 0x08 per smoke type: counts the emissions, wraps after

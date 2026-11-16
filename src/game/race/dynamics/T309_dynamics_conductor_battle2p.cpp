@@ -15,6 +15,7 @@
 #include "game/race/dynamics/dynamics_conductor_internal.h"
 #include "game/race/dynamics/T309_dynamics_conductor_battle2p.h"
 #include "game/race/modes/race_pod_rules.h"  /* pod_rules_lap_check (the enhanced engine's Pod race) */
+#include "game/app/pc_course_pick.h"        /* PC: pc_race_laps */
 // DATA_START 0x0033CD00
 
 // FUNC 0x001EFFD0 DynamicsConductorBattle2P::DynamicsConductorBattle2P
@@ -64,7 +65,7 @@ int DynamicsConductorBattle2P::getSpecialStart(int car, int *startType, int *sta
 /* The battle's lap count. */
 int DynamicsConductorBattle2P::virtual_29()
 {
-    return org->option.splitBattle.raceLaps;
+    return pc_race_laps(org, org->option.splitBattle.raceLaps);    /* PC: the lap forcer's (game/app/pc_course_pick.h) */
 }
 
 // FUNC 0x001F0098 DynamicsConductorBattle2P::SetSlowCarBoostParameters

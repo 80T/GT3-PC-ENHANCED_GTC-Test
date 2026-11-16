@@ -20,14 +20,18 @@
  * the last line.  GT3PC_PREWARM=0: no worker (everything decoded at the
  * draw). */
 #include "engine/pgl/native/pgl_d3d.h"
+#include "engine/pgl/native/pgl_render.h"   /* PC (2026-11-07): registry_cache_bytes, models_cache_bytes */
 
 #include <atomic>
 #include <cstdlib>
 #include <deque>
+#include <exception>
+#include <new>
 
 #include <windows.h>
 
 #include "platform/log.h"
+#include "platform/memstat.h"               /* PC (2026-11-07): the memory line */
 
 namespace pglr {
 namespace pre {
@@ -63,6 +67,39 @@ void report(double ms)
     pclog::write("pgl: decoded ahead %u models (%.1f MB) and %u textures (%.1f MB) in %.0f ms; since the last"
                  " line the draws took %u models and %u textures decoded ahead, decoded %u models and %u Tex1"
                  " textures themselves", m, (double)mb / 1048576.0, t, (double)tb / 1048576.0, ms, mt, tt, ml, tl);
+    /* PC (2026-11-07): the process's memory after a load (platform/
+     * memstat.h: the address space ran out in a long session) and the
+     * caches' decoded bytes */
+    char mem[256];
+    memstat::line(mem, sizeof(mem), true);
+    pclog::write("pgl: memory: %s; the caches: textures %u MB, meshes %u MB", mem,
+                 (unsigned)(registry_cache_bytes() >> 20), (unsigned)(models_cache_bytes() >> 20));
+}
+
+/* PC (2026-11-07): a job's run.  Out of memory (std::bad_alloc from a
+ * decode's buffers: the crash of 2026-11-07, 4071 MB of the 4096 in use) or
+ * any other exception, the job is dropped - what it would have made is
+ * decoded at the draw as before - and logged once each. */
+void run_job(Job *job)
+{
+    try {
+        job->run();
+    } catch (const std::bad_alloc &) {
+        static bool said;
+        if (!said) {
+            said = true;
+            char mem[256];
+            memstat::line(mem, sizeof(mem), true);
+            pclog::write("pgl: the decoding worker ran out of memory (%s): the job dropped, its models or textures"
+                         " decoded at the draw; the next ones quietly", mem);
+        }
+    } catch (const std::exception &e) {
+        static bool said;
+        if (!said) {
+            said = true;
+            pclog::write("pgl: the decoding worker's job failed (%s): dropped; the next ones quietly", e.what());
+        }
+    }
 }
 
 DWORD WINAPI worker(void *)
@@ -86,7 +123,7 @@ DWORD WINAPI worker(void *)
         ReleaseSRWLockExclusive(&g_lock);
         if (burst < 0.0)
             burst = seconds();
-        job->run();
+        run_job(job);
         delete job;
     }
 }

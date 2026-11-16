@@ -8,6 +8,7 @@
 #include "game/data/race_database_internal.h"
 #include "game/data/T485_car_color.h"
 #include "engine/io/T502_file_resolve.h"            /* PC: file_size_retry (the buffer's size) */
+#include "game/app/pc_param_db.h"                   /* PC: pc_common_db_file (database/common.sqlite3) */
 
 /* PC: the buffer size retail used, kept as the smallest. */
 #define CAR_COLOR_BUFFER_MIN 0x32000
@@ -47,9 +48,18 @@ CarColorDataBase::~CarColorDataBase()
 int CarColorDataBase::load()
 {
     int size;
+    void *buf;
 
     if (db != NULL)
         free(db);
+    /* PC: both built from database/common.sqlite3 when converted
+     * (game/app/pc_param_db.h), in loadFiles' layout */
+    buf = pc_common_db_file(PC_COMMON_CAR_COLORS);
+    if (buf != NULL) {
+        db      = (CarColorHeader *)buf;
+        strings = (StringsDataBase *)((u8 *)buf + ((db->size + 0x3F) & ~0x3F));
+        return 1;
+    }
     size = car_color_file_size("database/carcolor.db") + car_color_file_size("database/carcolor.sdb");
     if (size < CAR_COLOR_BUFFER_MIN)
         size = CAR_COLOR_BUFFER_MIN;

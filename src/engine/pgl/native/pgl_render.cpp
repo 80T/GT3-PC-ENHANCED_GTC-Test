@@ -27,6 +27,7 @@
 #include "platform/frame_monitor.h"
 #include "platform/gpu.h"
 #include "platform/log.h"
+#include "platform/sample_prof.h"          /* PC: GT3PC_SAMPLE */
 
 namespace pglr {
 
@@ -42,6 +43,7 @@ void *CmdList::add(CmdType t, size_t bytes)
     data_.resize(at + total);
     data_[at] = (uint8_t)t;
     offs_.push_back((uint32_t)at);
+    keys_.push_back(0);                     /* PC: (set_last_key: the resolved runs' structure keys) */
     return &data_[at + 16];
 }
 
@@ -262,8 +264,45 @@ void pglr_set_menu_aspect(float aspect)
     g_menuAspect = aspect > 0.0f ? aspect : 0.0f;
 }
 
+/* PC (2026-11-13): the blocks of the buffers the game freed and has not
+ * allocated again (pglr_buffer_freed / _alloc; the recording thread's). */
+static std::vector<uint32_t> g_freedBlocks;
+
+void pglr_buffer_freed(uint32_t baseBlock)
+{
+    for (uint32_t b : g_freedBlocks)
+        if (b == baseBlock)
+            return;
+    if (g_freedBlocks.size() < 1024)
+        g_freedBlocks.push_back(baseBlock);
+}
+
+void pglr_buffer_alloc(uint32_t baseBlock)
+{
+    for (size_t i = 0; i < g_freedBlocks.size(); i++) {
+        if (g_freedBlocks[i] == baseBlock) {
+            g_freedBlocks[i] = g_freedBlocks.back();
+            g_freedBlocks.pop_back();
+            return;
+        }
+    }
+}
+
 void pglr_end_frame(void)
 {
+    /* PC (2026-11-13): the buffers freed in the frame (and still free), after
+     * everything that drew into or read them */
+    for (uint32_t b : g_freedBlocks) {
+        CmdTarget *c = (CmdTarget *)g_frame.add(CMD_TARGET, sizeof(CmdTarget));
+        c->base = b;
+        c->fbw = 0;
+        c->psm = 0;
+        c->w = -1;
+        c->h = -1;
+        c->dx = 0.0f;
+        c->dy = 0.0f;
+    }
+    g_freedBlocks.clear();
     /* PC: a frame without a race view of its own: the menus' stretch, if on */
     if (g_frameAspect <= 0.0f && g_menuAspect > 0.0f)
         g_frameAspect = g_menuAspect;
@@ -313,8 +352,21 @@ static void execute_frame(void);
 static DWORD WINAPI exec_thread_main(void *)
 {
     t_execThread = true;
+    sample_prof::register_thread("executor");  /* PC: GT3PC_SAMPLE (platform/sample_prof.h) */
+    /* Debug aid: GT3PC_TEX_STRESS thread - each list starts 0 .. 8 ms late,
+     * the game thread running on meanwhile: whatever the list reads of the
+     * game's memory has that much longer to change before it is read (a
+     * texture uploaded from bytes the game had moved on from) */
+    const bool jitter = stress_on("thread");
+    if (jitter)
+        pclog::write("pgl: GT3PC_TEX_STRESS; thread: each frame's list starts 0 .. 8 ms late");
+    uint32_t seed = 0x2545F491u;
     for (;;) {
         WaitForSingleObject(g_execStart, INFINITE);
+        if (jitter) {
+            seed = seed * 1664525u + 1013904223u;
+            Sleep((seed >> 16) % 9);
+        }
         {
             fpu::DefaultFpuMode fpuMode;
             execute_frame();
@@ -414,6 +466,11 @@ static void exec_start(void)
 
 void pglr_kick(void)
 {
+    static thread_local bool sampled = false;   /* PC: the recording thread (GT3PC_SAMPLE) */
+    if (!sampled) {
+        sampled = true;
+        sample_prof::register_thread("game (recording)");
+    }
     exec_wait();                            /* (the frame before done) */
     if (!g_readyValid)
         return;
@@ -524,6 +581,12 @@ void pglr_sync(void)
     exec_wait();                            /* PC: the executor thread (the PS2's DMA) done */
 }
 
+void pglr_target_stats(int *alive, unsigned *created, unsigned *reused, unsigned *retired)
+{
+    exec_wait();
+    target_stats(alive, created, reused, retired);
+}
+
 void pglr_display(uint32_t fbBlock, uint32_t psm, uint32_t fbw, int dx, int dy, int dw, int dh)
 {
     exec_wait();
@@ -563,6 +626,8 @@ void pglr_regs(uint64_t mask, const uint64_t *reg, const uint64_t *gen)
     c->mask = mask;
     memcpy(c->reg, reg, sizeof(c->reg));
     memcpy(c->gen, gen, sizeof(c->gen));
+    c->key = cmd_regs_key(mask, reg, gen);  /* PC: (the resolved runs' key, worked out here) */
+    g_rec->set_last_key(c->key);
 }
 
 void pglr_ad(uint32_t gsReg, uint64_t value)
@@ -570,6 +635,7 @@ void pglr_ad(uint32_t gsReg, uint64_t value)
     CmdAd *c = (CmdAd *)g_rec->add(CMD_AD, sizeof(CmdAd));
     c->addr = gsReg;
     c->value = value;
+    g_rec->set_last_key(cmd_ad_key(gsReg, value));    /* PC (2026-11-06): (the resolved runs' key, worked out here) */
 }
 
 void pglr_target(uint32_t baseBlock, uint32_t fbw, uint32_t psm, int width, int height)
@@ -580,6 +646,21 @@ void pglr_target(uint32_t baseBlock, uint32_t fbw, uint32_t psm, int width, int 
     c->psm = psm;
     c->w = width;
     c->h = height;
+    c->dx = 0.0f;
+    c->dy = 0.0f;
+}
+
+/* PC (2026-11-14): pgl_bridge.h */
+void pglr_target_detail(uint32_t baseBlock, int width, int height, float dx, float dy)
+{
+    CmdTarget *c = (CmdTarget *)g_rec->add(CMD_TARGET, sizeof(CmdTarget));
+    c->base = baseBlock;
+    c->fbw = 0;
+    c->psm = 0;
+    c->w = width;
+    c->h = height;
+    c->dx = dx > 0.0f ? dx : 1.0f;
+    c->dy = dy > 0.0f ? dy : 1.0f;
 }
 
 void pglr_prim(uint32_t prim, const pgl::prim::GsVertex *v, int n, uint32_t flags)
@@ -645,6 +726,9 @@ void pglr_model_part(const PglrVu1 *vu, const PglrModelPart *part, uint32_t flag
     c->vu = *vu;
     c->part = *part;
     c->flags = flags;
+    c->pad = 0;
+    c->key = cmd_model_key(*vu, *part, flags);  /* PC: (the resolved runs' key, worked out here) */
+    g_rec->set_last_key(c->key);
 }
 
 void pglr_upload(uint32_t dbp, uint32_t dbw, uint32_t dpsm, int dx, int dy, int w, int h, const void *data,
@@ -679,20 +763,28 @@ void pglr_tex1_upload(const void *tex1Image, int immediate)
     if (immediate) {
         exec_wait();                        /* PC: (the registry: the executor thread's) */
         fpu::DefaultFpuMode fpuMode;
-        registry_tex1_upload(tex1Image, base);
+        registry_tex1_upload(tex1Image, base, nullptr);
         return;
     }
-    CmdTex1 *c = (CmdTex1 *)g_rec->add(CMD_TEX1_UPLOAD, sizeof(CmdTex1));
+    /* PC: the set's header and tables as they are now, with the base (the
+     * executor reads them a frame later; the game relinks them in place) */
+    const size_t n = registry_tex1_copy_size(tex1Image);
+    CmdTex1 *c = (CmdTex1 *)g_rec->add(CMD_TEX1_UPLOAD, sizeof(CmdTex1) + n);
     c->img = tex1Image;
     c->vramBase = base;
+    c->copyBytes = (uint32_t)n;
+    registry_tex1_copy(tex1Image, c + 1);
 }
 
 void pglr_texture_source(const void *tex1Image, uint32_t vramBase, uint64_t tex0)
 {
-    CmdTexSource *c = (CmdTexSource *)g_rec->add(CMD_TEX_SOURCE, sizeof(CmdTexSource));
+    const size_t n = registry_tex1_copy_size(tex1Image);   /* (as pglr_tex1_upload's) */
+    CmdTexSource *c = (CmdTexSource *)g_rec->add(CMD_TEX_SOURCE, sizeof(CmdTexSource) + n);
     c->img = tex1Image;
     c->vramBase = vramBase;
     c->tex0 = tex0;
+    c->copyBytes = (uint32_t)n;
+    registry_tex1_copy(tex1Image, c + 1);
 }
 
 void pglr_tex1_loaded(void *tex1Image)
@@ -709,6 +801,11 @@ void pglr_model_written(const void *model)
 void pglr_model_loaded(const void *model)
 {
     models_loaded(model);
+}
+
+void pglr_modelset_loaded(const void *const *packets, int n)
+{
+    models_set_loaded(packets, n);
 }
 
 static bool g_nextReadbackFlare;            /* pglr_readback_flare */

@@ -1,7 +1,7 @@
 # Build output
 /build/
 
-# Downloaded by the build (cmake/sdl3.cmake)
+# Downloaded by the build (cmake/sdl3.cmake, cmake/sqlite.cmake)
 /third_party/
 
 # The user's game data (never shipped)
@@ -9,6 +9,8 @@
 gt3.vol
 memcard1/
 memcard2/
+/saves/
+/screenshots/
 *.log
 
 # What the diagnostics write (diag\*.cmd)

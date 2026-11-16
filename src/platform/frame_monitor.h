@@ -61,12 +61,12 @@ void output_begin();
 void present_begin();
 /* The GPU sections (verbose): their names (n at most kGpuSections), and
  * frame seq's ms in each, once its queries are read. */
-constexpr int kGpuSections = 12;
+constexpr int kGpuSections = 14;
 void gpu_section_names(const char *const *names, int n);
 void gpu_sections(uint32_t seq, const float *ms, int n);
 /* The renderer's CPU profile of the execution (verbose): the kinds' and
  * the counts' names, and the frame being timed's ms by kind and counts. */
-constexpr int kExecKinds = 20, kExecCounts = 18;
+constexpr int kExecKinds = 20, kExecCounts = 80;    /* PC (2026-11-05): 80 - the renderer's counts passed 48 (pgl_render.h PCOUNT_N) */
 void exec_profile_names(const char *const *kinds, int nKinds, const char *const *counts, int nCounts);
 void exec_profile(const float *ms, int nKinds, const uint32_t *counts, int nCounts);
 /* The renderer's D3D thread's busy time in the frame being timed (ms; below
@@ -74,6 +74,10 @@ void exec_profile(const float *ms, int nKinds, const uint32_t *counts, int nCoun
  * execution or out of it, the presentation's), shown apart from EXECUTE's
  * profile (it runs alongside). */
 void exec_d3d_thread(float busyMs, float waitMs);
+/* PC (2026-11-05): the renderer's submit thread's busy time in the frame
+ * being timed (ms; below 0: the frame did not pipeline) and the executor's
+ * time waiting for it (its ring full, the frame's end), shown apart. */
+void exec_submit_thread(float busyMs, float waitMs);
 /* The renderer's executor thread's busy time (ms) for the frame being
  * timed: it runs the frame's list while the game thread runs the next
  * ticks and records the next frame (EXECUTE is then the game thread's wait

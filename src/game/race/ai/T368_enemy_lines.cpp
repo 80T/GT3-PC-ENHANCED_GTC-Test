@@ -10,6 +10,7 @@
 #include "game/race/core/T153_race_course.h"
 #include "game/race/ai/T368_enemy_lines.h"
 #include "game/race/ai/enemy_lines_internal.h"
+#include "game/app/pc_course_scale.h"       /* PC: pc_course_scale_lines */
 
 /* The order lines_prepare works through the lines (the racing line first:
  * line 4 needs its sectors); retail's .sdata (-G8). */
@@ -274,6 +275,10 @@ int lines_prepare(CourseLines *cl)
                     *slot = NULL;
             }
         }
+        /* PC: on a scaled course the lines converted and scaled there; the
+         * loop below takes them as converted (game/app/pc_course_scale.h) */
+        if (pc_course_scale_lines(cl->course->data, file) != 0)
+            raw = 0;
     }
 
     /* the sectors are cached: some node of some line has one */

@@ -36,9 +36,9 @@ namespace audio {
 namespace {
 
 constexpr int kRate = 48000;                    /* the SPU2's rate */
-constexpr float kMasterGain = 0.63f;            /* -4 dB */
+constexpr float kMasterGain = 0.63f;            /* -4 dB: the game's sound (not the music files) */
 constexpr float kDcPole = 0.9995f;              /* DC blocker pole: -3 dB at ~3.8 Hz */
-constexpr float kLimit = 0.891f;                /* the limiter's ceiling: -1 dBFS */
+constexpr float kLimit = 1.0f;                  /* the limiter's ceiling: 0 dBFS (a music file alone: untouched) */
 constexpr float kLimitRelease = 2.08e-4f;       /* its gain back to 1 per sample: 100 ms (1 - e^(-1/4800)) */
 constexpr int kNoDeviceStepMs = 5;              /* without a device: the render's pace */
 constexpr ULONGLONG kRetryMs = 2000;            /* without a device: the next try */
@@ -150,10 +150,15 @@ struct Stage {
             return;
         }
         snd_native_render(out, frames, now);
+        /* the game's sound at the master gain, the music files after it at
+         * their own level (straight) */
+        for (int i = 0; i < 2 * frames; i++)
+            out[i] *= kMasterGain;
+        snd_native_render_music(out, frames);
         for (int i = 0; i < frames; i++) {
             float lr[2];
             for (int c = 0; c < 2; c++) {
-                const float x = out[2 * i + c] * kMasterGain;
+                const float x = out[2 * i + c];
                 const float y = x - x1[c] + kDcPole * y1[c];
                 x1[c] = x;
                 y1[c] = y;

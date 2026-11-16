@@ -1,6 +1,7 @@
 /* crash.cpp - the crash report of GT3 PC (crash.h). */
 #include "platform/crash.h"
 #include "platform/log.h"
+#include "platform/memstat.h"               /* PC (2026-11-07): the memory line */
 #include "platform/scheduler.h"
 
 #include <windows.h>
@@ -91,8 +92,12 @@ void write_dump(EXCEPTION_POINTERS *ep)
     MINIDUMP_TYPE type = (MINIDUMP_TYPE)(MiniDumpWithIndirectlyReferencedMemory | MiniDumpWithDataSegs |
                                          MiniDumpWithThreadInfo | MiniDumpWithUnloadedModules);
     BOOL ok = MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), f, type, &mei, nullptr, nullptr);
+    const DWORD err = ok ? 0 : GetLastError();
     CloseHandle(f);
-    pclog::write(ok ? "crash: minidump written to %s" : "crash: could not write %s", path);
+    if (!ok)
+        DeleteFileA(path);                  /* PC (2026-11-07): no empty file left (an out-of-memory crash leaves none) */
+    pclog::write(ok ? "crash: minidump written to %s" : "crash: could not write %s (error 0x%08X; Windows keeps its own"
+                      " in %%LOCALAPPDATA%%\\CrashDumps)", path, (unsigned)err);
 }
 
 LONG WINAPI on_crash(EXCEPTION_POINTERS *ep)
@@ -103,14 +108,30 @@ LONG WINAPI on_crash(EXCEPTION_POINTERS *ep)
     const CONTEXT *c = ep->ContextRecord;
     char where[512];
 
-    pclog::write("crash: exception 0x%08X at 0x%08X, game thread %d (Windows thread %u)",
-                 (unsigned)er->ExceptionCode, (unsigned)(uintptr_t)er->ExceptionAddress,
-                 sched::current_thread(), (unsigned)GetCurrentThreadId());
+    /* PC (2026-11-07): a native thread named so (current_thread is 0 there:
+     * the decoding worker's crash read "game thread 0"); a C++ exception
+     * (0xE06D7363: a throw nobody caught, std::bad_alloc from new mostly)
+     * named; the memory, which an out-of-memory crash leaves no dump of */
+    const int gameThread = sched::current_thread();
+    char who[48];
+    if (gameThread != 0)
+        snprintf(who, sizeof(who), "game thread %d", gameThread);
+    else
+        snprintf(who, sizeof(who), "a native thread");
+    pclog::write("crash: exception 0x%08X at 0x%08X, %s (Windows thread %u)",
+                 (unsigned)er->ExceptionCode, (unsigned)(uintptr_t)er->ExceptionAddress, who,
+                 (unsigned)GetCurrentThreadId());
     if (er->ExceptionCode == EXCEPTION_ACCESS_VIOLATION && er->NumberParameters >= 2)
         pclog::write("crash: %s address 0x%08X",
                      er->ExceptionInformation[0] == 0 ? "reading" :
                      er->ExceptionInformation[0] == 8 ? "executing" : "writing",
                      (unsigned)er->ExceptionInformation[1]);
+    if (er->ExceptionCode == 0xE06D7363u)
+        pclog::write("crash: a C++ exception nobody caught (std::bad_alloc from new when the memory is out:"
+                     " tools\\crashdump.py names the type)");
+    char mem[256];
+    memstat::line(mem, sizeof(mem), false);
+    pclog::write("crash: memory: %s", mem);
     pclog::write("crash: eax %08X ebx %08X ecx %08X edx %08X esi %08X edi %08X ebp %08X esp %08X eip %08X",
                  (unsigned)c->Eax, (unsigned)c->Ebx, (unsigned)c->Ecx, (unsigned)c->Edx,
                  (unsigned)c->Esi, (unsigned)c->Edi, (unsigned)c->Ebp, (unsigned)c->Esp, (unsigned)c->Eip);

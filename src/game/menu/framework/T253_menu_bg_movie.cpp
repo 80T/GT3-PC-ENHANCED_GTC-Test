@@ -55,6 +55,10 @@ static int s_moviePhase;
  * frame (-1: not counting yet). */
 static s64 s_pcMovieTick = -1;
 
+/* PC: the frame last uploaded was one the GPU decoded (docs/movies.md "MP4
+ * movies"): its pictures are textures, drawn at their own size. */
+static int s_pcGpuFrame;
+
 static int pc_movie_paced(double rate)
 {
     const double d = rate - 30000.0 / 1001.0;
@@ -203,6 +207,33 @@ f32 MenuBgMovie::fieldOffset() const
     return s_moviePhase != 0 ? 0.25f : -0.25f;
 }
 
+/* PC (no original): the movie's texture, not VRAM's, for this picture: the
+ * renderer shows the frame's half (s_moviePhase, as the other halves), a
+ * square of texels over all of it.  TCC 0: the movie is opaque, its alpha the
+ * vertices' (the texture's reads 1.0, twice the GS's). */
+void MenuBgMovie::uploadGpu()
+{
+    gs_flush_dirty_regs();
+    gfx_texflush();
+    gfx_set_texture_buffer(0, GT3M_MOVIE_TBP << 6, PSM_CT32, 0);
+    gfx_set_texture_size(GT3M_MOVIE_SIDE, GT3M_MOVIE_SIDE);
+    gfx_set_texture_region(PGL_REGION_U, 0, GT3M_MOVIE_SIDE - 1);
+    gfx_set_texture_region(PGL_REGION_V, 0, GT3M_MOVIE_SIDE - 1);
+    gfx_tex_param(PGL_TEXPARAM_WMS, PGL_WRAP_CLAMP);
+    gfx_tex_param(PGL_TEXPARAM_WMT, PGL_WRAP_CLAMP);
+    gfx_tex_param(PGL_TEXPARAM_TFX, PGL_TFX_MODULATE);
+    gfx_tex_param(PGL_TEXPARAM_MXL, 0);
+    gfx_tex_param(PGL_TEXPARAM_TCC, 0);
+    gfx_tex_param(PGL_TEXPARAM_MMIN, PGL_FILTER_LINEAR);
+    gfx_tex_param(PGL_TEXPARAM_MMAG, PGL_FILTER_LINEAR);
+    uploaded = 1;
+}
+
+int MenuBgMovie::gpuFrame() const
+{
+    return s_pcGpuFrame;
+}
+
 /* Progressive: uploads the whole frame (bilinear). */
 // FUNC 0x001CD048 MenuBgMovie::uploadFrame
 void MenuBgMovie::uploadFrame()
@@ -233,6 +264,12 @@ void MenuBgMovie::uploadFrame()
 // FUNC 0x001CD168 MenuBgMovie::upload
 void MenuBgMovie::upload()
 {
+    /* PC: a frame the GPU decoded has no pixels to upload */
+    s_pcGpuFrame = gt3m_movie_gpu_show(lastFrame, s_moviePhase != 0 ? 0 : 1);
+    if (s_pcGpuFrame != 0) {
+        uploadGpu();
+        return;
+    }
     /* PC: an MP4 movie's frame is two pictures 1 / 59.94 s apart, stacked
      * (docs/movies.md "MP4 movies"): shown half by half as an interlaced
      * movie's fields are, on alternate updates, without the fields' line
@@ -265,6 +302,8 @@ void MenuBgMovie::release()
         buf.freeVram();
         uploaded = 0;
     }
+    if (s_pcGpuFrame != 0)                  /* PC: as gfx_set_texture_buffer leaves it */
+        gfx_tex_param(PGL_TEXPARAM_TCC, 1);
 }
 
 /* Once a frame, on field 1 (display state PGL_FIELD_HALF_ODD) only: gives
@@ -305,8 +344,10 @@ void MenuBgMovie::update()
                 F_0025CFC0(0, MOVIE_TIME_MAX);
             }
         }
-        if (frame != NULL)
+        if (frame != NULL) {
             lastFrame = frame;
+            gt3m_movie_gpu_taken(frame);    /* PC */
+        }
         return;
     }
 
@@ -331,8 +372,10 @@ void MenuBgMovie::update()
                 F_0025CFC0(0, MOVIE_TIME_MAX);
         }
     }
-    if (frame != NULL)
+    if (frame != NULL) {
         lastFrame = frame;
+        gt3m_movie_gpu_taken(frame);        /* PC: the pictures before it are free */
+    }
 }
 
 /* Starts file (from the preloaded copy when it is that file: then without

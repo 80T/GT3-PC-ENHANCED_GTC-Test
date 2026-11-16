@@ -106,6 +106,8 @@ void DynamicsConductor::licenseCheckStop(RaceCarState *car)
 
     if (st->finished != 0)
         return;
+    if (pcFaultsBeforeControl(car) != 0)
+        return;                             /* PC: no fault before the player has the car */
     if (st->fault & 2) {
         licenseFailed(car, 3);
         return;
@@ -125,4 +127,19 @@ void DynamicsConductor::licenseCheckStop(RaceCarState *car)
         car_sector_end(car, sector, time, org->loggerCreating);
     }
     licenseFinished(car, time);
+}
+
+/* PC (no original): T305_dynamics_conductor.h.  The computer's cars (a
+ * demonstration's too) as the original. */
+int DynamicsConductor::pcFaultsBeforeControl(RaceCarState *car)
+{
+    DynCarState *st = &car->st;
+    RaceOrganization *o = org;
+
+    if (st->driver != DRIVER_PAD)
+        return 0;
+    if (st->ctrlMode == CTRL_DRIVER && o->startFlag == 0 && o->countDown == 0)
+        return 0;
+    DynCar_clearFaults(car);
+    return 1;
 }

@@ -34,10 +34,14 @@ public:
 
     void setIpic(Ipic *pic);                /* 0x001CBFC8 decodes pic into a new menu-heap buffer
                                                (NULL: no picture) */
+    int  setStill(int slot, const char *name);  /* PC: a still of game/app/pc_still.h in place of the
+                                               picture: 1, or 0 and no picture */
     void movieUV(PrimUV *uv);               /* 0x001CC068 the texture coordinates of the movie frame */
     void ipicUV(PrimUV *uv, int w, int h);  /* 0x001CC140 those of a w x h picture */
     void drawIpic();                        /* 0x001CC288 uploads the picture to a temporary GSBuffer
                                                and draws it */
+    void drawMovie(f32 qw, f32 qh, u32 colorMask);  /* PC: the movie frame, qw x qh about the item's centre */
+    void drawStill(f32 qw, f32 qh, u32 colorMask);  /* PC: the still, the same way */
     void setMirror(int on);                 /* 0x001CC588 */
     void setUVRect(f32 u, f32 v, f32 w, f32 h); /* 0x001CC590 */
 
@@ -49,6 +53,7 @@ public:
     void *pixels;                           /* 0x114 the decoded picture (menu heap), NULL: none */
     int   picWidth;                         /* 0x118 */
     int   picHeight;                        /* 0x11C */
+    int   pcStill;                          /* PC: its slot + 1, 0: none */
 };
 
 /* The inline accessors 0x001CC588..0x001CC590: no callers, the users expand them; defined

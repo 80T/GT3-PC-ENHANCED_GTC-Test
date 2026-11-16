@@ -35,11 +35,13 @@
  * interpolation; L / R to the first two channels).
  *
  * Output stage (48 kHz float): a master gain (-4 dB, as PCSX2 scales the
- * SPU2's output), a DC blocker at ~4 Hz (the console's analog output is
- * AC-coupled) and a peak limiter at -1 dBFS (instant attack, 100 ms
- * release): the engine mixes without the SPU2's 16-bit clamps (headroom), so
- * a loud pile-up is turned down, not clipped; then, with kernel streaming,
- * the Windows volumes (glided over ~4 ms).
+ * SPU2's output) on the game's sound; the music files (snd_native_render_
+ * music: a .wav / .mp3 BGM) added after it at their own level, straight, as
+ * Windows plays them; a DC blocker at ~4 Hz (the console's analog output is
+ * AC-coupled) and a peak limiter at 0 dBFS (instant attack, 100 ms release:
+ * a music file alone passes untouched): the engine mixes without the SPU2's
+ * 16-bit clamps (headroom), so a loud pile-up is turned down, not clipped;
+ * then, with kernel streaming, the Windows volumes (glided over ~4 ms).
  *
  * Debug: with the environment variable GT3PC_AUDIO_DUMP=<file.wav> every
  * mixed sample (after the output stage, 48 kHz 16-bit) is also written to

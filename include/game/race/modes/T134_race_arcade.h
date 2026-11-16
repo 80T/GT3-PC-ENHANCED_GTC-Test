@@ -17,6 +17,7 @@
 
 #include "game/game.h"
 #include <stddef.h>                         /* size_t */
+#include "game/race/race_cars.h"            /* PC: PC_RACE_CARS_MAX */
 #include "game/race/modes/T133_race_single_player.h"   /* bases RaceSinglePlayer, RaceSinglePlayerInformation */
 #include "game/car/model/T184_car_icon_maker.h"       /* CarIcon (held by value) */
 #include "game/menu/records/T117_result_arcade.h"        /* ResultArcade (held by value) */
@@ -73,7 +74,7 @@ public:
      * board and to the race display (RaceDisplay +0x1C). */
     virtual void virtual_43();                              /* [43] +0x164 0x00182550 */
 
-    CarIcon      icons[7];                  /* 0x16EC0 one per car */
+    CarIcon      icons[PC_RACE_CARS_MAX];   /* 0x16EC0 one per car (PC: was 7; game/race/race_cars.h) */
     ResultArcade resultArcade;              /* 0x2509C */
     RacePause    pause;                     /* 0x259E8 */
     ReplayPause  replayPause;               /* 0x25C94 (mode 0) */

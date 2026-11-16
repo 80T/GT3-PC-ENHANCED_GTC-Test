@@ -190,7 +190,8 @@ enum {
     GS_PRIM_ABE            = 0x040,
     GS_PRIM_AA1            = 0x080,
     GS_PRIM_FST            = 0x100,
-    GS_PRIM_CTXT2          = 0x200
+    GS_PRIM_CTXT2          = 0x200,
+    GS_PRIM_FULL_COLOR     = 0x800          /* PC: pgl_state_prim.h PRIM_FULL_COLOR */
 };
 #define GS_PRIM_UNTEXTURED(attr, type)  ((u16)(((attr) | (type)) & ~GS_PRIM_TME))
 

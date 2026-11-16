@@ -17,6 +17,9 @@ namespace gpu {
 bool init(HWND window);
 ID3D11Device *device();
 ID3D11DeviceContext *context();
+/* PC (2026-11-07): the device's adapter (nullptr before init): the memory
+ * line's DXGI query (platform/memstat.h). */
+IDXGIAdapter *adapter();
 /* A function run first whenever the context or the swap chain is used
  * through here (context, backbuffer, screen_backbuffer, present): the
  * renderer's D3D thread runs what it has queued (engine/pgl/native/
@@ -29,6 +32,11 @@ void set_context_guard(void (*guard)());
  * the swap chain. */
 ID3D11RenderTargetView *backbuffer();
 void backbuffer_size(int *w, int *h);
+/* The fullscreen mode out of exclusive fullscreen, borderless, for a window
+ * that must show over the game (a Windows box hides behind exclusive
+ * fullscreen; platform/file_alert.h): before the first frame, on the game
+ * thread.  The next frame's backbuffer() takes it again. */
+void leave_fullscreen();
 
 /* Screens (multi-monitor; docs/renderer.md "Screens").  Screen 0 is the game
  * window's; the extra screens are borderless windows over other monitors

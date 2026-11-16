@@ -108,7 +108,8 @@ void DynamicsConductor::virtual_1()
 {
     int i;
 
-    for (i = 7; i >= 0; i--)
+    /* PC: PC_RACE_CARS_MAX - 1 (was 7), the whole of order[] (game/race/race_cars.h) */
+    for (i = PC_RACE_CARS_MAX - 1; i >= 0; i--)
         order[i] = -1;
     for (i = 0; i < carCount; i++) {
         getCar(i)->st.rank = i + 1;

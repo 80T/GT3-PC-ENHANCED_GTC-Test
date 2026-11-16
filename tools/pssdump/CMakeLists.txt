@@ -45,6 +45,12 @@ add_executable(pssgame
     ${GT3PC}/src/platform/log.cpp
     ${GT3PC}/src/platform/disc.cpp
     ${GT3PC}/src/platform/host_file.cpp
+    # (PC 2026-11-14: host_file and paths read a disc image's volume too)
+    ${GT3PC}/src/platform/disc_image.cpp
+    ${GT3PC}/src/launcher/iso9660.cpp
+    ${GT3PC}/src/launcher/volume.cpp
+    ${GT3PC}/src/launcher/inflate.cpp
+    ${GT3PC}/src/launcher/util.cpp
     ${GT3PC}/src/platform/paths.cpp
     ${GT3PC}/src/platform/audio.cpp)
 target_include_directories(pssgame PRIVATE ${GT3PC}/include ${GT3PC}/src)

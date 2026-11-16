@@ -48,6 +48,8 @@ struct MusicPlayList {
     void orderStraight();                   /* 0x0021AD38 order = table order */
     void orderShuffle();                    /* 0x0021AD90 a random order from seed */
     MusicEntry *next();                     /* 0x0021AEE8 the next song to play */
+    MusicEntry *nextThere();                /* PC: next(), past the songs whose files are not there */
+    MusicEntry *entryOfTrack(u32 index);    /* PC: the entry of track `index' of group 0x14, NULL none */
     /* PC (ROADMAP 18) */
     MusicEntry *entryAt(u32 i);             /* entry i: entries[] or the heap (grown to i) */
     int  clampCount();                      /* count to the 64 entries[] (GameOptions::load); 1 if clamped */

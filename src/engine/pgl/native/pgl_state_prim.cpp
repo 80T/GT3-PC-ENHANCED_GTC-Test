@@ -123,8 +123,8 @@ Batch texturedSprite(const PrimCtx &c, int x0, int y0, int x1, int y1, int u0, i
     uint64_t uv1 = (uint64_t)(int64_t)(int32_t)(((uint32_t)v1 << 16) | ((uint32_t)u1 & 0xFFFF)) << 4;
     uv0 += (8 << 16) | 8;
     uv1 += (8 << 16) | 8;
-    out[0] = blank(c.colorTex);
-    out[1] = blank(c.colorTex);
+    out[0] = blank(fullColor(c));           /* PC: was colorTex (PRIM_FULL_COLOR) */
+    out[1] = blank(fullColor(c));
     setXY(out[0], xy0);
     setXY(out[1], xy1);
     setUV(out[0], uv0);
@@ -132,7 +132,7 @@ Batch texturedSprite(const PrimCtx &c, int x0, int y0, int x1, int y1, int u0, i
     setZF(out[0], c.spriteZF);
     setZF(out[1], c.spriteZF);
     out[1].kick = true;
-    return Batch{(uint32_t)(c.primAttr | PRIM_SPRITE | PRIM_TME | PRIM_FST), 2};
+    return Batch{(uint32_t)(c.primAttr | PRIM_SPRITE | PRIM_TME | PRIM_FST | PRIM_FULL_COLOR), 2};
 }
 
 /* gs_draw_textured_sprite_f (0x00256188). */
@@ -154,8 +154,8 @@ Batch texturedSpriteF(const PrimCtx &c, float x0, float y0, float x1, float y1,
     uint32_t xy1 = ((uint32_t)(c.yoff + vu::ftoi0(y1)) << 16) | ((uint32_t)(c.xoff + vu::ftoi0(x1)) & 0xFFFF);
     uint32_t uv0 = ((uint32_t)(vu::ftoi0(v0) + 8) << 16) | ((uint32_t)(vu::ftoi0(u0) + 8) & 0xFFFF);
     uint32_t uv1 = ((uint32_t)(vu::ftoi0(v1) + 8) << 16) | ((uint32_t)(vu::ftoi0(u1) + 8) & 0xFFFF);
-    out[0] = blank(c.colorTex);
-    out[1] = blank(c.colorTex);
+    out[0] = blank(fullColor(c));           /* PC: was colorTex (PRIM_FULL_COLOR) */
+    out[1] = blank(fullColor(c));
     setXY(out[0], xy0);
     setXY(out[1], xy1);
     setUV(out[0], uv0);
@@ -163,7 +163,7 @@ Batch texturedSpriteF(const PrimCtx &c, float x0, float y0, float x1, float y1,
     setZF(out[0], c.spriteZF);
     setZF(out[1], c.spriteZF);
     out[1].kick = true;
-    return Batch{(uint32_t)(c.primAttr | PRIM_SPRITE | PRIM_TME | PRIM_FST), 2};
+    return Batch{(uint32_t)(c.primAttr | PRIM_SPRITE | PRIM_TME | PRIM_FST | PRIM_FULL_COLOR), 2};
 }
 
 /* The 12.4 x of gs_draw_textured_sprite_strips_f. */
@@ -192,7 +192,7 @@ Batch texturedSpriteStripsF(const PrimCtx &c, float x0, float y0, float x1, floa
 {
     const float yScale = c.halfHeight ? 8.0f : 16.0f;
     const float winY = (float)c.winY * 16.0f;
-    const uint32_t prim = (uint16_t)(c.primAttr | PRIM_SPRITE | PRIM_TME | PRIM_FST);
+    const uint32_t prim = (uint16_t)(c.primAttr | PRIM_SPRITE | PRIM_TME | PRIM_FST | PRIM_FULL_COLOR);
     int32_t X0 = stripX(c, x0);
     int32_t X1 = stripX(c, x1);
     int32_t Y0 = (int32_t)c.yoff + vu::ftoi0(winY + y0 * yScale);
@@ -218,7 +218,7 @@ Batch texturedSpriteStripsF(const PrimCtx &c, float x0, float y0, float x1, floa
     uint64_t v1Hi = (uint64_t)(int64_t)(int32_t)((uint32_t)V1 << 16);
     int n = 0;
     auto put = [&](uint64_t uv, uint64_t xy, bool kick) {
-        out[n] = blank(c.colorTex);
+        out[n] = blank(fullColor(c));       /* PC: was colorTex (PRIM_FULL_COLOR) */
         setUV(out[n], uv);
         setXY(out[n], (uint32_t)xy);
         setZF(out[n], c.spriteZF);
@@ -345,9 +345,11 @@ Batch polyFan2d(const PrimCtx &c, const float *xy, const float *uv, const uint32
     uint32_t prim = (c.primAttr | (PRIM_FST | PRIM_IIP | PRIM_TRI_FAN)) & 0xFFFF;
     if (uv != nullptr)
         prim |= PRIM_TME;
+    if (uv != nullptr && rgba == nullptr)
+        prim |= PRIM_FULL_COLOR;            /* PC: one constant colour, whole */
     const float winX16 = (float)c.winX * 16.0f;
     const float winY16 = (float)c.winY * 16.0f;
-    const uint32_t constColor = (uv != nullptr) ? c.colorTex : c.color;
+    const uint32_t constColor = (uv != nullptr) ? fullColor(c) : c.color;
     for (int i = 0; i < n; i++) {
         out[i] = blank(rgba != nullptr ? rgba[i] : constColor);
         if (uv != nullptr) {

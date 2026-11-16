@@ -530,9 +530,9 @@ void CameraManager::update(RaceOrganization *org, DynamicsConductor *dc)
         case INPUT_LIVE:
             changed = updateStart(org, dc, input, i);
             if (i == 0)
-                getGameStatus()->getGameOptions()->onboardMount[0] = getOnBoardCamera(0)->getMount();
+                getGameStatus()->getGameOptions()->onboardMount[0] = getOnBoardCamera(0)->pcSavedMount();  /* PC */
             if (i == 1)
-                getGameStatus()->getGameOptions()->onboardMount[1] = getOnBoardCamera(1)->getMount();
+                getGameStatus()->getGameOptions()->onboardMount[1] = getOnBoardCamera(1)->pcSavedMount();  /* PC */
             break;
         case 1:
         case 2:
@@ -633,6 +633,8 @@ int CameraManager::isOwnCar(RaceEntryCar *car)
     CameraTargetInfo *target = &views[current].targetInfo;
     int result = 0;
 
+    if (pc_debugcam_owns(current))
+        return 0;                           /* PC: the debug camera is in no car (its sounds: game/app/pc_debugcam.h) */
     if (target->mode == 0)
         result = car == target->car[0];
     return result;
@@ -643,6 +645,24 @@ int CameraManager::isOwnCar(RaceEntryCar *car)
 int CameraManager::F_00209220()
 {
     return views[current].camera->virtual_9();
+}
+
+/* PC: the current view is the onboard camera's cockpit view: its slot (1,
+ * or 2 a second driver's: game/app/pc_headcam.h), else 0. */
+int CameraManager::pcCockpit()
+{
+    if (pc_debugcam_owns(current) || views[current].camera != &views[current].onboard)
+        return 0;
+    return views[current].onboard.pcIsCockpit();
+}
+
+/* PC (2026-11-14): the current view is a custom camera's (game/app/
+ * pc_customcam.h): the onboard camera showing it, else NULL. */
+OnBoardCamera *CameraManager::pcCustom()
+{
+    if (pc_debugcam_owns(current) || views[current].camera != &views[current].onboard)
+        return NULL;
+    return views[current].onboard.pcCustom != 0 ? &views[current].onboard : NULL;
 }
 
 // FUNC 0x00209268 CameraManager::isDrawBackMirror
@@ -701,6 +721,8 @@ int CameraManager::F_00209370(RaceOrganization *org, RaceEntryCar *car)
 int CameraManager::getCameraKind()
 {
     int result = 2;
+    if (pc_debugcam_owns(current))
+        return result;                      /* PC: the debug camera is outside (its sounds: game/app/pc_debugcam.h) */
     int kind = views[current].camera->virtual_9();
 
     if (kind != 2) {

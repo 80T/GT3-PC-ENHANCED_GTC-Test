@@ -149,6 +149,31 @@ public:
     BrakeCaliper *getCaliper();             /* 0x00223F30 (? name) NULL without one; no callers */
     int   needWheelMotionBlur();            /* 0x00223F58 faceVisible; no callers */
     int   needTreadBlur();                  /* 0x00223F60 (? name) no callers */
+    /* PC (2026-11-13, no original): the disc and caliper moved back until
+     * the wheel in front of them clears them (game/car/model/pc_brake_fit.h).
+     * pcFitBrake measures this tyre's race wheel (its levels 0 and 1, the
+     * ones a brake is drawn with) and, given one, the menu wheel drawn in
+     * its place ([Graphics] MenuWheels): after the files, the brake and the
+     * size are set, before build (the heat glow's strip is built at the
+     * place found; RaceCarModel::setupTires), and again when a menu wheel
+     * turns up later (drawTires).  pcCopyFit: the other tyre of the axle
+     * takes the result.  pcBrakePush: the move in metres for what is drawn
+     * now - the greater of the two while menu wheels are on (the race wheel
+     * takes over at speed: the brake does not jump then). */
+    void  pcFitBrake(WheelFile2 *menuWheel);
+    void  pcCopyFit(const RaceTireModel &other);
+    f32   pcBrakePush();
+    /* PC (2026-11-13, no original): the menu tyre ([Graphics] MenuTires,
+     * game/app/pc_menu_tires.h).  pcBuildMenu builds pcMenuPackets - this
+     * tyre's levels 0 and 1 as a menu car's tyre is built (30 segments,
+     * bevelled, the sidewall 1 mm inside the wheel's face), with the menu
+     * tyre file, the level's own shadow / inside / brake as build's - at
+     * work and returns its rest; after the files, the brake, the size and
+     * the brake fit are set (RaceCarModel::pcBuildMenuTires).  draw takes
+     * them, and menuTire for the texture, while the setting is on.
+     * pcClearMenu: none (their work space is gone). */
+    void *pcBuildMenu(void *work, TireFile2 *menuTire);
+    void  pcClearMenu();
 
     RaceTirePacket packets[3];              /* 0x094 levels 0..2 */
     int            disc;                    /* 0x178 the brake disc (setBrake discNo - 1) */
@@ -156,6 +181,13 @@ public:
     f32            discRadius;              /* 0x180 */
     f32            discOffset;              /* 0x184 */
     f32            caliperAngle;            /* 0x188 radians */
+    /* PC (2026-11-13): pcFitBrake's results */
+    f32            pcPushRace;              /* the move its race wheel asks for, metres */
+    f32            pcPushMenu;              /* its menu wheel's */
+    WheelFile2    *pcFitMenu;               /* the menu wheel measured (NULL: none) */
+    /* PC (2026-11-13): pcBuildMenu's */
+    RaceTirePacket pcMenuPackets[2];        /* levels 0, 1 built as the menus' */
+    TireFile2     *pcMenuTire;              /* the menu tyre file (NULL: none built) */
 };
 EGCS_SIZE(RaceTireModel, 0x18C);
 

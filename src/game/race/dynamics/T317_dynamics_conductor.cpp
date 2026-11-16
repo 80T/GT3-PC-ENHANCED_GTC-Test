@@ -16,6 +16,12 @@
 #include "game/camera/T383_race_camera_base.h"     /* (seen: RaceCameraBase) */
 #include "game/race/dynamics/control_record_internal.h"
 #include "game/race/dynamics/T305_dynamics_conductor.h"
+#include "game/app/pc_course_scale.h"       /* PC: the course scale's lap remap */
+#include "game/app/pc_course_pick.h"        /* PC: pc_race_laps */
+#include "game/app/pc_race_cars.h"          /* PC: pc_grid_start (the grid past the course's places) */
+#include "game/app/pc_car_tuning.h"         /* PC: pc_car_tuning (its race cache filled before the threads) */
+#include "game/race/dynamics/pc_physics_threads.h"  /* PC: the cars' own steps on worker threads */
+#include "game/race/dynamics/pc_replay_sync.h"      /* PC: [Debug] ReplaySync */
 // DATA_START 0x0033DB28
 
 // FUNC 0x001F2A10 DynamicsConductor::DynamicsConductor
@@ -86,6 +92,11 @@ f32 DynamicsConductor::getLapLength()
  * one (the line), at most 4. */
 int DynamicsConductor::getGateCount()
 {
+    /* PC (2026-11-07): a line mode of the course mode forcer: its lines
+     * (game/app/pc_course_pick.h), as the machine test's */
+    const int lines = pc_race_mode_lines(org);
+    if (lines > 0)
+        return lines;
     int count = runway_marker_count(course->data->runway, 0) + 1;
 
     return (count < 5) ? count : 4;
@@ -93,9 +104,13 @@ int DynamicsConductor::getGateCount()
 
 // FUNC 0x001F2C10 DynamicsConductor::getGatePosition
 /* Slot 33: the course position of checkpoint `gate' (the runway's marker
- * value of key 0); -1 past getGateCount() - 2 (the last one is the line). */
+ * value of key 0); -1 past getGateCount() - 2 (the last one is the line).
+ * PC (2026-11-07): a line mode's lines before its finish line. */
 f32 DynamicsConductor::getGatePosition(int gate)
 {
+    const int lines = pc_race_mode_lines(org);
+    if (lines > 0)
+        return gate < lines - 1 ? pc_race_mode_line(org, gate, getLapLength()) : -1.0f;
     if (getGateCount() - 2 < gate)
         return -1.0f;
     return runway_marker_value(course->data->runway, gate, 0);
@@ -103,9 +118,12 @@ f32 DynamicsConductor::getGatePosition(int gate)
 
 // FUNC 0x001F2C90 DynamicsConductor::virtual_30
 /* Slot 30: the finish line's course position (the runway's unk_1C; 0:
- * none). */
+ * none).  PC (2026-11-07): a line mode's last line. */
 f32 DynamicsConductor::virtual_30()
 {
+    const int lines = pc_race_mode_lines(org);
+    if (lines > 0)
+        return pc_race_mode_line(org, lines - 1, getLapLength());
     return course->data->runway->unk_1C;
 }
 
@@ -368,7 +386,9 @@ int DynamicsConductor::startAtLaunchPoint(int car, int *startType, int *startArg
 
     if (point != 0) {
         *startType = START_AT_POINT;
-        *startArg = point;
+        /* PC: a point of the lap, on a scaled course where it went (game/app/
+         * pc_course_scale.h) */
+        *startArg = point > 0 ? (int)pc_course_lap_distance(lines.course->data, (f32)point) : point;
         return 1;
     }
     return 0;
@@ -450,6 +470,12 @@ void DynamicsConductor::virtual_25(int car, int *startType, int *startArg, int *
         maxRadius = 200.0f;
         break;
     }
+    {
+        /* PC: the same stretch of a scaled course (game/app/pc_course_scale.h) */
+        const f32 k = pc_course_lap_ratio(lines.course->data);
+        before *= k;
+        maxRadius *= k;
+    }
     *startArg = (int)lines_corner_entry_before(&lines, -before, maxRadius) - 5;
 }
 
@@ -461,6 +487,8 @@ void DynamicsConductor::attach(RaceOrganization *o)
 {
     org = o;
     rules.setFromRace(o->raceDB);
+    rules.laps = (u8)pc_race_laps(o, rules.laps);  /* PC: the lap forcer's / randomizer's laps (game/app/pc_course_pick.h) */
+    rules.timeLimit = (u16)pc_race_minutes(o, rules.timeLimit);    /* PC: the race time forcer's minutes */
     if (o->racePreviewMode != 0 || o->backgroundMode != 0) {
         rules.laps = 0;
         rules.timeLimit = 0;
@@ -500,6 +528,8 @@ void DynamicsConductor::initialize(int newMode)
     finishTimer = 0;
     pairs.setOwner(this);
     lines_init(&lines, course);
+    /* PC (2026-11-07): the course mode forcer's lines on this course, logged */
+    pc_race_mode_course(o, course->data->runway->unk_1C, getLapLength());
     virtual_20(1);
     for (i = 0; i < carCount; i++) {
         RaceEntryCar *e = o->entries->cars[i];
@@ -519,11 +549,12 @@ void DynamicsConductor::initialize(int newMode)
         getEachEntrantInfo_(i, &tyreFlag, &transMode, &driver, &noController);
         SetupCarSpec(&spec, equip, tyreFlag, getCourseKind(), 0,
                      "DynamicsConductor::initialize()");
-        grid.q = o->course->getGridPosition(e->order);
-        pos[0] = grid.f[0];
-        pos[1] = -grid.f[2];
-        pos[2] = grid.f[1];
-        rot[2] = o->course->getGridAngle(0);   /* record 0, not e->order (as in the code) */
+        /* PC: the grid record of the entry's place, or past the course's
+         * places one made along the racing line (game/app/pc_race_cars.h);
+         * retail read the record (grid.q = getGridPosition(e->order): x,
+         * -z, y) and record 0's heading */
+        (void)grid;
+        pc_grid_start(this, o->course, e->order, pos, &rot[2]);
         startType = START_GRID;
         startArg = 0;
         speedKmh = 0;
@@ -542,6 +573,7 @@ void DynamicsConductor::initialize(int newMode)
         car_view_update(getCar(i));
     }
     virtual_21(1);
+    pc_replay_sync_begin(this);             /* PC: the race kept, its replay checked */
 }
 
 // FUNC 0x001F3918 DynamicsConductor::collideAllCars
@@ -565,6 +597,88 @@ void DynamicsConductor::collideWalls(int first)
     for (i = first; i < carCount; i++)
         boxes_step_car(&boxes, i);
     conductor_load_car_boxes(this);
+}
+
+/* PC (no original): update's slow car boost chain (case 0) multiplies each
+ * car's factor into the next car's along the race order, so the cars far
+ * from the reference compound one step per car between them: with up to
+ * PC_RACE_CARS_MAX cars (game/race/race_cars.h) a leader 31 places ahead
+ * could run at (1 - slowGain)^31.  In a race of more than DC_GT3_RACE_CARS
+ * cars each car's factor is held to what one step gives, 1 - slowGain ..
+ * 1 + boostGain (its time scale with it, as slot 3 sets it: factor x
+ * boost.scale), and the held factor goes on down the chain.  Races of 6
+ * cars or fewer: the factor as slot 3 returned it. */
+static f32 boost_chain_bound(DynamicsConductor *dc, DynCarState *st, f32 factor)
+{
+    SlowCarBoost *b = &dc->boost;
+    f32 lo = 1.0f - b->slowGain;
+    f32 hi = b->boostGain + 1.0f;
+
+    if (dc->carCount <= DC_GT3_RACE_CARS)
+        return factor;
+    if (factor < lo)
+        factor = lo;
+    else if (hi < factor)
+        factor = hi;
+    else
+        return factor;
+    st->timeScale = factor * b->scale;
+    return factor;
+}
+
+/* PC (no original): one car's own steps at the start of update's frame,
+ * update's first twelve per-car loops in their order (the job of
+ * pc_physics_run, game/race/dynamics/pc_physics_threads.h). */
+static void dc_car_own_steps(void *ctx, int i)
+{
+    RaceCarState *car = ((DynamicsConductor *)ctx)->getCar(i);
+
+    car_save_prev(car);
+    hybrid_flow_reset(car);
+    pod_emotion_step(car);
+    car_pre_step(car);
+    car_input_update(car);
+    pod_parking_step(car);
+    car_wheel_steer_angles(car);
+    car_tyre_slip_ratios(car);
+    car_assists(car);
+    car_drivetrain_step(car);
+    car_brake_heat(car);
+    car_crash_sound_clear(car);
+}
+
+/* PC (no original): with GT3PC_PHYSICS_THREADS, cars first .. n - 1's own
+ * steps on the worker threads (pc_physics_threads.h); 1 when they ran
+ * there, 0 for the serial loops.  The steps write only their own car (the
+ * other cars' and the race's data they read is written later in the
+ * frame), so the cars' order does not change a bit; the exceptions are
+ * shared here:
+ * - the two first-use caches the steps write - pc_car_tuning's race lookup
+ *   (car_wheel_grip, ai_corner_speed, engine_output ...: one race, so it
+ *   stays) and the CVT rates (gearbox_cvt_torque) - are filled first, on
+ *   this thread, with the values their first use would give;
+ * - a car's RaceInput (car_input_update: the pad read, its recorder, in
+ *   the free run the player's lap record): the serial loops when more than
+ *   one car has an enabled input (two players, a ghost), or a car is of
+ *   another race (never). */
+static int dc_own_steps_threaded(DynamicsConductor *dc, int first, int n)
+{
+    int i, inputs = 0;
+
+    if (n - first < 2 || pc_physics_threads() == 0)
+        return 0;
+    for (i = first; i < n; i++) {
+        RaceCarState *car = dc->getCar(i);
+
+        if (car->org != dc->org)
+            return 0;
+        if (car->input->enabled != 0 && ++inputs > 1)
+            return 0;
+    }
+    pc_car_tuning(dc->getCar(first), PC_TUNE_GRIP);    /* (the result is not needed) */
+    gearbox_cvt_rates_init();
+    pc_physics_run(dc_car_own_steps, dc, first, n);
+    return 1;
 }
 
 // FUNC 0x001F39D8 DynamicsConductor::update
@@ -638,6 +752,9 @@ void DynamicsConductor::update(int replay)
         first = 0;
         if (replay != 0)
             first = 1;
+        /* PC: on worker threads with GT3PC_PHYSICS_THREADS (the same steps
+         * per car, dc_car_own_steps / dc_own_steps_threaded above) */
+        if (dc_own_steps_threaded(this, first, n) == 0) {
         for (i = first; i < n; i++)
             car_save_prev(getCar(i));
         for (i = first; i < n; i++)
@@ -662,6 +779,7 @@ void DynamicsConductor::update(int replay)
             car_brake_heat(getCar(i));
         for (i = first; i < n; i++)
             car_crash_sound_clear(getCar(i));
+        }
         if (replay == 0)
             processCollision_();
         else
@@ -724,19 +842,25 @@ void DynamicsConductor::update(int replay)
         case 0: {
             int pos;                        /* the reference car's place, 0-based */
 
+            /* PC: each result held by boost_chain_bound in races of more
+             * than 6 cars (above; unchanged up to 6) */
             scale = 1.0f;
             pos = getCar(ref)->st.rank - 1;
             for (i = pos; i > 0; i--)
-                scale = virtual_3(&getCar(order[i])->st, &getCar(order[i - 1])->st, scale);
+                scale = boost_chain_bound(this, &getCar(order[i - 1])->st,
+                                          virtual_3(&getCar(order[i])->st, &getCar(order[i - 1])->st, scale));
             scale = 1.0f;
             for (i = pos; i < carCount - 1; i++)
-                scale = virtual_3(&getCar(order[i])->st, &getCar(order[i + 1])->st, scale);
+                scale = boost_chain_bound(this, &getCar(order[i + 1])->st,
+                                          virtual_3(&getCar(order[i])->st, &getCar(order[i + 1])->st, scale));
             break;
         }
         }
 
         for (i = first; i < n; i++)
             pad_vibration_send(getCar(i));
+        if (replay == 0)
+            pc_replay_sync_frame(this);         /* PC */
     done:
         tickFinishTimer();
         pairs.update();

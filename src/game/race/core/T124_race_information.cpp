@@ -177,14 +177,20 @@ void RaceInformation::setRandomSeed(int seed)
 //   QUIRK: `left' counts down from all the cars, locked ones included: with
 //   a locked car, once every free car is taken the search for an unused one
 //   never ends.
+//   PC (the races of more cars, game/app/pc_race_cars.h, ask for more cars
+//   than a list often has): `left' counts the free cars only, so once they
+//   are all taken the cars repeat (as retail's lists without locked cars).
 void RaceInformation::assignCars(RaceOrganization *org, int *entries, int n)
 {
     int cars = db.getNumEntryCars();
     if (n > 0) {
         int *used = (int *)__builtin_alloca(cars * sizeof(int));
-        for (int i = 0; i < cars; i++)
-            used[i] = db_car_is_locked(db.getEntryCar(i));
         int left = cars;
+        for (int i = 0; i < cars; i++) {
+            used[i] = db_car_is_locked(db.getEntryCar(i));
+            if (used[i] != 0)
+                left--;                     /* PC: a locked car is not free */
+        }
         for (int j = 0; j < n; j++) {
             CarEquipments *car = &org->entries->cars[entries[j]]->info;
             int k = (int)(g_00351DE0.next01() * (f32)cars);

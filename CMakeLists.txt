@@ -7,6 +7,10 @@ if(NOT CMAKE_SIZEOF_VOID_P EQUAL 4)
     message(FATAL_ERROR "GT3 PC builds as 32-bit x86: configure from the x86 MSVC environment (build.cmd / tools\\msvc.cmd)")
 endif()
 
+# build/compile_commands.json: each file's compile command, for the editors'
+# code navigation (VS Code's C/C++ extension, clangd).
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)

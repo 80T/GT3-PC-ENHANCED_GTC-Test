@@ -7,6 +7,7 @@
  * default). */
 #include "engine/gfx/vram_internal.h"
 #include "engine/text/T517_realtime_text.h"
+#include "game/app/pc_param_db.h"                   /* PC: pc_realtime_db_file (text/realtime.sqlite3) */
 
 /* T517's .sdata, in the original's order: g_realtimeData (initialised, so
  * written here), realtime_set_language's "_", then g_realtimeTables (a
@@ -56,8 +57,11 @@ void realtime_load(void)
 
     if (g_realtimeData != NULL)
         return;
-    data = (RealTimeData *)file_read_blocking("text/realtime.dat", NULL, 0, 1,
-                                              &vol_device_object);
+    /* PC: built from text/realtime.sqlite3 when converted (game/app/pc_param_db.h) */
+    data = (RealTimeData *)pc_realtime_db_file();
+    if (data == NULL)
+        data = (RealTimeData *)file_read_blocking("text/realtime.dat", NULL, 0, 1,
+                                                  &vol_device_object);
     g_realtimeData = data;
     realtime_reloc(data->texts, data);
     for (i = 0; i < g_realtimeData->count; i++)

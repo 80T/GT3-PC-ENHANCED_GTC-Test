@@ -41,6 +41,12 @@ constexpr int kDiff = 40;               /* a channel's difference that counts */
 constexpr int kMinPixels = 12;          /* a flicker smaller than that is not reported */
 constexpr int kMaxFound = 6;
 constexpr size_t kMaxDraws = 20000;     /* kept a frame */
+/* GT3PC_FLICKER_RECT=x0,y0,x1,y1 (pixels of the 640 x 448 pictures,
+ * inclusive): only the pixels inside count - a small flicker (a car lamp's
+ * triangle, user report 2026-10-25) among bigger changes elsewhere (blinking
+ * texts, lamps switched by the game) that otherwise take the kMaxFound */
+int g_rect[4] = {0, 0, kW - 1, kH - 1};
+int g_maxFound = kMaxFound;             /* (24 with a rectangle: its flickers are small, and few) */
 
 struct Slot {
     Com<ID3D11Texture2D> tex;
@@ -74,6 +80,7 @@ constexpr int kQueryFrames = 4;
 struct QuerySet {
     uint64_t frame = ~0ull;
     std::vector<Com<ID3D11Query>> q;
+    std::vector<Com<ID3D11Query>> occ;  /* PC: the same draws' occlusion queries (FlickerDraw::gpuPassed) */
     std::vector<uint32_t> draw;
     size_t used = 0;
 };
@@ -105,6 +112,14 @@ void resolve_set(QuerySet &s)
         d.gpuPrims = (uint32_t)st.CPrimitives;
         d.gpuPixels = (uint32_t)st.PSInvocations;
         d.gpuBad = bad[i];
+        UINT64 passed = 0;
+        spins = 0;
+        if (i < s.occ.size() && s.occ[i]) {
+            while ((hr = dc()->GetData(s.occ[i].get(), &passed, sizeof(passed), 0)) == S_FALSE && spins++ < 100000)
+                ;
+            if (hr == S_OK)
+                d.gpuPassed = (uint32_t)passed;
+        }
     }
     s.used = 0;
     s.frame = ~0ull;
@@ -153,10 +168,13 @@ void describe(const FlickerDraw &d, char *out, size_t n)
     char bound[24] = "";
     if (d.bound != 0)
         snprintf(bound, sizeof(bound), " | BOUND WRONG %05X", d.bound);
-    char gpu[128] = "";
+    char gpu[160] = "";
+    char passed[24] = "";
+    if (d.gpuPassed != ~0u)
+        snprintf(passed, sizeof(passed), ", %u passed", d.gpuPassed);
     if (d.kind < 2 && d.gpuVerts != ~0u)
-        snprintf(gpu, sizeof(gpu), " | GPU %u verts, %u prims, %u pixels%s%s%s%s%s", d.gpuVerts, d.gpuPrims,
-                 d.gpuPixels, d.gpuBad ? " | GPU HELD OTHER:" : "", (d.gpuBad & 1) ? " VS constants" : "",
+        snprintf(gpu, sizeof(gpu), " | GPU %u verts, %u prims, %u pixels%s%s%s%s%s%s", d.gpuVerts, d.gpuPrims,
+                 d.gpuPixels, passed, d.gpuBad ? " | GPU HELD OTHER:" : "", (d.gpuBad & 1) ? " VS constants" : "",
                  (d.gpuBad & 2) ? " PS constants" : "", (d.gpuBad & 4) ? " vertices" : "",
                  (d.gpuBad & 8) ? " indices" : "");
     else if (d.kind < 2)
@@ -302,6 +320,92 @@ void log_draws(size_t n, const Found &f)
         else if (more > 0)
             pclog::write("pgl flicker:   (%d more such draws)", more);
     }
+    /* PC: the draws whose GPU counts are the odd ones out - primitives, shader
+     * runs or passing samples off from the same draw's in both neighbours,
+     * those two close: a moving camera changes every draw's constants and
+     * data each frame but its counts only a little, a triangle lost (culled,
+     * clipped, failing a test) changes them in its frame alone (user report
+     * 2026-10-25: a car lamp's triangle) */
+    /* (the same draw in a neighbour: by kind, size, PRIM, texture and target
+     * near the same index - a frame with a draw more or less shifts every
+     * later index; frame 1683 of the lamp report had 1274 draws, the one
+     * before 1275; a draw into the displayed buffer is into the other one in
+     * a neighbour: the two alternate) */
+    auto match = [&b](const FrameDraws *fd, uint32_t fdDisp, size_t i, const FlickerDraw &d) -> const FlickerDraw * {
+        for (int off = 0; off <= 12; off++)
+            for (int sgn = 1; sgn >= -1; sgn -= 2) {
+                if (off == 0 && sgn < 0)
+                    continue;
+                const long long j = (long long)i + sgn * off;
+                if (j < 0 || j >= (long long)fd->draws.size())
+                    continue;
+                const FlickerDraw &e = fd->draws[(size_t)j];
+                if (e.kind == d.kind && e.count == d.count && e.prim == d.prim && e.tex == d.tex &&
+                    (e.rt == d.rt || (e.rt == fdDisp && d.rt == b.disp)))
+                    return &e;
+            }
+        return nullptr;
+    };
+    if (da != nullptr && dc_ != nullptr && a.frame != b.frame && c.frame != b.frame) {
+        auto odd = [](uint32_t x, uint32_t y, uint32_t z, bool exact) {
+            if (x == ~0u || y == ~0u || z == ~0u)
+                return false;
+            const uint32_t lo = std::min(x, z), hi = std::max(x, z);
+            if (exact)
+                return lo == hi && y != lo;
+            const uint32_t dev = y < lo ? lo - y : y > hi ? y - hi : 0;
+            return dev >= 4 && dev > 2 * (hi - lo) && (uint64_t)dev * 50 > lo;
+        };
+        int shown = 0;
+        for (size_t i = 0; i < db->draws.size(); i++) {
+            const FlickerDraw &y = db->draws[i];
+            if (y.kind >= 2)
+                continue;
+            const FlickerDraw *px = match(da, a.disp, i, y), *pz = match(dc_, c.disp, i, y);
+            if (px == nullptr || pz == nullptr)
+                continue;                   /* (not the same draw in the three frames) */
+            const FlickerDraw &x = *px, &z = *pz;
+            const bool p = odd(x.gpuPrims, y.gpuPrims, z.gpuPrims, true);
+            const bool r = odd(x.gpuPixels, y.gpuPixels, z.gpuPixels, false);
+            const bool s = odd(x.gpuPassed, y.gpuPassed, z.gpuPassed, false);
+            if (!p && !r && !s)
+                continue;
+            if (shown++ >= 20)
+                continue;
+            describe(y, s1, sizeof(s1));
+            pclog::write("pgl flicker:   GPU counts off (%s%s%s): draw %u: prims %u (neighbours %u / %u), pixels %u"
+                         " (%u / %u), passed %d (%d / %d): %s", p ? "prims " : "", r ? "pixels " : "",
+                         s ? "passed" : "", (unsigned)i, y.gpuPrims, x.gpuPrims, z.gpuPrims, y.gpuPixels, x.gpuPixels,
+                         z.gpuPixels, (int)y.gpuPassed, (int)x.gpuPassed, (int)z.gpuPassed, s1);
+        }
+        if (shown == 0)
+            pclog::write("pgl flicker:   no draw's GPU counts are off from both neighbours'");
+        else if (shown > 20)
+            pclog::write("pgl flicker:   (%d more such draws)", shown - 20);
+        /* with GT3PC_FLICKER_RECT: every draw of a 640 x 448 target (a race
+         * frame: the pictures' own pixels) touching the rectangle, with the
+         * neighbours' counts, odd or not */
+        if (g_rect[0] != 0 || g_rect[1] != 0 || g_rect[2] != kW - 1 || g_rect[3] != kH - 1) {
+            int listed = 0;
+            for (size_t i = 0; i < db->draws.size(); i++) {
+                const FlickerDraw &y = db->draws[i];
+                if (y.kind >= 2 || y.rt == b.disp || y.x1 < g_rect[0] || y.x0 > g_rect[2] || y.y1 < g_rect[1] ||
+                    y.y0 > g_rect[3] || y.x1 - y.x0 >= kW - 1)
+                    continue;               /* (full-screen passes left out) */
+                if (listed++ >= 80)
+                    continue;
+                const FlickerDraw *px = match(da, a.disp, i, y), *pz = match(dc_, c.disp, i, y);
+                describe(y, s1, sizeof(s1));
+                pclog::write("pgl flicker:   in the rectangle: draw %u: prims %u (%d / %d), pixels %u (%d / %d), passed"
+                             " %d (%d / %d): %s", (unsigned)i, y.gpuPrims, px ? (int)px->gpuPrims : -1,
+                             pz ? (int)pz->gpuPrims : -1, y.gpuPixels, px ? (int)px->gpuPixels : -1,
+                             pz ? (int)pz->gpuPixels : -1, (int)y.gpuPassed, px ? (int)px->gpuPassed : -1,
+                             pz ? (int)pz->gpuPassed : -1, s1);
+            }
+            if (listed > 80)
+                pclog::write("pgl flicker:   (%d more in the rectangle)", listed - 80);
+        }
+    }
     /* the pixels in the displayed buffer's GS pixels */
     const float du = b.uv[2] - b.uv[0], dv = b.uv[3] - b.uv[1];
     const int gx0 = (int)((b.uv[0] + du * (float)f.x0 / kW) * (float)b.gsW);
@@ -389,8 +493,8 @@ void dump()
         }
         if (k >= 2) {
             Found f = {k - 1, 0, kW, kH, -1, -1};
-            for (int y = 0; y < kH; y++)
-                for (int x = 0; x < kW; x++) {
+            for (int y = g_rect[1]; y <= g_rect[3]; y++)
+                for (int x = g_rect[0]; x <= g_rect[2]; x++) {
                     const size_t i = (size_t)y * kW + x;
                     if (differs(p0[i], p1[i]) && differs(p1[i], p2[i]) && !differs(p0[i], p2[i])) {
                         f.pixels++;
@@ -429,7 +533,7 @@ void dump()
             tooClose = tooClose || (f.k + 2 > k.k && k.k + 2 > f.k);
         if (!tooClose)
             keep.push_back(f);
-        if ((int)keep.size() >= kMaxFound)
+        if ((int)keep.size() >= g_maxFound)
             break;
     }
     std::sort(keep.begin(), keep.end(), [](const Found &a, const Found &b) { return a.k < b.k; });
@@ -481,6 +585,17 @@ bool flicker_on()
                 g_dir[len - 1] = 0;
             pclog::write("pgl: GT3PC_FLICKER: the last %d pictures kept; F8 writes the ones that differ from both"
                          " neighbours to %s", g_state, g_dir);
+            const char *rect = getenv("GT3PC_FLICKER_RECT");
+            int r[4];
+            if (rect != nullptr && sscanf(rect, "%d,%d,%d,%d", &r[0], &r[1], &r[2], &r[3]) == 4) {
+                g_rect[0] = std::max(0, std::min(r[0], r[2]));
+                g_rect[1] = std::max(0, std::min(r[1], r[3]));
+                g_rect[2] = std::min(kW - 1, std::max(r[0], r[2]));
+                g_rect[3] = std::min(kH - 1, std::max(r[1], r[3]));
+                g_maxFound = 24;
+                pclog::write("pgl: GT3PC_FLICKER_RECT: only the pixels in (%d,%d)-(%d,%d) count; up to %d"
+                             " reported", g_rect[0], g_rect[1], g_rect[2], g_rect[3], g_maxFound);
+            }
         }
     }
     return g_state > 0;
@@ -525,10 +640,17 @@ ID3D11Query *flicker_query_begin()
             return nullptr;
         }
         s.q.push_back(std::move(q));
+        D3D11_QUERY_DESC od = {D3D11_QUERY_OCCLUSION, 0};
+        Com<ID3D11Query> o;
+        if (FAILED(dev()->CreateQuery(&od, o.put())))
+            o.reset();                      /* (the passing counts not kept) */
+        s.occ.push_back(std::move(o));
         s.draw.push_back(0);
     }
     ID3D11Query *q = s.q[s.used].get();
     s.draw[s.used] = (uint32_t)g_cur.size();
+    if (s.occ[s.used])
+        dc()->Begin(s.occ[s.used].get());
     s.used++;
     dc()->Begin(q);
     return q;
@@ -539,6 +661,8 @@ void flicker_query_end(ID3D11Query *q, bool indexed, uint32_t first, uint32_t co
     dc()->End(q);
     const int set = (int)(g_qFrame % kQueryFrames);
     const QuerySet &s = g_q[set];
+    if (s.used > 0 && s.occ[s.used - 1])
+        dc()->End(s.occ[s.used - 1].get());
     if (s.used > 0)
         d3d_verify_copy(set, (uint32_t)(s.used - 1), indexed, first, count, baseVertex);
 }

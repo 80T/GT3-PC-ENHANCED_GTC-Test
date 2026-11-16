@@ -20,7 +20,8 @@ static s64 pc_price_scale(void)
 s64 pc_new_game_money(s64 initial)
 {
     s64 money = initial;
-    if (settings::starting_credits() != 0)
+    /* (PC 2026-11-14: -1 the version's own; 0 is an amount - a custom one) */
+    if (settings::starting_credits() >= 0)
         money = (s64)settings::starting_credits() * pc_price_scale();
     if (settings::debug_fill_money())
         money = (s64)100000000 * pc_price_scale();

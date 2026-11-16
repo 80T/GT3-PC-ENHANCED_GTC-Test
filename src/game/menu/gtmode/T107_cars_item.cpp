@@ -64,6 +64,7 @@
 #include "engine/gfx/T514_gs_buffer.h"            /* GSBuffer */
 #include "engine/gfx/T515_tex_set.h"              /* TexSet */
 #include "game/menu/gtmode/car_get_internal.h"
+#include "game/app/pc_menu_race_model.h"         /* PC (2026-11-12): [Debug] MenuRaceModel */
 
 /* The prize car scene's light vectors: T107 .bss, file statics (local
  * symbols in the original), in this order. */
@@ -180,7 +181,15 @@ void TheCar::drawBody()
 {
     selectSpec();                           /* implicit: setCar (TheCar::selectSpec, inline) */
     f32 radius = menu_car_spec()->car.dyn.gear.tyreRadius[0];
+#if ENH_PHYSICS_REAR_RIDE_HEIGHT
+    /* PC (2026-11-12): pitched for the rear axle's own height; drawTires
+     * follows in this matrix (ShowRoomCar::pcRestLift) */
+    f32 pitch;
+    pgl_translate(0.0f, menu_car_spec()->car.pcRestLift(radius, &pitch), 0.0f);
+    vu0_rotate_x(pitch);
+#else
     pgl_translate(0.0f, radius - menu_car_spec()->car.wheelHeight(0, 0.0f, 0.0f), 0.0f);
+#endif
     body.draw();
 }
 
@@ -551,9 +560,11 @@ void CarsItem::drawAll()
         drawFloor(c, car->alpha, 0);
         car_shadow_set_dir(0.0f, 0.0f, 0.0f);
         pgl_set_scalar_param(0, 0.0f);      /* qAF0: no environment-map colours */
+        pc_menu_race_model_begin(pc_menu_race_model_prizes());  /* PC (2026-11-12) */
         car->F_0013CC48();
         car->drawBody();
         car->drawTires();
+        pc_menu_race_model_end();
         pgl_set_scalar_param(0, 1.0f);
         pgl_pop_matrix();
     }
@@ -639,9 +650,11 @@ void CarsItem::drawSelected()
     pgl_set_scalar_param(0, getFade());          /* qAF0: the environment-map colours */
     car_shadow_set_dir(0.0f, 0.0f, 0.0f);
     car->setLights(&camera, getFade());
+    pc_menu_race_model_begin(pc_menu_race_model_prizes());  /* PC (2026-11-12) */
     car->F_0013CC48();
     car->drawBody();
     car->drawTires();
+    pc_menu_race_model_end();
     car->resetLights();
     pgl_set_scalar_param(0, 1.0f);
     pgl_pop_matrix();

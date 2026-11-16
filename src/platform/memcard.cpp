@@ -2,10 +2,12 @@
 #include "platform/memcard.h"
 #include "platform/log.h"
 #include "platform/paths.h"
+#include "platform/save_folders.h"             /* PC (2026-11-15): the save folders */
 #include "sifdev.h"
 
 #include <windows.h>
 
+#include <algorithm>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -47,14 +49,73 @@ Listing g_listing[2];
  * same card"). */
 bool g_reported[2];
 
-std::string card_root(int port)
+/* PC (2026-11-15): the save folder in each slot (save_folders.h; memcard.h
+ * set_slot_folder) - its name ("" no card) and path with its '\' - and a
+ * change waiting for the slot's open files (wanted). */
+struct Slot {
+    std::string name, root;
+    bool wanted = false;
+    std::string wantedName;
+    /* changed since the game's last sceMcGetInfo of the slot: its other
+     * calls answer -1 (sceMcResChangedCard), as libmc's after a swap */
+    bool swapped = false;
+};
+Slot g_slot[2];
+std::string g_savesDir;                         /* saves\<engine>\ (ANSI, with its '\') */
+std::vector<std::string> g_folders;             /* folders(): the last read, and when (GetTickCount64) */
+ULONGLONG g_foldersAt;
+
+const std::string &card_root(int port)
 {
-    return paths::game_dir() + (port == 0 ? "memcard1\\" : "memcard2\\");
+    return g_slot[port].root;
 }
 
 bool valid_card(int port, int slot)
 {
     return (port == 0 || port == 1) && slot == 0;
+}
+
+/* PC (2026-11-15): a slot's chosen folder put in once the card has no file
+ * open (the lock held). */
+void apply_wanted(int port)
+{
+    Slot &s = g_slot[port];
+    if (!s.wanted)
+        return;
+    for (const Fd &f : g_fds)
+        if (f.used && f.port == port)
+            return;
+    s.wanted = false;
+    s.name = s.wantedName;
+    s.root = s.name.empty() ? std::string() : g_savesDir + s.name + "\\";
+    s.swapped = true;
+    g_reported[port] = false;
+    g_listing[port] = Listing();
+    pclog::write("memcard: slot %d: %s", port + 1, s.name.empty() ? "no card" : s.root.c_str());
+}
+
+bool is_dir(const std::string &p);
+
+/* PC (2026-11-15): the slot holds a card - a folder there. */
+bool card_in(int port)
+{
+    const std::string &r = card_root(port);
+    return !r.empty() && is_dir(r.substr(0, r.size() - 1));
+}
+
+/* PC (2026-11-15): the start of a card call (the lock held): 0 when the slot's
+ * card can take it, else libmc's answer - no card (-10), or -1 after a swap
+ * the game has not asked about yet. */
+int card_check(int port, int slot)
+{
+    if (!valid_card(port, slot))
+        return -10;
+    apply_wanted(port);
+    if (!card_in(port))
+        return -10;
+    if (g_slot[port].swapped)
+        return sceMcResChangedCard;
+    return 0;
 }
 
 std::string card_path(int port, const char *name)
@@ -229,14 +290,30 @@ void delete_tree(const std::string &dir, bool removeSelf)
 
 } // namespace
 
+/* PC (2026-11-15): the cards are the save folders gt3pc_engine.ini [Saves]
+ * names (save_folders.h); nothing is made here (earlier: memcard1\ and
+ * memcard2\ of the game folder, made when missing). */
 void init()
 {
     std::lock_guard<std::mutex> lock(g_mutex);
+    g_savesDir = paths::saves_dir();
+    const std::wstring ini = save_folders::from_ansi(paths::engine_ini_path());
+    pclog::write("memcard: save folders %s (%s [Saves])", g_savesDir.c_str(), paths::engine_ini_path().c_str());
     for (int port = 0; port < 2; port++) {
-        std::string root = card_root(port);
-        CreateDirectoryA(root.c_str(), nullptr);
+        std::string name = save_folders::to_ansi(save_folders::slot(ini, port));
+        if (port == 1 && !name.empty() && _stricmp(name.c_str(), g_slot[0].name.c_str()) == 0) {
+            pclog::write("memcard: slot 2: %s is slot 1's folder: no card", name.c_str());
+            name.clear();
+        }
+        Slot &s = g_slot[port];
+        s.name = name;
+        s.root = name.empty() ? std::string() : g_savesDir + name + "\\";
+        if (name.empty())
+            pclog::write("memcard: slot %d: no card", port + 1);
+        else
+            pclog::write("memcard: slot %d: %s%s", port + 1, s.root.c_str(),
+                         card_in(port) ? "" : " (not there: no card)");
     }
-    pclog::write("memcard: %smemcard1, %smemcard2", paths::game_dir().c_str(), paths::game_dir().c_str());
 }
 
 int get_slot_max(int port)
@@ -251,13 +328,20 @@ int get_info(int port, int slot, int *type, int *freeClusters, int *format)
         if (type) *type = sceMcTypeNoCard;
         return -10;
     }
-    std::string root = card_root(port);
-    bool formatted = is_dir(root.substr(0, root.size() - 1));
-    if (type) *type = sceMcTypePS2;
-    if (freeClusters) *freeClusters = formatted ? free_clusters(port) : 0;
-    if (format) *format = formatted ? 1 : 0;
-    if (!formatted)
-        return sceMcResNoFormat;
+    /* PC (2026-11-15): a save folder (none, or not there: no card; reported
+     * as a new card when one is put in) */
+    apply_wanted(port);
+    g_slot[port].swapped = false;
+    if (!card_in(port)) {
+        if (type) *type = sceMcTypeNoCard;
+        if (freeClusters) *freeClusters = 0;
+        if (format) *format = 0;
+        g_reported[port] = false;
+        return -10;
+    }
+    if (type) *type = sceMcTypePS2;                         /* (a folder is a formatted card) */
+    if (freeClusters) *freeClusters = free_clusters(port);
+    if (format) *format = 1;
     /* The first answer is "a new card": the game's card manager (T501
      * mc_slot_poll_info) reads the free space and the format only then; a
      * plain 0 at start left its slot unformatted until it formatted the
@@ -272,8 +356,8 @@ int get_info(int port, int slot, int *type, int *freeClusters, int *format)
 int open(int port, int slot, const char *name, int mode)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
-    if (!valid_card(port, slot))
-        return -10;
+    if (const int res = card_check(port, slot))             /* PC (2026-11-15) */
+        return res;
     std::string p = card_path(port, name);
     if (mode & sceMcFileCreateDir) {
         if (exists(p))
@@ -386,8 +470,8 @@ int mkdir(int port, int slot, const char *name)
 int remove(int port, int slot, const char *name)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
-    if (!valid_card(port, slot))
-        return -10;
+    if (const int res = card_check(port, slot))             /* PC (2026-11-15) */
+        return res;
     std::string p = card_path(port, name);
     if (is_dir(p)) {
         if (count_entries(p) > 2)
@@ -403,8 +487,8 @@ int remove(int port, int slot, const char *name)
 int rename(int port, int slot, const char *org, const char *newName)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
-    if (!valid_card(port, slot))
-        return -10;
+    if (const int res = card_check(port, slot))             /* PC (2026-11-15) */
+        return res;
     std::string from = card_path(port, org);
     if (!exists(from))
         return sceMcResNoEntry;
@@ -421,8 +505,8 @@ int rename(int port, int slot, const char *org, const char *newName)
 int get_dir(int port, int slot, const char *pattern, unsigned int mode, int maxent, sceMcTblGetDir *table)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
-    if (!valid_card(port, slot))
-        return -10;
+    if (const int res = card_check(port, slot))             /* PC (2026-11-15) */
+        return res;
     Listing &l = g_listing[port];
     if (mode == 0) {
         l.entries.clear();
@@ -479,8 +563,8 @@ int get_dir(int port, int slot, const char *pattern, unsigned int mode, int maxe
 int set_file_info(int port, int slot, const char *name, const char *info, unsigned int valid)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
-    if (!valid_card(port, slot))
-        return -10;
+    if (const int res = card_check(port, slot))             /* PC (2026-11-15) */
+        return res;
     std::string p = card_path(port, name);
     if (!exists(p))
         return sceMcResNoEntry;
@@ -508,16 +592,17 @@ int set_file_info(int port, int slot, const char *name, const char *info, unsign
 int get_ent_space(int port, int slot, const char *path)
 {
     (void)path;
-    if (!valid_card(port, slot))
-        return -10;
+    std::lock_guard<std::mutex> lock(g_mutex);              /* PC (2026-11-15): the slot's state */
+    if (const int res = card_check(port, slot))
+        return res;
     return 0x20;
 }
 
 int format(int port, int slot)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
-    if (!valid_card(port, slot))
-        return -10;
+    if (const int res = card_check(port, slot))             /* PC (2026-11-15) */
+        return res;
     std::string root = card_root(port);
     root.pop_back();
     changed();
@@ -539,6 +624,75 @@ bool busy()
         if (f.used && f.writer)
             return true;
     return g_lastChange != 0 && GetTickCount64() - g_lastChange < kBusyMs;
+}
+
+/* ---- PC (2026-11-15): the save folders (memcard.h) ---- */
+
+const std::string &saves_dir()
+{
+    return g_savesDir;
+}
+
+std::vector<std::string> folders()
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    const ULONGLONG now = GetTickCount64();
+    if (g_foldersAt == 0 || now - g_foldersAt >= 1000) {
+        g_foldersAt = now;
+        g_folders.clear();
+        for (const std::wstring &f : save_folders::list(save_folders::from_ansi(g_savesDir)))
+            if (save_folders::name_problem(f) == nullptr)
+                g_folders.push_back(save_folders::to_ansi(f));
+    }
+    return g_folders;
+}
+
+std::string slot_folder(int port)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    if (port != 0 && port != 1)
+        return std::string();
+    const Slot &s = g_slot[port];
+    return s.wanted ? s.wantedName : s.name;
+}
+
+bool slot_folder_there(int port)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    if (port != 0 && port != 1)
+        return false;
+    const Slot &s = g_slot[port];
+    const std::string &name = s.wanted ? s.wantedName : s.name;
+    return !name.empty() && is_dir(g_savesDir + name);
+}
+
+bool slot_waiting(int port)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    return (port == 0 || port == 1) && g_slot[port].wanted;
+}
+
+bool set_slot_folder(int port, const std::string &name)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    if (port != 0 && port != 1)
+        return false;
+    const Slot &other = g_slot[1 - port];
+    const std::string &otherName = other.wanted ? other.wantedName : other.name;
+    if (!name.empty() && _stricmp(name.c_str(), otherName.c_str()) == 0)
+        return false;
+    Slot &s = g_slot[port];
+    const std::string &now = s.wanted ? s.wantedName : s.name;
+    if (_stricmp(name.c_str(), now.c_str()) == 0 && name == now)
+        return true;
+    s.wanted = true;
+    s.wantedName = name;
+    save_folders::set_slot(save_folders::from_ansi(paths::engine_ini_path()), port, save_folders::from_ansi(name));
+    apply_wanted(port);
+    if (s.wanted)
+        pclog::write("memcard: slot %d: %s once the card's open file is closed", port + 1,
+                     name.empty() ? "no card" : name.c_str());
+    return true;
 }
 
 } // namespace memcard

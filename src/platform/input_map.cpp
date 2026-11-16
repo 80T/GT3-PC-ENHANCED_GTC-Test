@@ -9,12 +9,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <string>
+#include <vector>
 
 namespace input_map {
 namespace {
 
-const char *const kSections[kProfileCount] = {"Controller1", "Controller2", "Wheel1", "Wheel2", "DebugCamera"};
-const char *const kNames[kProfileCount] = {"Controller 1", "Controller 2", "Wheel 1", "Wheel 2", "Debug camera"};
+const char *const kSections[kProfileCount] = {"Controller1", "Controller2", "Wheel1",   "Wheel2",
+                                              "DebugCamera", "HShifter1",   "HShifter2"};
+const char *const kNames[kProfileCount] = {"Controller 1", "Controller 2", "Wheel 1",   "Wheel 2",
+                                           "Debug camera", "H-Shifter 1",  "H-Shifter 2"};
 
 const ControlInfo kPadControls[kPadControlCount] = {
     {"Up", "D-pad up", ControlKind::button},
@@ -41,10 +44,21 @@ const ControlInfo kPadControls[kPadControlCount] = {
     {"RightStickDown", "Right stick down", ControlKind::direction},
     {"RightStickLeft", "Right stick left", ControlKind::direction},
     {"RightStickRight", "Right stick right", ControlKind::direction},
+    {"Clutch", "Clutch", ControlKind::pedal},          /* PC (2026-11-09) */
     {"CameraLeft", "Chase cam left", ControlKind::direction},
     {"CameraRight", "Chase cam right", ControlKind::direction},
     {"CameraUp", "Chase cam up", ControlKind::direction},
     {"CameraDown", "Chase cam down", ControlKind::direction},
+};
+
+/* PC (2026-11-09): an H-Shifter's gates */
+const ControlInfo kHShifterControls[kHShifterControlCount] = {
+    {"Neutral", "Neutral", ControlKind::button}, {"Gear1", "1st", ControlKind::button},
+    {"Gear2", "2nd", ControlKind::button},       {"Gear3", "3rd", ControlKind::button},
+    {"Gear4", "4th", ControlKind::button},       {"Gear5", "5th", ControlKind::button},
+    {"Gear6", "6th", ControlKind::button},       {"Gear7", "7th", ControlKind::button},
+    {"Gear8", "8th", ControlKind::button},       {"Gear9", "9th", ControlKind::button},
+    {"Reverse", "Reverse", ControlKind::button},
 };
 
 const ControlInfo kWheelControls[kWheelControlCount] = {
@@ -68,6 +82,7 @@ const ControlInfo kWheelControls[kWheelControlCount] = {
     {"Down", "D-pad down", ControlKind::button},
     {"Left", "D-pad left", ControlKind::button},
     {"Right", "D-pad right", ControlKind::button},
+    {"Clutch", "Clutch pedal", ControlKind::pedal},    /* PC (2026-11-09) */
     {"CameraLeft", "Chase cam left", ControlKind::direction},
     {"CameraRight", "Chase cam right", ControlKind::direction},
     {"CameraUp", "Chase cam up", ControlKind::direction},
@@ -90,14 +105,19 @@ const ControlInfo kDebugControls[kDebugControlCount] = {
     {"FovUp", "Field of view up", ControlKind::button},
     {"FovDown", "Field of view down", ControlKind::button},
     {"Lock", "Lock camera (drive)", ControlKind::button},
+    {"YAxisLook", "Y-axis look", ControlKind::button},
+    {"GroundCollision", "Ground collision", ControlKind::button},
 };
 
-const char *const kPadDeadzoneKeys[kDeadzones] = {"LeftStickDeadzone", "RightStickDeadzone", "TriggerDeadzone"};
+/* (a controller's fourth not used: deadzone_count) */
+const char *const kPadDeadzoneKeys[kDeadzones] = {"LeftStickDeadzone", "RightStickDeadzone", "TriggerDeadzone", ""};
 const char *const kPadDeadzoneNames[kDeadzones] = {"Left stick dead zone", "Right stick dead zone",
-                                                   "Trigger dead zone"};
-const char *const kWheelDeadzoneKeys[kDeadzones] = {"SteeringDeadzone", "GasDeadzone", "BrakeDeadzone"};
+                                                   "Trigger dead zone", ""};
+/* PC (2026-11-10, user: "Add a clutch pedal deadzone for the wheels") */
+const char *const kWheelDeadzoneKeys[kDeadzones] = {"SteeringDeadzone", "GasDeadzone", "BrakeDeadzone",
+                                                    "ClutchDeadzone"};
 const char *const kWheelDeadzoneNames[kDeadzones] = {"Steering dead zone", "Gas pedal dead zone",
-                                                     "Brake pedal dead zone"};
+                                                     "Brake pedal dead zone", "Clutch pedal dead zone"};
 
 /* SDL3's gamepad buttons and axes: the ini names (SDL_GetGamepadStringForButton's)
  * and the labels. */
@@ -287,6 +307,11 @@ Binding mouse_motion(int axis, int dir)
     return x;
 }
 
+/* the devices bindings name (device_id): [id - 1] (the game's all added by
+ * init, before the controller thread reads them) */
+std::vector<std::string> g_deviceNames;
+constexpr size_t kDeviceIds = 255;          /* (Binding::device) */
+
 /* ---- the game's ---- */
 
 Profile g_profiles[kProfileCount];
@@ -305,19 +330,43 @@ const char kHotkeySection[] = "Hotkeys";
 struct HotkeyInfo {
     const char *key, *name;
     KeyCombo def;
+    Binding dev;                            /* PC: the device's default (none but the song changer's) */
+    bool shared = false;                    /* PC (2026-11-08): acts only while its mode is on (hotkey_shares_keys) */
 };
+/* (the gamepad buttons, SDL's: Select, D-pad up / down) */
+enum { kPadBack = 4, kPadUp = 11, kPadDown = 12 };
 const HotkeyInfo kHotkeys[kHotkeyCount] = {
-    {"SettingsMenu", "Settings menu", {VK_F2}},
-    {"SystemMenu", "Esc menu", {VK_ESCAPE}},
-    {"FrameMonitor", "Frame time monitor", {VK_F3}},
-    {"Fullscreen", "Windowed / full screen", {VK_RETURN, false, true, false}},
-    {"Pause", "Pause / next tick", {VK_F5}},
-    {"Resume", "Resume", {VK_F6}},
-    {"FlickerCapture", "Flicker capture (debug)", {VK_F8}},
-    {"Trace", "Draw trace (debug)", {VK_F9}},
-    {"DebugCamera", "Debug camera (in a race)", {VK_F7}},
+    {"SettingsMenu", "Settings menu", {VK_F2}, {}},
+    {"SystemMenu", "Esc menu", {VK_ESCAPE}, {}},
+    {"FrameMonitor", "Frame time monitor", {VK_F3}, {}},
+    {"Fullscreen", "Windowed / full screen", {VK_RETURN, false, true, false}, {}},
+    {"Pause", "Pause / next tick", {VK_F5}, {}},
+    {"Resume", "Resume", {VK_F6}, {}},
+    {"FlickerCapture", "Flicker capture (debug)", {VK_F8}, {}},
+    {"Trace", "Draw trace (debug)", {VK_F9}, {}},
+    {"DebugCamera", "Debug camera (in a race)", {VK_F7}, {}},
+    {"SongMenu", "Song changer (in a race)", {'M'}, pad_button(kPadBack)},
+    {"PreviousSong", "Previous song (song changer)", {VK_OEM_COMMA}, pad_button(kPadUp)},
+    {"NextSong", "Next song (song changer)", {VK_OEM_PERIOD}, pad_button(kPadDown)},
+    {"FrameCapture", "Frame capture (debug)", {VK_F11}, {}},  /* PC (2026-11-06): pgl_capture.h */
+    /* PC (2026-11-08): the cockpit camera's calibration (cockpit_osd.h): the
+     * arrows (user: "Arrow keys are good"), shared with the D-pad's keys
+     * since they act only while it is on; no device by default, as the user
+     * asked of the hotkeys */
+    {"CalibrationUp", "Calibration: previous axis", {VK_UP}, {}, true},
+    {"CalibrationDown", "Calibration: next axis", {VK_DOWN}, {}, true},
+    {"CalibrationLeft", "Calibration: step down", {VK_LEFT}, {}, true},
+    {"CalibrationRight", "Calibration: step up", {VK_RIGHT}, {}, true},
+    {"CalibrationSave", "Calibration: save", {VK_F4}, {}, true},
+    {"CalibrationCancel", "Calibration: cancel", {VK_DELETE}, {}, true},
+    {"CalibrationReset", "Calibration: axis to 0", {'0'}, {}, true},
+    {"TextureMenu", "Texture replacement menu", {VK_F10}, {}},     /* PC (2026-11-13): texture_menu.h */
+    {"TextureRefresh", "Refresh replacement textures", {VK_F10, true, false, false}, {}},
+    {"TextureToggle", "Replacement textures on / off", {VK_F12}, {}},
+    {"Screenshot", "Screenshot", {VK_F1}, {}},                      /* PC (2026-11-15): screenshot.h */
 };
 KeyCombo g_hotkeys[kHotkeyCount];
+Binding g_hotDevices[kHotkeyCount];         /* PC: the hotkeys' devices */
 
 } // namespace
 
@@ -333,11 +382,15 @@ const char *profile_name(int profile)
 
 int control_count(int profile)
 {
+    if (is_hshifter(profile))
+        return kHShifterControlCount;      /* PC (2026-11-09) */
     return profile == kDebugCamera ? kDebugControlCount : is_wheel(profile) ? kWheelControlCount : kPadControlCount;
 }
 
 const ControlInfo &control(int profile, int i)
 {
+    if (is_hshifter(profile))
+        return kHShifterControls[i];       /* PC (2026-11-09) */
     return profile == kDebugCamera ? kDebugControls[i] : is_wheel(profile) ? kWheelControls[i] : kPadControls[i];
 }
 
@@ -345,8 +398,24 @@ int control_in_order(int profile, int row)
 {
     if (profile == kDebugCamera)
         return row;
-    /* (the chase camera's are the profile's last controls) */
-    return row < kCameraControls ? camera_control(profile) + row : row - kCameraControls;
+    if (is_hshifter(profile))               /* PC (2026-11-09): Neutral, Reverse, 1st .. 9th */
+        return row == 0 ? HS_NEUTRAL : row == 1 ? HS_REVERSE : row - 1;
+    /* PC (2026-11-10, user: "move the clutch pedal mapping from the bottom
+     * next to brake.  For controllers, put the clutch at the top"): a
+     * controller's clutch first, then its chase camera's, then the rest; a
+     * wheel's chase camera's, its steering, gas, brake and clutch, then the
+     * rest.  (The clutch and the chase camera's are the profile's last
+     * controls, the clutch before them.) */
+    if (!is_wheel(profile)) {
+        if (row == 0)
+            return PAD_CLUTCH;
+        row--;
+        return row < kCameraControls ? PAD_CAM_LEFT + row : row - kCameraControls;
+    }
+    if (row < kCameraControls)
+        return WHEEL_CAM_LEFT + row;
+    row -= kCameraControls;
+    return row <= WHEEL_BRAKE ? row : row == WHEEL_BRAKE + 1 ? WHEEL_CLUTCH : row - 1;
 }
 
 bool slot_takes(int slot, Source s)
@@ -357,6 +426,15 @@ bool slot_takes(int slot, Source s)
     return slot == 1 ? input : !input;
 }
 
+bool slot_takes(int profile, int slot, Source s)
+{
+    if (!is_hshifter(profile))
+        return slot_takes(slot, s);
+    if (s == Source::none)
+        return true;
+    return slot == 0 && s != Source::mouse_motion;     /* PC (2026-11-09): one binding, any device */
+}
+
 /* The mouse's movement (Source::mouse_motion): its ini name by axis (0 x, 1
  * y) and direction (- left / up, + right / down). */
 static const char *motion_name(int axis, int dir)
@@ -364,7 +442,31 @@ static const char *motion_name(int axis, int dir)
     return axis == 0 ? (dir < 0 ? "moveleft" : "moveright") : (dir < 0 ? "moveup" : "movedown");
 }
 
-void format(const Binding &b, char *out, size_t n)
+int device_id(const char *name)
+{
+    if (name == nullptr || name[0] == '\0')
+        return 0;
+    for (size_t i = 0; i < g_deviceNames.size(); i++)
+        if (_stricmp(g_deviceNames[i].c_str(), name) == 0)
+            return (int)i + 1;
+    if (g_deviceNames.size() >= kDeviceIds)
+        return 0;
+    g_deviceNames.push_back(name);
+    return (int)g_deviceNames.size();
+}
+
+const char *device_name(int id)
+{
+    return id >= 1 && id <= (int)g_deviceNames.size() ? g_deviceNames[id - 1].c_str() : "";
+}
+
+int device_count()
+{
+    return (int)g_deviceNames.size();
+}
+
+/* The binding's text without its device. */
+static void format_input(const Binding &b, char *out, size_t n)
 {
     char k[24];
     switch (b.source) {
@@ -410,11 +512,17 @@ void format(const Binding &b, char *out, size_t n)
         out[0] = '\0';
 }
 
-bool parse(const char *text, Binding *out)
+void format(const Binding &b, char *out, size_t n)
 {
-    char s[64];
-    snprintf(s, sizeof(s), "%s", text);
-    trim(s);
+    format_input(b, out, n);
+    const size_t len = n > 0 ? strlen(out) : 0;
+    if (b.device != 0 && len > 0 && len < n)
+        snprintf(out + len, n - len, "@%s", device_name(b.device));
+}
+
+/* The binding's text without its device (trimmed). */
+static bool parse_input(const char *s, Binding *out)
+{
     *out = Binding();
     if (s[0] == '\0' || _stricmp(s, "none") == 0)
         return true;
@@ -499,7 +607,30 @@ bool parse(const char *text, Binding *out)
     return false;
 }
 
-void describe(const Binding &b, char *out, size_t n)
+bool parse(const char *text, Binding *out)
+{
+    char s[256];
+    snprintf(s, sizeof(s), "%s", text);
+    /* `@<name>': the device it names (a device's binding only) */
+    char *name = strchr(s, '@');
+    if (name != nullptr)
+        *name++ = '\0';
+    trim(s);
+    if (!parse_input(s, out))
+        return false;
+    if (name != nullptr && out->source != Source::none && slot_takes(0, out->source)) {
+        trim(name);
+        if (name[0] != '\0') {
+            out->device = (uint8_t)device_id(name);
+            if (out->device == 0)
+                return false;
+        }
+    }
+    return true;
+}
+
+/* The binding's label without its device. */
+static void describe_input(const Binding &b, char *out, size_t n)
 {
     switch (b.source) {
     case Source::pad_button:
@@ -561,6 +692,14 @@ void describe(const Binding &b, char *out, size_t n)
         out[0] = '\0';
 }
 
+void describe(const Binding &b, char *out, size_t n)
+{
+    describe_input(b, out, n);
+    const size_t len = n > 0 ? strlen(out) : 0;
+    if (b.device != 0 && len > 0 && len < n)
+        snprintf(out + len, n - len, " on %s", device_name(b.device));
+}
+
 bool capture_axis(bool joyAxis, int axis, int rest, int now, Binding *out)
 {
     if (joyAxis && abs(rest) > 16384) {
@@ -579,14 +718,14 @@ bool capture_axis(bool joyAxis, int axis, int rest, int now, Binding *out)
 
 const char *deadzone_key(int profile, int i)
 {
-    if (i < 0 || i >= kDeadzones)
+    if (i < 0 || i >= deadzone_count(profile))
         return "";
     return is_wheel(profile) ? kWheelDeadzoneKeys[i] : kPadDeadzoneKeys[i];
 }
 
 const char *deadzone_name(int profile, int i)
 {
-    if (i < 0 || i >= kDeadzones)
+    if (i < 0 || i >= deadzone_count(profile))
         return "";
     return is_wheel(profile) ? kWheelDeadzoneNames[i] : kPadDeadzoneNames[i];
 }
@@ -594,6 +733,8 @@ const char *deadzone_name(int profile, int i)
 void defaults(int profile, Profile *out)
 {
     *out = Profile();
+    if (is_hshifter(profile))
+        return;                             /* PC (2026-11-09): nothing mapped */
     if (is_wheel(profile)) {
         /* the steering on the first axis, the 12 buttons in the Driving
          * Force's order (Logitech's later wheels keep it), the D-pad on the
@@ -615,8 +756,9 @@ void defaults(int profile, Profile *out)
     if (profile == kDebugCamera) {
         /* the left stick moves, the right stick looks, the triggers up / down,
          * the shoulders the speed, the D-pad the field of view, the right
-         * stick's click the lock; the keyboard W A S D, E / Q, the mouse's
-         * movement, its wheel, Page Up / Down, F */
+         * stick's click the lock, the left stick's the Y-axis look, the top
+         * face button the ground collision; the keyboard W A S D, E / Q, the
+         * mouse's movement, its wheel, Page Up / Down, F, Y, G */
         const struct {
             int control;
             Binding pad, key;
@@ -636,6 +778,8 @@ void defaults(int profile, Profile *out)
             {DEBUG_FOV_UP, pad_button(DUP), key(VK_PRIOR)},
             {DEBUG_FOV_DOWN, pad_button(DDOWN), key(VK_NEXT)},
             {DEBUG_LOCK, pad_button(RSTICK), key('F')},
+            {DEBUG_Y_LOOK, pad_button(LSTICK), key('Y')},
+            {DEBUG_GROUND, pad_button(NORTH), key('G')},
         };
         for (const auto &d : kDebugDefaults) {
             out->map[d.control][0] = d.pad;
@@ -672,6 +816,7 @@ void defaults(int profile, Profile *out)
         {PAD_RSTICK_DOWN, pad_axis(RY, 1), 'K'},
         {PAD_RSTICK_LEFT, pad_axis(RX, -1), 'J'},
         {PAD_RSTICK_RIGHT, pad_axis(RX, 1), 'L'},
+        {PAD_CLUTCH, Binding(), 0},         /* PC (2026-11-09): none (the player maps it) */
         /* the chase camera: the right stick's own (game/app/pc_freecam.h) */
         {PAD_CAM_LEFT, pad_axis(RX, -1), 'J'},
         {PAD_CAM_RIGHT, pad_axis(RX, 1), 'L'},
@@ -680,9 +825,11 @@ void defaults(int profile, Profile *out)
     };
     for (const auto &d : kDefaults) {
         out->map[d.control][0] = d.pad;
-        if (profile == kController1)
+        if (profile == kController1 && d.vk != 0)
             out->map[d.control][1] = key(d.vk);
     }
+    /* the sticks' dead zones (a stick's drift at rest; the triggers 0) */
+    out->deadzone[0] = out->deadzone[1] = kStickDeadzoneDefault;
 }
 
 void load(const char *ini, int profile, Profile *out)
@@ -690,21 +837,22 @@ void load(const char *ini, int profile, Profile *out)
     defaults(profile, out);
     const char *sec = profile_section(profile);
     for (int c = 0; c < control_count(profile); c++) {
-        char buf[160];
+        char buf[400];
         GetPrivateProfileStringA(sec, control(profile, c).key, "\x01", buf, sizeof(buf), ini);
         if (strcmp(buf, "\x01") == 0)
             continue;                       /* missing: the default */
-        char *semi = strchr(buf, ';');
+        char *semi = strrchr(buf, ';');     /* (the last: a device's name may hold one, slot 1 none) */
         if (semi != nullptr)
             *semi++ = '\0';
         const char *texts[kSlots] = {buf, semi != nullptr ? semi : ""};
         for (int s = 0; s < kSlots; s++) {
             Binding b;
-            out->map[c][s] = parse(texts[s], &b) && slot_takes(s, b.source) ? b : Binding();
+            out->map[c][s] = parse(texts[s], &b) && slot_takes(profile, s, b.source) ? b : Binding();
         }
     }
-    for (int i = 0; i < kDeadzones; i++)
-        out->deadzone[i] = clamp_deadzone((int)GetPrivateProfileIntA(sec, deadzone_key(profile, i), 0, ini));
+    for (int i = 0; i < deadzone_count(profile); i++)     /* (PC 2026-11-09 / 10: an H-Shifter none, a wheel four) */
+        out->deadzone[i] =
+            clamp_deadzone((int)GetPrivateProfileIntA(sec, deadzone_key(profile, i), out->deadzone[i], ini));
     if (is_wheel(profile)) {
         GetPrivateProfileStringA(sec, "Device", "auto", out->device, sizeof(out->device), ini);
         trim(out->device);
@@ -721,13 +869,13 @@ void save(const char *ini, int profile, const Profile &p)
 {
     const char *sec = profile_section(profile);
     for (int c = 0; c < control_count(profile); c++) {
-        char a[64], b[64], line[140];
+        char a[300], b[64], line[380];
         format(p.map[c][0], a, sizeof(a));
         format(p.map[c][1], b, sizeof(b));
         snprintf(line, sizeof(line), "%s;%s", a, b);
         WritePrivateProfileStringA(sec, control(profile, c).key, line, ini);
     }
-    for (int i = 0; i < kDeadzones; i++) {
+    for (int i = 0; i < deadzone_count(profile); i++) {
         char v[16];
         snprintf(v, sizeof(v), "%d", clamp_deadzone(p.deadzone[i]));
         WritePrivateProfileStringA(sec, deadzone_key(profile, i), v, ini);
@@ -738,19 +886,39 @@ void save(const char *ini, int profile, const Profile &p)
     }
 }
 
+bool names_device(const Profile &p, const char *name)
+{
+    if (name == nullptr || name[0] == '\0')
+        return false;
+    for (const auto &slots : p.map)
+        for (const Binding &b : slots)
+            if (b.device != 0 && _stricmp(device_name(b.device), name) == 0)
+                return true;
+    return false;
+}
+
 float value(const Binding &b, const Sources &s)
 {
+    /* the device it names (nothing while that one is not connected), else
+     * the profile's own */
+    const PadSource *pad = s.pad;
+    const JoySource *joy = s.joy;
+    if (b.device != 0) {
+        const bool open = s.devices != nullptr && b.device <= s.deviceCount;
+        pad = open ? s.devices[b.device - 1].pad : nullptr;
+        joy = open ? s.devices[b.device - 1].joy : nullptr;
+    }
     switch (b.source) {
     case Source::pad_button:
-        return s.pad != nullptr && b.index < 32 && ((s.pad->buttons >> b.index) & 1) ? 1.0f : 0.0f;
+        return pad != nullptr && b.index < 32 && ((pad->buttons >> b.index) & 1) ? 1.0f : 0.0f;
     case Source::pad_axis:
-        return s.pad != nullptr && b.index < kPadAxes ? half(s.pad->axes[b.index], b.dir) : 0.0f;
+        return pad != nullptr && b.index < kPadAxes ? half(pad->axes[b.index], b.dir) : 0.0f;
     case Source::joy_button:
-        return s.joy != nullptr && b.index < s.joy->buttonCount && s.joy->buttons[b.index] ? 1.0f : 0.0f;
+        return joy != nullptr && b.index < joy->buttonCount && joy->buttons[b.index] ? 1.0f : 0.0f;
     case Source::joy_axis: {
-        if (s.joy == nullptr || b.index >= s.joy->axisCount)
+        if (joy == nullptr || b.index >= joy->axisCount)
             return 0.0f;
-        const int v = s.joy->axes[b.index];
+        const int v = joy->axes[b.index];
         if (b.dir == 2)
             return (float)(v + 32768) / 65535.0f;
         if (b.dir == -2)
@@ -758,7 +926,7 @@ float value(const Binding &b, const Sources &s)
         return half(v, b.dir);
     }
     case Source::joy_hat:
-        return s.joy != nullptr && b.index < s.joy->hatCount && (s.joy->hats[b.index] & b.dir) ? 1.0f : 0.0f;
+        return joy != nullptr && b.index < joy->hatCount && (joy->hats[b.index] & b.dir) ? 1.0f : 0.0f;
     case Source::key:
         return s.key != nullptr && s.key(b.index) ? 1.0f : 0.0f;
     case Source::mouse_wheel:
@@ -785,7 +953,7 @@ void init(const char *ini)
     }
     for (int w = 0; w < 2; w++)
         g_controller[w] = g_profiles[kWheel1 + w].controller;
-    load_hotkeys(ini, g_hotkeys);
+    load_hotkeys(ini, g_hotkeys, g_hotDevices);
 }
 
 bool plays_with_controller(int player)
@@ -814,7 +982,7 @@ int deadzone(int p, int i)
 
 void set_deadzone(int p, int i, int percent)
 {
-    if (p < 0 || p >= kProfileCount || i < 0 || i >= kDeadzones)
+    if (p < 0 || p >= kProfileCount || i < 0 || i >= deadzone_count(p))
         return;
     percent = clamp_deadzone(percent);
     if (g_deadzones[p][i].exchange(percent) == percent || g_ini.empty())
@@ -847,6 +1015,11 @@ const char *hotkey_name(int h)
 KeyCombo hotkey_default(int h)
 {
     return h >= 0 && h < kHotkeyCount ? kHotkeys[h].def : KeyCombo();
+}
+
+bool hotkey_shares_keys(int h)
+{
+    return h >= 0 && h < kHotkeyCount && kHotkeys[h].shared;
 }
 
 bool is_modifier(int vk)
@@ -911,22 +1084,60 @@ void describe_combo(const KeyCombo &k, char *out, size_t n)
     snprintf(out, n, "%s%s%s%s", k.ctrl ? "Ctrl+" : "", k.alt ? "Alt+" : "", k.shift ? "Shift+" : "", key);
 }
 
-void load_hotkeys(const char *ini, KeyCombo out[kHotkeyCount])
+Binding hotkey_device_default(int h)
 {
+    return h >= 0 && h < kHotkeyCount ? kHotkeys[h].dev : Binding();
+}
+
+void load_hotkeys(const char *ini, KeyCombo out[kHotkeyCount], Binding dev[kHotkeyCount])
+{
+    /* PC: the controls' keys, for a hotkey missing from the file (one newer
+     * than it: its default key may be a control's there) */
+    Profile profiles[kProfileCount];
+    bool loaded = false;
+    auto control_key = [&](int vk) {
+        if (!loaded) {
+            for (int p = 0; p < kProfileCount; p++)
+                load(ini, p, &profiles[p]);
+            loaded = true;
+        }
+        for (int p = 0; p < kProfileCount; p++)
+            for (int c = 0; c < control_count(p); c++) {
+                const Binding &b = profiles[p].map[c][is_hshifter(p) ? 0 : 1];   /* (an H-Shifter's: slot 0) */
+                if (b.source == Source::key && b.index == vk)
+                    return true;
+            }
+        return false;
+    };
     for (int h = 0; h < kHotkeyCount; h++) {
-        char buf[64];
+        char buf[400];
         GetPrivateProfileStringA(kHotkeySection, kHotkeys[h].key, "\x01", buf, sizeof(buf), ini);
-        if (strcmp(buf, "\x01") == 0 || !parse_combo(buf, &out[h]))
+        const bool missing = strcmp(buf, "\x01") == 0;
+        /* PC: the device's binding after the first `;' (a combination has
+         * none: the key ';' is "Semicolon"); without it the default */
+        char *semi = missing ? nullptr : strchr(buf, ';');
+        if (semi != nullptr)
+            *semi++ = '\0';
+        if (missing || !parse_combo(buf, &out[h]))
             out[h] = kHotkeys[h].def;       /* missing or unreadable: the default */
+        if (missing && !kHotkeys[h].shared && !out[h].ctrl && !out[h].alt && !out[h].shift && out[h].vk != 0 &&
+            control_key(out[h].vk))
+            out[h] = KeyCombo();            /* PC: a control's key stays the control's (a shared hotkey's may be one) */
+        if (dev != nullptr) {
+            Binding b;
+            dev[h] = semi == nullptr ? kHotkeys[h].dev : parse(semi, &b) && slot_takes(0, b.source) ? b : Binding();
+        }
     }
 }
 
-void save_hotkey(const char *ini, int h, const KeyCombo &k)
+void save_hotkey(const char *ini, int h, const KeyCombo &k, const Binding &dev)
 {
     if (h < 0 || h >= kHotkeyCount)
         return;
-    char buf[64];
-    format_combo(k, buf, sizeof(buf));
+    char key[64], device[300], buf[380];
+    format_combo(k, key, sizeof(key));
+    format(dev, device, sizeof(device));
+    snprintf(buf, sizeof(buf), "%s;%s", key, device);   /* PC: the device too */
     WritePrivateProfileStringA(kHotkeySection, kHotkeys[h].key, buf, ini);
 }
 
@@ -934,6 +1145,12 @@ const KeyCombo &hotkey(int h)
 {
     static const KeyCombo none;
     return h >= 0 && h < kHotkeyCount ? g_hotkeys[h] : none;
+}
+
+const Binding &hotkey_device(int h)
+{
+    static const Binding none;
+    return h >= 0 && h < kHotkeyCount ? g_hotDevices[h] : none;
 }
 
 bool is_hotkey(int h, int vk, bool ctrl, bool alt, bool shift)

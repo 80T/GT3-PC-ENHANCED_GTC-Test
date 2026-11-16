@@ -43,6 +43,12 @@ enum {
  * four F1 tyres with brakes, so this leaves more than 3x room (an overrun
  * is logged). */
 enum { RACE_TIRE_WORK_SIZE = 0x40000 };
+/* PC (2026-11-13): the work space of a car model's menu tyres
+ * (RaceCarModel::pcBuildMenuTires: the four tyres' levels 0 and 1 at 30
+ * segments, game/app/pc_menu_tires.h): 0x1E380 bytes for four F1 tyres with
+ * brakes, 0x14080 for an ordinary car's (measured over the US cars; an
+ * overrun is logged). */
+enum { PC_MENU_TIRE_WORK_SIZE = 0x40000 };
 
 /* file_req_alloc's kind 0: a file of the volume, unpacked (T504). */
 enum { FILE_REQ_PLAIN = 0 };

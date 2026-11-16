@@ -35,6 +35,21 @@ extern f32 g_pcViewLag;
 /* By the race, once per tick: draw frames between the ticks. */
 void pc_frame_request_interpolation(void);
 
+/* A replay's speed (docs/renderer.md "Replay speed", ROADMAP 51): 1/8 .. 8,
+ * stepped by L2 / R2.  The ticks themselves run slower or faster, each the
+ * same tick as ever, so all of the race keeps together and a replay plays the
+ * same at any speed; in slow motion frames are drawn between them, whatever
+ * the display.  What is not ticks stays at real time: the music, and the
+ * camera cuts timed to it.
+ * By a replay on screen, once per tick it runs (not paused, not behind a
+ * menu: anything else keeps the normal rate). */
+void pc_replay_speed_request(void);
+/* A race starts: the normal speed. */
+void pc_replay_speed_reset(void);
+/* In a replay, each pad read of player `port' (0, 1): the buttons that step
+ * the speed, held; each press of one is a step. */
+void pc_replay_speed_buttons(int port, int slower, int faster);
+
 /* After the projection and the view of a race view are set (key: the
  * view - one per screen of a split screen; shot: what it shows from, the
  * camera and its mount): kept per tick, and between ticks replaced by their

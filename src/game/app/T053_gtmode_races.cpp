@@ -114,6 +114,7 @@
 #include "game/data/T484_race_database.h"        /* RaceDataBase, COURSE_KIND_* */
 #include "game/data/T489_car_database.h"         /* race_name_split, RACE_KIND_* */
 #include "pc_ee.h"                          /* PC: ee_f2u, the EE's float -> unsigned conversion */
+#include "game/app/pc_course_pick.h"            /* PC: pc_course_career (the course randomizer / forcer) */
 
 /* T053's data starts unreferenced: its .rodata with <new>'s "bad_alloc" and
  * gtMenus' file names (only the table points at them), its .sdata with
@@ -675,6 +676,7 @@ int run_gtmode_race(void)
     info.vibration = getGameStatus()->getGameOptions()->vibration1p;
     info.transmission = getGameStatus()->getGameOptions()->gearAuto ^ 1;
     info.setRaceCode(nameToCode(raceName));
+    pc_course_career(&info);                                /* PC: the course randomizer's draw (forcer first) */
     RaceOrganization *org = race_organization_create(&info);    /* s2 */
 
     ShortMenuArgs menuArgs;                                 /* fp+0x00250: ShortMenuResultEntry() x 6,
@@ -695,7 +697,7 @@ int run_gtmode_race(void)
     int distance = 0;                                       /* fp+0x34048 driven in the garage car */
     result_list_by_order(org, &menuArgs, 1);
     int loop = 1;                                           /* fp+0x3404C */
-    menuArgs.laps = info.db.event->numberOfLaps;
+    menuArgs.laps = pc_race_laps(org, info.db.event->numberOfLaps);    /* PC: the laps run (pc_course_pick.h) */
 
     do {
         org->backgroundMode = 1;
@@ -833,6 +835,7 @@ int run_championship(int cont)
             const char *raceName = getGameStatus()->getMenuStatus()->event;
             select_race(raceName);
             info.setChampionship(raceName, 0);
+            pc_course_career(&info);                        /* PC: session 1's course (randomizer / forcer) */
             org = race_organization_create(&info);          /* draws the opponents (see above) */
             delete org;
         } else {
@@ -840,6 +843,7 @@ int run_championship(int cont)
             select_race(info.currentRaceCode);
             info.setChampionship(info.currentRaceCode, 1);
             info.selectEnemies = 1;                         /* the resumed opponents are kept */
+            pc_course_career(&info);                        /* PC: the session's course (randomizer / forcer) */
         }
         info.transmission = getGameStatus()->getGameOptions()->gearAuto ^ 1;
         info.vibration = getGameStatus()->getGameOptions()->vibration1p;
@@ -862,7 +866,7 @@ int run_championship(int cont)
         int loop = 1;                                       /* fp+0x35054 */
 
         do {
-            menuArgs.laps = info.db.event->numberOfLaps;
+            menuArgs.laps = pc_race_laps(org, info.db.event->numberOfLaps);    /* PC: the laps run (pc_course_pick.h) */
             org->backgroundMode = 1;
             race->virtual_8(RACE_DEMO);
             int action = run_short_menu(&params, &menuArgs, shown, NULL, NULL);   /* s0 */
@@ -922,6 +926,7 @@ int run_championship(int cont)
                 } else {
                     race->~RaceChampionship();              /* virtual (slot 0, flags 2) */
                     info.nextSession();
+                    pc_course_career(&info);                /* PC: the session's course (randomizer / forcer) */
                     courseCode = info.getCourseCode();
                     delete org;
                     org = race_organization_create(&info);

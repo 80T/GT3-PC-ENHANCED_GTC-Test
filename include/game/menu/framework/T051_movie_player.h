@@ -19,6 +19,7 @@
 #include "game/menu/framework/T253_menu_bg_movie.h"        /* MenuBgMovie g_002CDC10 (MovieRender::render) */
 #include "engine/pgl/G001_flare.h"                /* gfx_enable, gfx_blend_func, pgl_color4f,
                                                gs_draw_flat_sprite (MovieRender::render) */
+#include "game/app/pc_aspect.h"                 /* PC: pc_aspect_movie_frame */
 
 class GSBuffer;                             /* T514 (references only) */
 struct MovieParam;                          /* T000: file, size, flags (pointers only) */
@@ -71,6 +72,7 @@ public:
      * endRender.  (Its FUNC marker is in T051_movie_player.cpp.) */
     virtual void render(GSBuffer &buf)
     {
+        pc_aspect_movie_frame();            /* PC: the movie has the window, whatever the menus' aspect */
         g_002CDC10.update();
         beginRender(buf);
         movie.virtual_2();                  /* MpegImage's draw */

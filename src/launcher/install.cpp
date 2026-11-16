@@ -5,7 +5,12 @@
  * file; gzip-packed files are inflated in memory and checked against their
  * CRC-32 and size before they are written. */
 #include "install.h"
+#include "gameconf.h"
+#include "databases.h"
 #include "inflate.h"
+#include "music.h"
+#include "stills.h"
+#include "image_packs.h"                    /* PC (2026-11-08) */
 #include "util.h"
 #include "volume.h"
 
@@ -72,29 +77,9 @@ std::wstring data_folder_of(Version v, const std::string &boot, const std::strin
     return std::wstring(kDataFolder) + L"_" + util::widen(what);
 }
 
-/* The courses' region folder of a language (the game's course_set_region:
- * Japanese JP, English (US) US, English (UK) UK, the others EU). */
-std::string course_region(const std::string &language)
-{
-    if (same_text(language, "JP"))
-        return "JP";
-    if (same_text(language, "US"))
-        return "US";
-    if (same_text(language, "BR"))
-        return "UK";
-    return "EU";
-}
-
-/* The unified structure (install.h): a volume path's place in the data
- * folder.  `flatCourses`: the volume has its courses in courses/ itself (the
- * Japanese disc), which go into courses/<region>/ (courses/.list stays). */
-std::string unified_path(const std::string &path, bool flatCourses, const std::string &region)
-{
-    if (flatCourses && path.size() > 8 && _strnicmp(path.c_str(), "courses/", 8) == 0 &&
-        path.find('/', 8) == std::string::npos && _stricmp(path.c_str() + 8, ".list") != 0)
-        return path.substr(0, 8) + region + "/" + path.substr(8);
-    return path;
-}
+/* (PC 2026-11-14: the unified structure's course_region, flat_courses and
+ * unified_path are volume.h's now: the game reads a disc image's volume in
+ * the same structure) */
 
 /* What the game needs to know of a release, from its CORE.GT3: the car
  * database files its code reads, and its own language (install.h). */
@@ -128,7 +113,7 @@ std::wstring release_name(const std::string &boot, const std::string &folder, co
         what += "\\" + folder;
     else if (!boot.empty())
         what += ", " + serial(boot);
-    return L"A Gran Turismo 3 engine game (" + util::widen(what) + L")";
+    return L"(" + util::widen(what) + L")";
 }
 
 /* The release's own language, by its car database (each release's code
@@ -199,11 +184,13 @@ CoreFacts core_facts(const std::vector<uint8_t> &core, const std::string &boot)
     return f;
 }
 
-/* The marker's lines before the counts (install.h). */
-std::string marker_head(const std::wstring &release, const std::string &boot, const CoreFacts &f)
+/* The marker's lines before the counts (install.h); how: where the files are
+ * from (a disc image's folder, PC 2026-11-14: "read from its disc image"). */
+std::string marker_head(const std::wstring &release, const std::string &boot, const CoreFacts &f,
+                        const char *how = "unpacked from its volume")
 {
     const std::string name = util::narrow(release);
-    std::string m = name + ": the game files, unpacked from its volume\r\n";
+    std::string m = name + ": the game files, " + how + "\r\n";
     m += "release " + name + "\r\n";
     if (!boot.empty())
         m += "boot " + boot + "\r\n";
@@ -334,6 +321,98 @@ std::wstring full_folder(const std::wstring &folder_in)
     return util::with_slash(fn && fn < MAX_PATH * 4 ? std::wstring(full, fn) : folder_in);
 }
 
+/* The demo replays of the licence tests and the arcade time trials (this
+ * tree's demo\: resources of this type named as the files;
+ * src/launcher/CMakeLists.txt). */
+constexpr const wchar_t *kDemoResource = L"GT3DEMO";
+
+BOOL CALLBACK list_demo(HMODULE, LPCWSTR, LPWSTR name, LONG_PTR names)
+{
+    reinterpret_cast<std::vector<std::wstring> *>(names)->push_back(name);
+    return TRUE;
+}
+
+/* Reads the whole file `path` into `out` (false when it cannot be, or is
+ * larger than `max`).  Below (read_small_file). */
+bool read_small_file(const std::wstring &path, size_t max, std::vector<uint8_t> *out);
+
+/* Writes the demos over the disc's in the data folder `data`.  The engine is
+ * the same for every region and opens demo\<name> in all of them
+ * (load_demo_setting); the European disc has its PAL copies beside those,
+ * <name>_p (and L0S0001_uk, L0S0001_uk_p), which its own code read: each file
+ * goes to its plain name and over any such copy.  `changed`: only the files
+ * whose bytes differ from the launcher's (an installed version refreshed at
+ * the start, refresh_demos; a file already the same is left untouched).
+ * *count: the demos written (every one of the set, or with `changed` those
+ * that had a file to write); false with the reason in *message when one
+ * cannot be written.  discFiles (PC 2026-11-14, a disc image's folder:
+ * prepare_disc): the names of the disc's own demo files, which are not in the
+ * folder - its copies of a demo (<name>_*) are written there too, so the game
+ * reads the launcher's in their place as in an install. */
+bool write_demos(const std::wstring &data, bool changed, int *count, std::wstring *message,
+                 const std::vector<std::wstring> *discFiles = nullptr)
+{
+    HMODULE inst = GetModuleHandleW(nullptr);
+    std::vector<std::wstring> names;
+    EnumResourceNamesW(inst, kDemoResource, list_demo, reinterpret_cast<LONG_PTR>(&names));
+    const std::wstring folder = util::with_slash(data) + L"demo";
+    if (!names.empty() && !util::make_folders(folder)) {
+        *message = L"The folder " + folder + L" could not be created: " + util::system_error_text(GetLastError()) + L".";
+        return false;
+    }
+    int written = 0;
+    for (const std::wstring &name : names) {
+        HRSRC r = FindResourceW(inst, name.c_str(), kDemoResource);
+        HGLOBAL res = r ? LoadResource(inst, r) : nullptr;
+        const void *p = res ? LockResource(res) : nullptr;
+        const DWORD size = r ? SizeofResource(inst, r) : 0;
+        if (p == nullptr || size == 0) {
+            *message = L"The demo replay " + name + L" is missing from the launcher.";
+            return false;
+        }
+        std::vector<std::wstring> files{name};
+        WIN32_FIND_DATAW fd;
+        HANDLE f = FindFirstFileW((folder + L"\\" + name + L"_*").c_str(), &fd);
+        if (f != INVALID_HANDLE_VALUE) {
+            do {
+                files.push_back(fd.cFileName);
+            } while (FindNextFileW(f, &fd));
+            FindClose(f);
+        }
+        if (discFiles != nullptr)
+            for (const std::wstring &d : *discFiles) {
+                if (d.size() <= name.size() + 1 || d[name.size()] != L'_' ||
+                    _wcsnicmp(d.c_str(), name.c_str(), name.size()) != 0)
+                    continue;
+                bool have = false;
+                for (const std::wstring &file : files)
+                    have = have || _wcsicmp(file.c_str(), d.c_str()) == 0;
+                if (!have)
+                    files.push_back(d);
+            }
+        bool any = false;
+        for (const std::wstring &file : files) {
+            const std::wstring out = folder + L"\\" + file;
+            if (changed) {
+                std::vector<uint8_t> have;
+                if (read_small_file(out, size, &have) && have.size() == size &&
+                    memcmp(have.data(), p, size) == 0)
+                    continue;
+            }
+            DWORD err = 0;
+            if (!write_file(out, static_cast<const uint8_t *>(p), size, &err)) {
+                *message = L"Writing " + out + L" failed: " + util::system_error_text(err) + L".";
+                return false;
+            }
+            any = true;
+        }
+        if (any)
+            written++;
+    }
+    *count = changed ? written : (int)names.size();
+    return true;
+}
+
 /* How long a folder's rename waits for the other programs holding its files
  * open (move_folder). */
 constexpr DWORD kMoveWaitMs = 120000;
@@ -367,10 +446,11 @@ bool move_folder(const std::wstring &from, const std::wstring &to, Listener &lis
 /* Unpacks every file of the volume `read` gives (`volume_size` bytes) into
  * folder\<dataName>.part, in the unified structure (`language`: the disc's,
  * for its courses' region folder), then puts it in place as
- * folder\<dataName>; the marker starts with `head` (marker_head). */
+ * folder\<dataName>; the marker starts with `head` (marker_head).  convert:
+ * the music converted for the PC (music.h) before the marker. */
 Result unpack(const volume::Reader &read, uint64_t volume_size, const std::wstring &folder_in,
               const std::wstring &dataName, const std::wstring &source, const std::string &head,
-              const std::string &language, Listener &listener, std::wstring *message)
+              const std::string &language, bool convert, Listener &listener, std::wstring *message)
 {
     std::wstring err;
     const std::wstring folder = full_folder(folder_in);
@@ -388,26 +468,23 @@ Result unpack(const volume::Reader &read, uint64_t volume_size, const std::wstri
     }
     /* the unified structure: courses in courses/ itself and none in a
      * folder of it (the Japanese disc) go into the region's folder */
-    bool flatFiles = false, courseFolders = false;
-    for (const volume::File &f : files)
-        if (f.path.size() > 8 && _strnicmp(f.path.c_str(), "courses/", 8) == 0) {
-            if (f.path.find('/', 8) != std::string::npos)
-                courseFolders = true;
-            else if (_stricmp(f.path.c_str() + 8, ".list") != 0)
-                flatFiles = true;
-        }
-    const bool flatCourses = flatFiles && !courseFolders;
-    const std::string region = course_region(language);
+    const bool flatCourses = volume::flat_courses(files);
+    const std::string region = volume::course_region(language);
     /* in disc order: one pass over the image */
     std::sort(files.begin(), files.end(), [](const volume::File &a, const volume::File &b) { return a.lsn < b.lsn; });
-    uint64_t total = 0;
-    for (const volume::File &f : files)
+    uint64_t total = 0, adsBytes = 0;
+    for (const volume::File &f : files) {
         total += f.size;
+        if (f.path.size() > 8 && _strnicmp(f.path.c_str(), "bgm/", 4) == 0 &&
+            _stricmp(f.path.c_str() + f.path.size() - 4, ".ads") == 0)
+            adsBytes += f.size;
+    }
 
-    /* Room for the files (an installed data folder stays until the swap). */
+    /* Room for the files (an installed data folder stays until the swap),
+     * the music's .wav files too */
     ULARGE_INTEGER avail = {};
     if (GetDiskFreeSpaceExW(folder.c_str(), &avail, nullptr, nullptr)) {
-        uint64_t need = total + (64u << 20);
+        uint64_t need = total + (64u << 20) + (convert ? music::growth(adsBytes) : 0);
         if (avail.QuadPart < need) {
             *message = L"There is not enough free disk space in " + folder + L": the game files need " +
                        util::format_size(need) + L", and " + util::format_size(avail.QuadPart) + L" is free.";
@@ -436,7 +513,7 @@ Result unpack(const volume::Reader &read, uint64_t volume_size, const std::wstri
             *message = L"The installation was cancelled.";
             return Result::cancelled;
         }
-        std::wstring rel = util::widen(unified_path(f.path, flatCourses, region));
+        std::wstring rel = util::widen(volume::unified_path(f.path, flatCourses, region));
         std::replace(rel.begin(), rel.end(), L'/', L'\\');
         const std::wstring out = util::with_slash(part) + rel;
         const std::wstring outFolder = out.substr(0, out.find_last_of(L'\\'));
@@ -475,6 +552,56 @@ Result unpack(const volume::Reader &read, uint64_t volume_size, const std::wstri
         }
         done += f.size;
         listener.progress(done, total);
+    }
+
+    /* The music as the PC plays it (music.h); what could not be converted
+     * stays as it was (the game plays the .ads) */
+    std::wstring musicNote;
+    if (convert) {
+        listener.phase(L"Converting the music to WAV...");
+        if (music::convert(part, listener, &musicNote) == Result::cancelled) {
+            delete_tree(part);
+            *message = L"The installation was cancelled.";
+            return Result::cancelled;
+        }
+    }
+    /* The game configs as SQLite databases (gameconf.h); the .gcf files go
+     * once their databases are checked */
+    std::wstring confNote;
+    if (convert) {
+        listener.phase(L"Writing the game configs as databases...");
+        gameconf::convert(part, &confNote);
+    }
+    /* The database folder as SQLite databases (databases.h); its .db files
+     * go once their databases are checked */
+    std::wstring dbNote;
+    if (convert) {
+        listener.phase(L"Writing the database folder as databases...");
+        databases::convert(part, &dbNote);
+    }
+    /* The arcade menus' stills as PNG files (stills.h); course.ipic goes once
+     * they are checked */
+    std::wstring stillNote;
+    if (convert) {
+        listener.phase(L"Writing the arcade menus' stills as PNG files...");
+        stills::convert(part, &stillNote);
+    }
+    /* PC (2026-11-08): the image packs as folders of PNG files
+     * (image_packs.h); each .imgs goes once its folder is checked */
+    std::wstring packNote;
+    if (convert) {
+        listener.phase(L"Writing the image packs as PNG files...");
+        image_packs::convert(part, &packNote);
+    }
+    /* The demo replays (the licence tests', the arcade time trials') over the
+     * disc's */
+    int demos = 0;
+    if (convert) {
+        listener.phase(L"Writing the demo replays...");
+        if (!write_demos(part, false, &demos, message)) {
+            delete_tree(part);
+            return Result::failed;
+        }
     }
 
     /* The marker, last: a data folder without it is incomplete. */
@@ -517,10 +644,28 @@ Result unpack(const volume::Reader &read, uint64_t volume_size, const std::wstri
                data + L".";
     if (flatCourses)
         *message += L" Its courses are in courses\\" + util::widen(region) + L" (the unified structure).";
+    if (!musicNote.empty())
+        *message += L" " + musicNote;
+    if (!confNote.empty())
+        *message += L" " + confNote;
+    if (!dbNote.empty())
+        *message += L" " + dbNote;
+    if (!stillNote.empty())
+        *message += L" " + stillNote;
+    if (!packNote.empty())
+        *message += L" " + packNote;
+    if (demos != 0)
+        *message += L" " + std::to_wstring(demos) +
+                    L" demo replays (the licence tests', the arcade time trials') written over the disc's.";
     return Result::ok;
 }
 
 } // namespace
+
+bool refresh_demos(const std::wstring &data, int *written, std::wstring *message)
+{
+    return write_demos(data, true, written, message);
+}
 
 const wchar_t *version_name(Version v)
 {
@@ -665,6 +810,15 @@ std::string installed_language(const std::wstring &folder, const std::wstring &d
 {
     const std::string l = marker_value(marker_lines(folder, data), "language");
     return l.empty() ? std::string("US") : l;
+}
+
+/* PC (2026-11-15) */
+std::string marker_info(const std::wstring &data, const char *key)
+{
+    std::wstring d = data;
+    while (!d.empty() && (d.back() == L'\\' || d.back() == L'/'))
+        d.pop_back();
+    return marker_value(marker_lines(std::wstring(), d), key);
 }
 
 bool language_installed(const std::wstring &folder, const std::wstring &data, const char *code)
@@ -813,7 +967,7 @@ Result install_from_iso(const std::wstring &iso_path, const std::wstring &folder
         return image.read(vol, offset, buf, size, &e);
     };
     return unpack(read, vol.size, folder, disc.data, iso_path, marker_head(disc.release, disc.boot, facts),
-                  facts.language, listener, message);
+                  facts.language, disc.version != Version::data_only, listener, message);
 }
 
 Result install_from_volume(const std::wstring &volume_path, const std::wstring &folder, Listener &listener,
@@ -863,9 +1017,137 @@ Result install_from_volume(const std::wstring &volume_path, const std::wstring &
         return true;
     };
     Result r = unpack(read, (uint64_t)size.QuadPart, folder, data, volume_path, marker_head(release, boot, facts),
-                      facts.language, listener, message);
+                      facts.language, version != Version::data_only, listener, message);
     CloseHandle(h);
     return r;
+}
+
+/* PC (2026-11-14): a disc image's own data folder (install.h). */
+Result prepare_disc(const std::wstring &iso_path, const std::wstring &folder_in, DiscFolder *out, std::wstring *message)
+{
+    /* (the path the game opens: whole, whatever folder it starts in) */
+    wchar_t whole[2048];
+    const DWORD wn = GetFullPathNameW(iso_path.c_str(), 2048, whole, nullptr);
+    const std::wstring path = wn != 0 && wn < 2048 ? std::wstring(whole, wn) : iso_path;
+    iso9660::Image image;
+    std::wstring err;
+    if (!image.open(path, &err)) {
+        *message = L"The disc image " + path + L" could not be used: " + err + L".";
+        return Result::failed;
+    }
+    DiscInfo disc;
+    bool wrong_disc = false;
+    if (!check_disc(image, &disc, message, &wrong_disc))
+        return wrong_disc ? Result::wrong_disc : Result::failed;
+    /* A variant of a version - its number under other letters: a prototype's
+     * SCEF_502.94 for Europe's SCES_502.94 - is played as that version: its
+     * marker has the version's boot file, which the game names the saves by
+     * (T108 mcGetNamePrefix); its folder is named by its own. */
+    Version version = disc.version;
+    std::string versionBoot = disc.boot;
+    if (version == Version::data_only && disc.folder.empty()) {
+        static const char *const kBoots[kVersions] = {"SCUS_971.02", "SCES_502.94", "SCPS_150.09"};
+        for (int v = 0; v < kVersions; v++)
+            if (disc.boot.size() == strlen(kBoots[v]) && _stricmp(disc.boot.c_str() + 4, kBoots[v] + 4) == 0) {
+                version = (Version)v;
+                versionBoot = kBoots[v];
+            }
+    }
+    if (version == Version::data_only) {
+        *message = disc.release + L" is not a version the game plays (USA, Europe, Japan). \"Install game files...\" "
+                                  L"extracts its files as data only.";
+        return Result::wrong_disc;
+    }
+    /* (a variant's name: its version's with its own serial, "Gran Turismo 3
+     * A-Spec (Europe, SCEF-50294)") */
+    std::wstring release = disc.release;
+    if (versionBoot != disc.boot) {
+        release = version_name(version);
+        if (!release.empty() && release.back() == L')')
+            release.pop_back();
+        release += L", " + util::widen(serial(disc.boot)) + L")";
+    }
+    /* what its code reads (the databases) and its language, as an install's marker says them */
+    std::string core;
+    std::vector<uint8_t> coreBytes;
+    if (image.read_all(disc.core, &core, &err))
+        coreBytes.assign(core.begin(), core.end());
+    const CoreFacts facts = core_facts(coreBytes, disc.boot);
+    /* its folder: the boot file and the CRC-32 of the volume's table of contents */
+    uint8_t hdr[0x40];
+    uint32_t headerSize = 0, bodySize = 0;
+    std::vector<uint8_t> toc;
+    bool tocOk = image.read(disc.volume, 0, hdr, sizeof(hdr), &err);
+    if (tocOk) {
+        memcpy(&headerSize, hdr + 12, 4);
+        memcpy(&bodySize, hdr + 16, 4);
+        const uint64_t tocSize = (uint64_t)headerSize + bodySize;
+        tocOk = tocSize <= disc.volume.size && tocSize <= (64u << 20);
+        if (tocOk) {
+            toc.resize((size_t)tocSize);
+            tocOk = image.read(disc.volume, 0, toc.data(), (uint32_t)tocSize, &err);
+        }
+    }
+    if (!tocOk) {
+        *message = L"The disc image's game volume could not be read" + (err.empty() ? std::wstring() : L" (" + err + L")") +
+                   L". Make a new image of the disc.";
+        return Result::failed;
+    }
+    std::string boot = disc.boot;
+    for (char &c : boot)
+        if (c < 0x20 || strchr("<>:\"/\\|?* ", c) != nullptr)
+            c = '_';
+    wchar_t id[16];
+    swprintf(id, 16, L"%08X", (unsigned)inflate::crc32(0, toc.data(), toc.size()));
+    out->name = util::widen(boot) + L"_" + id;
+    out->release = release;
+    out->version = version;
+
+    const std::wstring data = full_folder(folder_in) + kDiscsFolder + L"\\" + out->name;
+    if (!util::make_folders(data)) {
+        *message = L"The folder " + data + L" could not be created: " + util::system_error_text(GetLastError()) + L".";
+        return Result::failed;
+    }
+    /* the demo replays (the licence tests', the arcade time trials'), which
+     * the game reads in place of the disc's - the disc's copies of them too
+     * (<name>_p: the volume's demo files tell); then the marker, last */
+    std::vector<std::wstring> discDemos;
+    {
+        std::vector<volume::File> files;
+        const iso9660::Entry &vol = disc.volume;
+        const volume::Reader read = [&image, &vol](uint64_t offset, void *buf, uint32_t size) {
+            std::wstring e;
+            return image.read(vol, offset, buf, size, &e);
+        };
+        if (!volume::list_files(read, vol.size, &files, &err)) {
+            *message = L"The disc image's game files could not be listed (" + err + L"). Make a new image of the disc.";
+            return Result::failed;
+        }
+        for (const volume::File &f : files)
+            if (f.path.size() > 5 && _strnicmp(f.path.c_str(), "demo/", 5) == 0 && f.path.find('/', 5) == std::string::npos)
+                discDemos.push_back(util::widen(f.path.substr(5)));
+    }
+    int demos = 0;
+    if (!write_demos(data, true, &demos, message, &discDemos))
+        return Result::failed;
+    std::string marker = marker_head(release, versionBoot, facts, "read from its disc image");
+    if (versionBoot != disc.boot)
+        marker += "disc " + disc.boot + "\r\n";         /* (its own boot file, for the reader) */
+    marker += "image " + util::narrow(path) + "\r\n";
+    marker += "volume " + (disc.folder.empty() ? std::string() : disc.folder + "/") + disc.volume.name + "\r\n";
+    const std::wstring markerPath = util::with_slash(data) + kMarkerFile;
+    std::vector<uint8_t> have;
+    if (read_small_file(markerPath, 1u << 20, &have) && have.size() == marker.size() &&
+        memcmp(have.data(), marker.data(), marker.size()) == 0)
+        return Result::ok;                  /* (as it is: the game may be reading it) */
+    DWORD werr = 0;
+    if (!write_file(markerPath, (const uint8_t *)marker.data(), marker.size(), &werr)) {
+        *message = L"Writing " + markerPath + L" failed: " + util::system_error_text(werr) + L".";
+        if (werr == ERROR_SHARING_VIOLATION || werr == ERROR_ACCESS_DENIED)
+            *message += L"\n\nIf the game is running from this disc image, close it first.";
+        return Result::failed;
+    }
+    return Result::ok;
 }
 
 } // namespace install

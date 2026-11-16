@@ -14,6 +14,7 @@
 #include "game/car/physics/T284_car_param.h"
 #include "game/car/physics/car_param_internal.h"
 #include "game/enhanced.h"                          /* ENH_PHYSICS_* */
+#include "game/app/pc_car_tuning.h"                 /* PC: the race's surface grips */
 // DATA_START 0x0033C378
 
 // FUNC 0x001DB220 curve_setup_kmh_deg
@@ -319,7 +320,9 @@ void TyreData_initAngleCurves(TyreData *t, CarSpecTyre *ts)
  * wear floor surfaceGrip[11] = scale / grip (at most 1; it overwrites the
  * surface value the loop stored there), the load curve (curve3: the load x
  * 20 kgf, the first forced to 0) and the grip at rest.  `log' (a0) is not
- * used. */
+ * used.
+ * PC: a race car's surface grip the race sets (pc_surface_grip_raw, in
+ * hundredths: game/app/pc_car_tuning.h) in place of the record's %. */
 void TyreData_initLoadCurve(void *log, TyreData *t, CarSpecTyre *ts, f32 scale)
 {
     int i, n;
@@ -333,8 +336,11 @@ void TyreData_initLoadCurve(void *log, TyreData *t, CarSpecTyre *ts, f32 scale)
 
     for (i = 0; i < 16; i++) {
         u8 pct = ts->unk_4B[i];
+        const int pcRaw = pc_surface_grip_raw(i);   /* PC */
 
-        if (pct == 0)
+        if (pcRaw >= 0)
+            t->surfaceGrip[i] = (f32)pcRaw * 0.01f * grip;  /* PC: the race's */
+        else if (pct == 0)
             t->surfaceGrip[i] = grip;
         else
             t->surfaceGrip[i] = (f32)pct * 0.01f * grip;

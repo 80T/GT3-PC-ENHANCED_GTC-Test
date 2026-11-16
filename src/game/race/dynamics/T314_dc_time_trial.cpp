@@ -140,6 +140,8 @@ void DynamicsConductorTimeTrial::virtual_17(int car, int lap, u32 raw, u32 ms, u
 void DynamicsConductorTimeTrial::virtual_12()
 {
     RaceCarState *c = getCar(0);
+    if (pcFaultsBeforeControl(c) != 0)
+        return;                             /* PC: no fault before the player has the car (T352) */
     u8 fault = c->st.fault;
 
     if (fault & FAULT_COURSE_OUT)

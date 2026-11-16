@@ -65,6 +65,7 @@
 #include "game/common/T494_text_utils.h"           /* format_number */
 #include "engine/pdistd/T532_heap.h"                 /* memalign, free */
 #include "engine/pdistd/T534_sprintf.h"              /* sprintf */
+#include "game/data/T484_race_database.h"        /* PC: PC_RESULT_LAST_PLACE */
 #include "game/menu/gtmode/trophy_internal.h"
 
 using namespace gt2k_menu;
@@ -251,10 +252,15 @@ void GTmodeTrophyControl::run()
 /* Returns 1 if a screen was shown.  type: the race's trophy type 1..8;
  * rank: 0 = first (the range checks rank 0..2 and type 1..8 are single
  * unsigned compares in the binary).  The controller is on the stack (the
- * arcade and GT mode ones at sp+0x000, the consolation one at sp+0xF00). */
+ * arcade and GT mode ones at sp+0x000, the consolation one at sp+0xF00).
+ * PC (ROADMAP 35): in a race of more than 6 cars the 7th and lower are the
+ * 6th here (PC_RESULT_LAST_PLACE: the consolation screen's "6th", as the
+ * prize money, RaceDataBase::getPrize); a 6-car race is as before. */
 // FUNC 0x00137DC0 trophy_prize_screen
 int trophy_prize_screen(int prize, int rank, int type, int consolation)
 {
+    if (rank > PC_RESULT_LAST_PLACE)        /* PC: the 6th */
+        rank = PC_RESULT_LAST_PLACE;
     /* The screens' constructors are inline: ControlBase::ControlBase, the
      * ControlBaseWithPageManager vptr, PageManager::PageManager(this), the
      * MiniPrizeControlBase vptr, MiniPrize::MiniPrize, the MiniPrizeInfo

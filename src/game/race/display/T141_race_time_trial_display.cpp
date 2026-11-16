@@ -437,7 +437,8 @@ void RaceTimeTrialDisplay::virtual_0(RaceOrganization *o, int raceMode, int repl
 /* ------------------------------------------------------------------------ */
 
 /* The event board's colour of the rules (RaceEventDisplay's default). */
-#define POD_RULE_COLOR 0x802BCC49
+#include "game/app/pc_hud_color.h"              /* PC: pc_hud_color */
+#define POD_RULE_COLOR pc_hud_color(kHudEvents, 0x802BCC49)
 /* RaceDisplay::replay of a live race (T154's RD_LIVE). */
 #define POD_REPLAY_LIVE 0
 

@@ -24,7 +24,11 @@
  *     the BGM voices.  The window [lo, hi] (us of the movie) holds the
  *     sound to the pictures: it starts with the first window (the second
  *     frame shown) and pauses while it has played past hi; (0, MAX) lets
- *     it run.
+ *     it run.  PC: the JP discs' movies (opening, both endings) carry 16-bit
+ *     PCM instead (48 kHz, 0x200 bytes of each channel in turn, prefix
+ *     0xFF 0xA0), which the BGM voices cannot play (SPU2 ADPCM only; the
+ *     IOP sent PCM through the core's sound input): it goes to the PCM
+ *     output (snd_native_pcm_*, as an MP4's sound), deinterleaved.
  * The callers are game threads (the feeder, the render thread for the
  * window): one runs at a time, so this state needs no lock; the sound
  * functions lock themselves.  Reads are positional (platform/disc.h,
@@ -35,11 +39,13 @@
 #include "engine/media/native/mp4_movie.h"
 #include "engine/media/native/mp4_token.h"
 #include "engine/media/native/pss_demux.h"
+#include "engine/sound/native/ads_stream.h"
 #include "engine/sound/native/sound_native.h"
 #include "platform/disc.h"
 #include "platform/host_file.h"
 #include "platform/log.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cstdint>
 #include <cstdio>
@@ -81,6 +87,12 @@ struct MpgService {
     std::vector<uint8_t> pending;   /* audio not taken by the BGM FIFOs yet */
     size_t pendingPos = 0;
     uint64_t audioBytes = 0;
+    /* PC: a 16-bit PCM sound (the JP discs'), to the PCM output */
+    bool headChecked = false;       /* the .ads head was looked at */
+    bool pcmSound = false;
+    bool pcmStarted = false;
+    uint32_t pcmChannels = 0, pcmInterleave = 0;
+    uint64_t pcmBodyLeft = 0;       /* body bytes still to come */
     /* PC: an MP4 movie in its place (docs/movies.md "MP4 movies"): the frame
      * tokens, the sound decoded to PCM (sound_native.h snd_native_pcm_*) */
     bool mp4 = false;
@@ -88,7 +100,7 @@ struct MpgService {
     int mp4Frames = 0, mp4Next = 0;
     bool mp4Ended = false;          /* every token of this pass handed out (marker sent) */
     std::unique_ptr<Mp4AudioReader> audio;
-    std::vector<int16_t> pcm;       /* decoded, not taken yet */
+    std::vector<int16_t> pcm;       /* decoded (an MP4's) or deinterleaved (a PCM sound's), not taken yet */
     size_t pcmPos = 0;
     bool pcmEnded = false;
     uint64_t pcmFrames = 0;
@@ -245,10 +257,94 @@ bool source_rewind(void *user)
     return !s.readError;
 }
 
+/* The pending audio's taken bytes dropped (at the end, or past 1 MB). */
+void trim_pending(MpgService &s)
+{
+    if (s.pendingPos > 0 && s.pendingPos == s.pending.size()) {
+        s.pending.clear();
+        s.pendingPos = 0;
+    } else if (s.pendingPos > (1u << 20)) {
+        s.pending.erase(s.pending.begin(), s.pending.begin() + (ptrdiff_t)s.pendingPos);
+        s.pendingPos = 0;
+    }
+}
+
+/* PC: the sound's head once its 0x28 bytes are in: a 16-bit PCM .ads goes
+ * to the PCM output (the head dropped); any other is the BGM voices' to
+ * judge.  False while the head is still coming. */
+bool check_head(MpgService &s)
+{
+    if (s.headChecked)
+        return true;
+    if (s.pending.size() - s.pendingPos < spu2::ADS_HEAD_BYTES)
+        return false;
+    s.headChecked = true;
+    spu2::AdsHeader h;
+    if (!spu2::ads_parse_header(s.pending.data() + s.pendingPos, spu2::ADS_HEAD_BYTES, &h) ||
+        h.type != spu2::ADS_TYPE_PCM)
+        return true;
+    s.pcmSound = true;
+    s.pcmChannels = h.channels;
+    s.pcmInterleave = h.interleave;
+    s.pcmBodyLeft = h.bodySize != 0 ? h.bodySize : UINT64_MAX;
+    s.pendingPos += spu2::ADS_HEAD_BYTES;
+    snd_native_pcm_open((int)h.rate, (int)h.channels);  /* (stops the BGM push gt3m_mpg_open set up) */
+    pclog::write("movie: the sound is 16-bit PCM (%u Hz, %u channel(s), interleave 0x%X, %u bytes): played "
+                 "through the PCM output", h.rate, h.channels, h.interleave, h.bodySize);
+    return true;
+}
+
+/* PC: a PCM sound into the PCM output: whole chunks (interleave bytes of
+ * each channel in turn) as interleaved frames, what it takes now (about
+ * 2 s ahead), the rest later; its end once the body is in. */
+void push_pcm(MpgService &s)
+{
+    const uint32_t ch = s.pcmChannels, il = s.pcmInterleave, chunk = il * ch;
+    const uint32_t per = il / 2;                    /* samples per channel per chunk */
+    for (;;) {
+        if (s.pcmPos < s.pcm.size()) {
+            const int frames = (int)((s.pcm.size() - s.pcmPos) / ch);
+            const int took = snd_native_pcm_push(s.pcm.data() + s.pcmPos, frames);
+            s.pcmPos += (size_t)took * ch;
+            s.pcmFrames += (uint64_t)took;
+            if (took < frames)
+                break;                              /* (the output's 2 s are full) */
+        }
+        s.pcm.clear();
+        s.pcmPos = 0;
+        uint64_t chunks = (s.pending.size() - s.pendingPos) / chunk;
+        chunks = std::min<uint64_t>(std::min<uint64_t>(chunks, s.pcmBodyLeft / chunk), 32);
+        if (chunks == 0)
+            break;
+        s.pcm.resize((size_t)chunks * per * ch);
+        for (uint64_t k = 0; k < chunks; k++) {
+            const uint8_t *src = s.pending.data() + s.pendingPos + k * chunk;
+            int16_t *dst = s.pcm.data() + k * per * ch;
+            for (uint32_t c = 0; c < ch; c++)
+                for (uint32_t i = 0; i < per; i++)
+                    dst[i * ch + c] = (int16_t)(src[c * il + 2 * i] | (src[c * il + 2 * i + 1] << 8));
+        }
+        s.pendingPos += (size_t)(chunks * chunk);
+        s.pcmBodyLeft -= chunks * chunk;
+    }
+    trim_pending(s);
+    const bool allIn = s.pcmBodyLeft < chunk || (s.soundEnded && s.pending.size() - s.pendingPos < chunk);
+    if (allIn && !s.pushEnded && s.pcmPos >= s.pcm.size()) {
+        snd_native_pcm_end();
+        s.pushEnded = true;
+    }
+}
+
 /* Audio into the BGM FIFOs: what they take now, the rest later. */
 void push_pending(MpgService &s)
 {
-    if (!s.pushOpen || !s.started)
+    if (!s.pushOpen || !check_head(s))
+        return;
+    if (s.pcmSound) {
+        push_pcm(s);
+        return;
+    }
+    if (!s.started)
         return;
     while (s.pendingPos < s.pending.size()) {
         int n = snd_native_bgm_push(s.pending.data() + s.pendingPos, (uint32_t)(s.pending.size() - s.pendingPos));
@@ -263,13 +359,7 @@ void push_pending(MpgService &s)
             break;
         s.pendingPos += (size_t)n;
     }
-    if (s.pendingPos > 0 && s.pendingPos == s.pending.size()) {
-        s.pending.clear();
-        s.pendingPos = 0;
-    } else if (s.pendingPos > (1u << 20)) {
-        s.pending.erase(s.pending.begin(), s.pending.begin() + (ptrdiff_t)s.pendingPos);
-        s.pendingPos = 0;
-    }
+    trim_pending(s);
     if (s.soundEnded && !s.pushEnded && s.pendingPos == s.pending.size()) {
         snd_native_bgm_push_end();
         s.pushEnded = true;
@@ -366,11 +456,17 @@ void close_service(MpgService &s)
         s.open = false;
         return;
     }
-    if (s.pushOpen || s.sound)
-        snd_native_bgm_stop();                   /* the movie's sound ends with its stream */
+    if (s.pcmSound)
+        snd_native_pcm_stop();                   /* the movie's sound ends with its stream */
+    else if (s.pushOpen || s.sound)
+        snd_native_bgm_stop();
     if (s.host && s.hostFd >= 0)
         host_file_close(s.hostFd);
-    pclog::write("movie: stream closed (mode %d, %llu audio bytes)", s.mode, (unsigned long long)s.audioBytes);
+    if (s.pcmSound)
+        pclog::write("movie: stream closed (mode %d, %llu audio bytes, %llu PCM frames played out)", s.mode,
+                     (unsigned long long)s.audioBytes, (unsigned long long)s.pcmFrames);
+    else
+        pclog::write("movie: stream closed (mode %d, %llu audio bytes)", s.mode, (unsigned long long)s.audioBytes);
     s.open = false;
 }
 
@@ -505,6 +601,20 @@ void gt3m_mpg_window(long long lo, long long hi)
         return;
     s.started = true;
     push_pending(s);
+    if (s.pcmSound) {
+        /* PC: a PCM sound, held to the pictures as an MP4's */
+        if (!s.pcmStarted) {
+            s.pcmStarted = true;
+            snd_native_pcm_start();
+        }
+        const int64_t played = snd_native_pcm_played_us();
+        const bool hold = hi != INT64_MAX && played >= 0 && played > hi;
+        if (hold != s.paused) {
+            snd_native_pcm_pause(hold ? 1 : 0);
+            s.paused = hold;
+        }
+        return;
+    }
     if (hi == INT64_MAX) {
         if (s.paused) {
             snd_native_bgm_resume();

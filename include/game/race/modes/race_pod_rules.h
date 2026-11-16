@@ -18,6 +18,7 @@
 #define GAME_RACE_POD_RULES_H
 
 #include "game/game.h"
+#include "game/race/race_cars.h"            /* PC: PC_RACE_CARS_MAX */
 
 class DynamicsConductor;                    /* T305 (pointers only) */
 
@@ -43,12 +44,13 @@ class PodRaceRules {
 public:
     DynamicsConductor *dc;                  /* the conductor the rules were set up for (NULL: none) */
     u8   on;                                /* 1: the Pod race's rules run */
-    u8   stops[8];                          /* the stops done, per car (at most 255) */
+    u8   stops[PC_RACE_CARS_MAX];           /* the stops done, per car (at most 255) (PC: [8] in Lupo 2;
+                                               game/race/race_cars.h) */
     f32  areaStart;                         /* the stop area's lap distance, m */
     f32  areaLength;                        /* m */
-    f32  stopX[8];                          /* where each computer car stops (ai_brake_factor, T366) */
-    f32  stopY[8];
-    f32  stopDist[8];                       /* its lap distance */
+    f32  stopX[PC_RACE_CARS_MAX];           /* where each computer car stops (ai_brake_factor, T366) */
+    f32  stopY[PC_RACE_CARS_MAX];
+    f32  stopDist[PC_RACE_CARS_MAX];        /* its lap distance */
 };
 
 extern PodRaceRules g_podRules;

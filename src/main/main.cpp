@@ -9,6 +9,7 @@
 #include <shellapi.h>                       /* CommandLineToArgvW (the Esc menu's Restart) */
 
 #include "pc_static_init.h"
+#include "engine/media/native/still_cache.h"
 #include "platform/audio.h"
 #include "platform/crash.h"
 #include "platform/gamepad.h"
@@ -16,6 +17,7 @@
 #include "platform/heap_arena.h"
 #include "platform/log.h"
 #include "platform/paths.h"
+#include "platform/play_time.h"
 #include "platform/scheduler.h"
 #include "platform/settings.h"
 #include "platform/system_menu.h"
@@ -52,9 +54,12 @@ void game_main_thread(void *)
 /* The Esc menu's Restart (platform/system_menu.h): the new run gets this
  * one's arguments and --restart-after <this process id>, and waits for this
  * one to end before anything else - the log rotated, the audio device, the
- * display mode and the memory card files let go. */
+ * display mode and the memory card files let go.  Restart as new game adds
+ * --new-game, for that one run. */
 constexpr char kRestartAfter[] = "--restart-after";
 constexpr wchar_t kRestartAfterW[] = L"--restart-after";
+constexpr char kNewGame[] = "--new-game";
+constexpr wchar_t kNewGameW[] = L"--new-game";
 
 void wait_for_previous_run(int argc, char **argv)
 {
@@ -100,7 +105,7 @@ void append_arg(std::wstring &cmd, const wchar_t *arg)
     cmd += L'"';
 }
 
-void start_new_run()
+void start_new_run(bool newGame)
 {
     wchar_t exe[MAX_PATH * 2];
     GetModuleFileNameW(nullptr, exe, MAX_PATH * 2);
@@ -113,10 +118,14 @@ void start_new_run()
             i++;                                /* (the last run's) */
             continue;
         }
+        if (wcscmp(argv[i], kNewGameW) == 0)
+            continue;                           /* (the last run's: a Restart from it loads as usual) */
         append_arg(cmd, argv[i]);
     }
     if (argv != nullptr)
         LocalFree(argv);
+    if (newGame)
+        append_arg(cmd, kNewGameW);
     append_arg(cmd, kRestartAfterW);
     append_arg(cmd, std::to_wstring(GetCurrentProcessId()).c_str());
     STARTUPINFOW si = {};
@@ -150,6 +159,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     }
     pclog::open(exe);
     pclog::write("Gran Turismo 3 A-Spec (PC)");
+    for (int i = 1; i < argc; i++)
+        if (strcmp(argv[i], kNewGame) == 0) {
+            system_menu::set_new_game_run();
+            pclog::write("restart: a new game: no autoload");
+        }
     crash::install();
     {
         uint32_t heapSize;
@@ -157,6 +171,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     }
 
     if (!paths::init(argc, argv)) {
+        /* PC (2026-11-14): a disc image that could not be used (its path is
+         * UTF-8: any file's name) */
+        if (!paths::init_error().empty()) {
+            const std::string &e = paths::init_error();
+            std::wstring w((size_t)MultiByteToWideChar(CP_UTF8, 0, e.c_str(), (int)e.size(), nullptr, 0), L'\0');
+            if (!w.empty())
+                MultiByteToWideChar(CP_UTF8, 0, e.c_str(), (int)e.size(), &w[0], (int)w.size());
+            MessageBoxW(nullptr, w.c_str(), L"Gran Turismo 3", MB_OK | MB_ICONERROR);
+            return 1;
+        }
         MessageBoxA(nullptr,
                     "The game files were not found (the data folder next to gt3pc.exe).\n\n"
                     "Run the GT3 launcher to install them from your Gran Turismo 3 A-Spec disc image.",
@@ -165,8 +189,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     }
 
     settings::load();   /* gt3pc.ini: the display mode */
+    play_time::start(); /* gt3pc.ini [Stats] PlayTime: counted from here */
     if (settings::debug_console())
         pclog::open_console();  /* (before the window: the game window takes the focus after it) */
+    gt3media::still_cache_prepare();    /* the arcade menus' stills: no disk or decoder in the menus */
     if (!window::create("Gran Turismo 3 A-Spec"))
         pclog::fatal("could not create the window");
     if (!gpu::init(window::handle()))
@@ -184,12 +210,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     gamepad::shutdown();    /* the motors stop */
     audio::shutdown();      /* the output stopped and silent (its looped buffer played on while the process
                                ended: a crackle at the close), the dump closed */
+    play_time::stop();      /* the count written */
     const bool restart = system_menu::restart_requested();
     if (restart)
         pclog::write("restart: a new run starts once this one has ended");
     pclog::close();
     if (restart)
-        start_new_run();
+        start_new_run(system_menu::restart_as_new_game());
     /* The game threads never end by themselves. */
     ExitProcess(code);
 }

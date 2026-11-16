@@ -678,8 +678,8 @@ void gs_draw_flat_sprite_strips(int x0, int y0, int x1, int y1)
 }
 
 // FUNC 0x00256020 gs_draw_textured_sprite
-/* A textured sprite (SPRITE | TME | FST) in colorTex, the draw window
- * origin added, UVs + half a texel. */
+/* A textured sprite (SPRITE | TME | FST) in fullColor (PC: was colorTex),
+ * the draw window origin added, UVs + half a texel. */
 void gs_draw_textured_sprite(int x0, int y0, int x1, int y1, int u0, int v0, int u1, int v1)
 {
     GsContext *ctx = GS_SPR_CTX;

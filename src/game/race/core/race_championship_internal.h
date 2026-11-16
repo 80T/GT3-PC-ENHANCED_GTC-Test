@@ -83,20 +83,29 @@ enum {
 /* The queue timer of a posted display event: it expires after 2 frames. */
 enum { DISPLAY_EVENT_DELAY = 2 };
 
-/* The ranges of the display event word's fields (pack() clamps to them). */
+/* The ranges of the display event word's fields (pack() clamps to them).
+ * PC (ROADMAP 35): the car field is 5 bits, cars 0..31 (game/race/
+ * race_cars.h PC_RACE_CARS_MAX; GT3's 4 bits, 0..15), and every field after
+ * it one bit higher (T194_race_display_event.cpp): the difference keeps 27
+ * signed bits.  The PS2's values in brackets. */
 enum {
-    EVENT_CAR_MAX         = 15,             /* bits 0..3 */
-    EVENT_CHECK_POINT_MAX = 15,             /* bits 4..7 */
-    EVENT_LAP_MAX         = 999,            /* bits 8..17 */
-    EVENT_SPEED_MAX       = 9999,           /* bits 4..17, tenths */
-    EVENT_DIFF_MAX        = 0x7FFFFFF       /* bits 4..31, signed */
+    EVENT_CAR_MAX         = 31,             /* bits 0..4 [15: 0..3] */
+    EVENT_CHECK_POINT_MAX = 15,             /* bits 5..8 [4..7] */
+    EVENT_LAP_MAX         = 999,            /* bits 8..17 (lap time), 9..18 (check point) [8..17] */
+    EVENT_SPEED_MAX       = 9999,           /* bits 5..18, tenths [4..17] */
+    EVENT_DIFF_MAX        = 0x3FFFFFF       /* bits 5..31, signed [0x7FFFFFF: 4..31] */
 };
 /* The largest time a difference event carries (RaceDisplayDiffEvent::
- * setTime / getTime: above it 0xFFFFFFF in the word, RACE_TIME_INVALID out
- * of it). */
+ * setTime / getTime: above it EVENT_TIME_SATURATED in the word,
+ * RACE_TIME_INVALID out of it).  PC: both halved with the field (twice
+ * EVENT_DIFF_MAX, as GT3's 0xFFFFFFE / 0xFFFFFFF were): pack clamps the
+ * saturated value to EVENT_DIFF_MAX as before, so getTime still never gives
+ * RACE_TIME_INVALID, and EVENT_DIFF_MAX (67108863 ms) stays above the
+ * longest time the HUD shows (race_format_time, T158: 59999999, 999'59.999),
+ * which every larger time is shown as, as before. */
 enum {
-    EVENT_TIME_MAX       = 0x0FFFFFFE,
-    EVENT_TIME_SATURATED = 0x0FFFFFFF
+    EVENT_TIME_MAX       = 0x07FFFFFE,      /* [0x0FFFFFFE] */
+    EVENT_TIME_SATURATED = 0x07FFFFFF       /* [0x0FFFFFFF] */
 };
 
 /* ======================================================================== */

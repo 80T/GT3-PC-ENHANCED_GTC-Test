@@ -1,4 +1,5 @@
-/* system_menu.h - the Esc menu of GT3 PC: Back, Restart, Exit.
+/* system_menu.h - the Esc menu of GT3 PC: Back, Restart, Restart as new game,
+ * Exit.
  *
  * Esc shows or hides it in the middle of the picture (over the game, which
  * goes on, as under the settings menu).  While it is shown it takes the
@@ -8,8 +9,10 @@
  *   Esc / Backspace       close                (Circle)
  * Back closes the menu.  Restart ends this run and starts the game again
  * from the beginning (main.cpp: a new gt3pc.exe with the same arguments,
- * which waits for this one to end).  Exit closes the window as its close
- * button does.  Both wait while a memory card is being written
+ * which waits for this one to end).  Restart as new game is the same, and
+ * that one next run skips the memory card's autoload (--new-game; a Restart
+ * from it, or the next start, loads as usual).  Exit closes the window as its
+ * close button does.  All three wait while a memory card is being written
  * (memcard::busy: a save is not cut short), the menu saying so; Esc then
  * cancels.  Drawn with platform/overlay.h.  No Windows headers. */
 #pragma once
@@ -32,5 +35,11 @@ void key(int vk, bool repeat);
 void present(ID3D11RenderTargetView *backbuffer);
 /* Restart was chosen (main.cpp, once the window has closed). */
 bool restart_requested();
+/* That restart was Restart as new game. */
+bool restart_as_new_game();
+/* This run was started by Restart as new game: main.cpp says so (--new-game)
+ * before the game threads start, T000's main then skips the autoload. */
+void set_new_game_run();
+bool new_game_run();
 
 } // namespace system_menu

@@ -170,6 +170,12 @@ struct Batch {
      * decode (pgl_models.cpp: where a draw lands on screen) */
     float bmin[3], bmax[3];
     bool hasBounds;
+    /* PC (2026-11-04): the least and greatest vertex alpha (rgba and rgba2)
+     * and the greatest squared length of a normal (nrm and nrm2), filled with
+     * the box: the range of the alpha a lit draw writes (pgl_exec.cpp
+     * light_alpha_range, the alpha mirror) */
+    uint8_t aMin, aMax;
+    float nMax2;
 };
 
 struct Mesh {

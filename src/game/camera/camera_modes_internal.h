@@ -22,7 +22,8 @@
  * class cannot be reopened), T388_camera_mode0.h (CameraSet = CameraView),
  * T392_camera_target_selector.h.  CameraManager::update (0x00208BE8, T383)
  * calls the mode handlers as (org, dc, input, view) for every view; each
- * view's cameras are in CameraManager::views[view] (CameraView, 0x24C0 bytes).
+ * view's cameras are in CameraManager::views[view] (CameraView, 0x24C0 bytes;
+ * PC: 0x3780, its tables of PC_RACE_CARS_MAX cars).
  *
  * This header keeps only what is local to the unit: two free functions
  * without a header (camera_kind1_alt_style = F_0020B1D8, pickAutoCamera),

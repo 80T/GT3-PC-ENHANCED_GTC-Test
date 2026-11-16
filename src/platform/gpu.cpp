@@ -488,7 +488,7 @@ void suspend_fullscreen(bool on)
         g_swap->SetFullscreenState(FALSE, nullptr);
         window::apply_mode(settings::DisplayMode::borderless);
         g_forceResize = true;
-        pclog::write("gpu: exclusive fullscreen suspended: borderless while other monitors are in use");
+        pclog::write("gpu: exclusive fullscreen suspended: borderless for now");
     } else {
         window::apply_mode(settings::DisplayMode::fullscreen);
         if (enter_fullscreen())
@@ -626,6 +626,7 @@ bool init(HWND window)
 }
 
 ID3D11Device *device() { return g_device; }
+IDXGIAdapter *adapter() { return g_adapter; }   /* PC (2026-11-07) */
 /* (set_context_guard) */
 static void (*g_contextGuard)();
 
@@ -692,6 +693,13 @@ void backbuffer_size(int *w, int *h)
 {
     *w = g_bbW;
     *h = g_bbH;
+}
+
+void leave_fullscreen()
+{
+    guard_context();
+    if (g_mode == settings::DisplayMode::fullscreen)
+        suspend_fullscreen(true);
 }
 
 int screen_count()

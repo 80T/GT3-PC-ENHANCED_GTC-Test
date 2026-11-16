@@ -17,6 +17,12 @@
  *                            0xFFFFFFF / RACE_TIME_INVALID (T128)
  *   speed       (type 0x11): speed * 10 in 4..17 (0..9999)
  *   information (type 0x12): an information code 4..7
+ * PC (ROADMAP 35, the races of up to 32 cars): the car is bits 0..4,
+ * clamped to 0..31, and the fields after it one bit higher (check point
+ * 5..8 and lap 9..18, speed 5..18, information 5..8; the lap time's lap
+ * stays at 8..17); the difference is a signed 27-bit value 5..31
+ * (+-0x3FFFFFF), setTime / getTime at 0x7FFFFFE / 0x7FFFFFF
+ * (T194_race_display_event.cpp).
  * The difference events with a type (0xE general time, 0xF time
  * difference, 0x10 lap difference) are T154's (defined here, inline only:
  * see below).  pack() sets the bit fields
@@ -63,7 +69,7 @@ public:
      * and the event is another car's, car is restored and 0 returned. */
     int  peek(RaceOrganization *org, int nth);  /* 0x001902B0 */
 
-    int car;                                /* 0x0 the car (0..15), -1: any */
+    int car;                                /* 0x0 the car (0..15; PC: 0..31), -1: any */
     /*  vptr                                   0x4 */
 };
 EGCS_SIZE(RaceDisplayEventBase, 0x8);
@@ -109,10 +115,13 @@ EGCS_SIZE(RaceDisplayCheckPointEvent, 0x10);
 class RaceDisplayDiffEvent : public RaceDisplayEventBase {
 public:
     RaceDisplayDiffEvent();                 /* 0x00190500 diff = 0 */
-    virtual int  pack() const;              /* [1] +0x14 0x00190538 car, diff clamped to +-0x7FFFFFF in 4..31 */
+    virtual int  pack() const;              /* [1] +0x14 0x00190538 car, diff clamped to +-0x7FFFFFF in 4..31
+                                               (PC: +-0x3FFFFFF in 5..31) */
     virtual void unpack(int bits);          /* [2] +0x1C 0x001905B0 diff sign-extended */
-    void setTime(u32 t);                    /* 0x001905C8 0xFFFFFFF above 0xFFFFFFE (unsigned) */
-    u32  getTime();                         /* 0x001905E8 RACE_TIME_INVALID above 0xFFFFFFE (unsigned) */
+    void setTime(u32 t);                    /* 0x001905C8 0xFFFFFFF above 0xFFFFFFE (unsigned; PC: 0x7FFFFFF
+                                               above 0x7FFFFFE) */
+    u32  getTime();                         /* 0x001905E8 RACE_TIME_INVALID above 0xFFFFFFE (unsigned; PC:
+                                               0x7FFFFFE) */
 
     int diff;                               /* 0x8 a time (ms) or a difference (ms, laps) */
 };

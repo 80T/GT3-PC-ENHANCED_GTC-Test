@@ -2,6 +2,7 @@
  * original: new PC code. */
 #include "game/app/pc_freecam.h"
 #include "platform/pad_pc.h"
+#include "platform/settings.h"
 
 #include <math.h>
 
@@ -19,7 +20,10 @@
 #define FREECAM_EXPO        3.0f            /* the stick's curve (e^(k a) - 1) / (e^k - 1): half way 18% */
 #define FREECAM_PIVOT_UP    0.5f            /* the pivot above the car's origin (its middle), metres */
 #define FREECAM_CLEARANCE   0.3f            /* the eye above the road, metres */
-#define FREECAM_SLOTS       4               /* cameras at once (the split screen's two) */
+#define FREECAM_SLOTS       16              /* cameras at once (the split screen's two, their orbits and looks;
+                                               PC 2026-11-14: the custom cameras' own, 8 before) */
+#define LOOK_YAW_MAX        180.0f          /* the cockpit camera's look round, degrees each side (straight back) */
+#define LOOK_PITCH_MAX      60.0f           /* up and down */
 
 static const f32 kDegToRad = 0.017453292f;
 
@@ -117,27 +121,39 @@ void pc_freecam_stick(int player, int wheel, int takenX, int takenY, f32 *stickX
     *stickY = -curve(y);                    /* (up +) */
 }
 
+f32 pc_freecam_chase_rest(void)
+{
+    return (f32)settings::chase_angle();
+}
+
 void pc_freecam_apply(const void *key, f32 *m, const f32 *pivot, f32 stickX, f32 stickY, PcGroundFn ground,
-                      void *ctx, f32 groundDefault)
+                      void *ctx, f32 groundDefault, f32 rest, int ownAxes)
 {
     /* the stick turns the aim (its deflection the speed) against a pull back
      * behind that grows with the angle (user request): a held deflection
-     * settles where the two meet, let go it returns */
+     * settles where the two meet, let go it returns - to the angle set
+     * (`rest', the swing's rest: the aim is kept from it.  PC 2026-11-14: the
+     * caller's - the chase camera's [Graphics] ChaseAngle, a custom
+     * camera's own; user: "The existing chase cam angle setting should only
+     * apply to the base chase cam.  The user-made ones get their own") */
     const int i = slot(key);
+    /* (the swing stays within 45 degrees either way, or as far as a rest
+     * angle beyond that - a custom camera's, up to 90) */
+    const f32 pitchMax = fabsf(rest) > FREECAM_PITCH_MAX ? fabsf(rest) : FREECAM_PITCH_MAX;
     const f32 keep = expf(-FREECAM_PULL * FREECAM_TICK);
     s_cams[i].aimYaw = pull_back(s_cams[i].aimYaw * keep, 0.05f);
     s_cams[i].aimPitch = pull_back(s_cams[i].aimPitch * keep, 0.05f);
     s_cams[i].aimYaw = clampf(s_cams[i].aimYaw + stickX * FREECAM_YAW_RATE * FREECAM_TICK, -FREECAM_YAW_MAX,
                               FREECAM_YAW_MAX);
     s_cams[i].aimPitch = clampf(s_cams[i].aimPitch + stickY * FREECAM_PITCH_RATE * FREECAM_TICK,
-                                -FREECAM_PITCH_MAX, FREECAM_PITCH_MAX);
+                                -pitchMax - rest, pitchMax - rest);
     s_cams[i].yaw += (s_cams[i].aimYaw - s_cams[i].yaw) * FREECAM_EASE;
     s_cams[i].pitch += (s_cams[i].aimPitch - s_cams[i].pitch) * FREECAM_EASE;
     if (s_cams[i].aimYaw == 0.0f && fabsf(s_cams[i].yaw) < 0.05f)
         s_cams[i].yaw = 0.0f;
     if (s_cams[i].aimPitch == 0.0f && fabsf(s_cams[i].pitch) < 0.05f)
         s_cams[i].pitch = 0.0f;
-    if (s_cams[i].yaw == 0.0f && s_cams[i].pitch == 0.0f)
+    if (s_cams[i].yaw == 0.0f && s_cams[i].pitch == 0.0f && rest == 0.0f)
         return;                             /* behind: the camera's own view */
 
     /* the camera's axes in the world (the rotation's columns) and its eye
@@ -165,13 +181,19 @@ void pc_freecam_apply(const void *key, f32 *m, const f32 *pivot, f32 stickX, f32
         centre[j] = pivot[j] + o.u[j] * FREECAM_PIVOT_UP;
         d[j] = eye[j] - centre[j];
     }
-    const f32 backSign = dot3(d, axis[2]) >= 0.0f ? 1.0f : -1.0f;
+    /* PC (2026-11-14): with ownAxes the view's own back axis, whatever side
+     * of the centre the eye is on: from the eye's side, an eye over the
+     * centre (along ~0) flipped the swing tick by tick - a custom camera's
+     * ANGLE twitching to its opposite on cars whose bumper eye sits over the
+     * car's middle (scratchpad camreplay: 3 of the US demos' cars, 2,629
+     * flips in 129,284 ticks; user report) */
+    const f32 backSign = ownAxes ? 1.0f : (dot3(d, axis[2]) >= 0.0f ? 1.0f : -1.0f);
     for (int j = 0; j < 3; j++)
         o.b[j] = axis[2][j] * backSign;
 
     /* below the default height, the eye kept above the road: the pitch the
      * road lets it go down to (the eye's height grows with the pitch) */
-    f32 pitch = s_cams[i].pitch;
+    f32 pitch = s_cams[i].pitch + rest;
     const f32 yaw = s_cams[i].yaw;
     if (pitch < 0.0f && ground != NULL) {
         f32 lo = pitch, hi = 0.0f;
@@ -197,10 +219,11 @@ void pc_freecam_apply(const void *key, f32 *m, const f32 *pivot, f32 stickX, f32
         }
         /* held at the road: the aim goes no lower (pushing on would only
          * have to be wound back) */
-        if (pitch > s_cams[i].pitch) {
-            s_cams[i].pitch = pitch;
-            if (s_cams[i].aimPitch < pitch)
-                s_cams[i].aimPitch = pitch;
+        const f32 held = pitch - rest;
+        if (held > s_cams[i].pitch) {
+            s_cams[i].pitch = held;
+            if (s_cams[i].aimPitch < held)
+                s_cams[i].aimPitch = held;
         }
     }
 
@@ -217,4 +240,68 @@ void pc_freecam_apply(const void *key, f32 *m, const f32 *pivot, f32 stickX, f32
     }
     for (int k = 0; k < 3; k++)
         m[12 + k] = -(newEye[0] * m[k] + newEye[1] * m[4 + k] + newEye[2] * m[8 + k]);
+}
+
+/* PC (2026-11-07): the cockpit camera's look round (pc_freecam.h). */
+void pc_freecam_look(const void *key, f32 *m, f32 stickX, f32 stickY)
+{
+    /* the aim as the orbit's: the stick turns it, the pull brings it back to
+     * the front when let go (no rest angle: the front is straight ahead) */
+    const int i = slot(key);
+    const f32 keep = expf(-FREECAM_PULL * FREECAM_TICK);
+    s_cams[i].aimYaw = pull_back(s_cams[i].aimYaw * keep, 0.05f);
+    s_cams[i].aimPitch = pull_back(s_cams[i].aimPitch * keep, 0.05f);
+    /* (the stick as pc_freecam_stick gives it, with the orbit's signs - user,
+     * 2026-11-07: "the Y axis should match the chase cam look controls": x
+     * negated, so a negative yaw turns the view's back toward its left, its
+     * front toward its right: stick right looks right, as the orbit goes
+     * round the left side; y up positive, and the pitch turns the back
+     * toward up, the front down: stick up looks down, as the orbit's eye
+     * rises over the car and looks down on it) */
+    s_cams[i].aimYaw = clampf(s_cams[i].aimYaw + stickX * FREECAM_YAW_RATE * FREECAM_TICK, -LOOK_YAW_MAX, LOOK_YAW_MAX);
+    s_cams[i].aimPitch = clampf(s_cams[i].aimPitch + stickY * FREECAM_PITCH_RATE * FREECAM_TICK, -LOOK_PITCH_MAX,
+                                LOOK_PITCH_MAX);
+    s_cams[i].yaw += (s_cams[i].aimYaw - s_cams[i].yaw) * FREECAM_EASE;
+    s_cams[i].pitch += (s_cams[i].aimPitch - s_cams[i].pitch) * FREECAM_EASE;
+    if (s_cams[i].aimYaw == 0.0f && fabsf(s_cams[i].yaw) < 0.05f)
+        s_cams[i].yaw = 0.0f;
+    if (s_cams[i].aimPitch == 0.0f && fabsf(s_cams[i].pitch) < 0.05f)
+        s_cams[i].pitch = 0.0f;
+    if (s_cams[i].yaw == 0.0f && s_cams[i].pitch == 0.0f)
+        return;                             /* straight ahead: the camera's own view */
+
+    /* the camera's axes in the world (the rotation's columns: right, up and
+     * back - the projection looks down -z) and its eye (t = -eye A) */
+    f32 axis[3][3], len[3];
+    for (int k = 0; k < 3; k++) {
+        for (int j = 0; j < 3; j++)
+            axis[k][j] = m[4 * j + k];
+        len[k] = sqrtf(dot3(axis[k], axis[k]));
+        if (len[k] <= 0.0f)
+            return;
+        for (int j = 0; j < 3; j++)
+            axis[k][j] /= len[k];
+    }
+    f32 eye[3];
+    for (int j = 0; j < 3; j++)
+        eye[j] = -(m[12] * axis[0][j] / len[0] + m[13] * axis[1][j] / len[1] + m[14] * axis[2][j] / len[2]);
+
+    /* the axes turned about the eye: the pitch about the right axis, then
+     * the yaw about the up axis (the world's +y side of it: looking up is
+     * toward the sky whichever way the car leans) */
+    Orbit o;
+    const f32 upSign = axis[1][1] >= 0.0f ? 1.0f : -1.0f;
+    for (int j = 0; j < 3; j++) {
+        o.r[j] = axis[0][j];
+        o.u[j] = axis[1][j] * upSign;
+        o.b[j] = axis[2][j];
+    }
+    for (int k = 0; k < 3; k++) {
+        f32 a[3];
+        orbit_turn(o, axis[k], s_cams[i].pitch, s_cams[i].yaw, a);
+        for (int j = 0; j < 3; j++)
+            m[4 * j + k] = a[j] * len[k];
+    }
+    for (int k = 0; k < 3; k++)
+        m[12 + k] = -(eye[0] * m[k] + eye[1] * m[4 + k] + eye[2] * m[8 + k]);
 }

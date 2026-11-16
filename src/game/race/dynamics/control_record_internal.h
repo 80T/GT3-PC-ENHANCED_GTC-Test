@@ -14,7 +14,8 @@
  *         and Manager (one recorder over a whole buffer of the pool or over
  *         0x8000-byte lap slots)
  *   T360  CarPairStates, DynamicsConductor +0xBA34 (Lupo 2's "race
- *         watcher"): an 8x8 state machine over the ordered pairs of cars
+ *         watcher"): an 8x8 (PC: PC_RACE_CARS_MAX square) state machine
+ *         over the ordered pairs of cars
  *   T361  the course drive parameters of a drive class (CourseDriveParam)
  *
  * The classes and functions are declared in the canonical headers: the own
@@ -24,7 +25,8 @@
  * interpBias (the first pass's stepAcc), +0xEC8 its computer driver
  * (AIDriver = DynSub_EC8), +0xF84 its run state (DynCarState = DynState).
  * The conductor's +0xBBA8 (the first pass's CourseGrid) is CourseLines lines
- * (T368) followed by CarBoxList boxes (T167) with CarBox box[8] (T376; the
+ * (T368) followed by CarBoxList boxes (T167) with CarBox box[8] (PC:
+ * PC_RACE_CARS_MAX) (T376; the
  * first pass's GridSlot).  This header keeps what is local to the unit: the
  * global only this unit reads and named constants.
  *
@@ -144,6 +146,11 @@ enum {
     LINE_PIT_LANE = 4,                      /* line 4: line_point_at_linear (its distances run past the lap) */
     LINE_RACING   = 6                       /* the racing line */
 };
+
+/* PC (no original): the most cars of GT3's own races.  Races of more
+ * (PC_RACE_CARS_MAX, game/race/race_cars.h) bound the slow car boost chain
+ * of update (case 0); races of up to 6 cars run as retail. */
+enum { DC_GT3_RACE_CARS = 6 };
 
 /* Race event types: RACE_EVENT_* of T122_race_event_queue.h. */
 

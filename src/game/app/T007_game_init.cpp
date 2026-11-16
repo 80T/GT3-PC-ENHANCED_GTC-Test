@@ -41,6 +41,7 @@
 #include "engine/text/T517_realtime_text.h"        /* realtime_load */
 #include "game/data/T050_country.h"              /* PC: set_country (the run's language) */
 #include "platform/language.h"                  /* PC: language::current */
+#include "game/app/pc_course_pick.h"            /* PC: pc_course_pick_init */
 #include "game/save/T429_game_status.h"          /* createGameStatus */
 /* UnitArena<64> instantiated by T180's g_002C2F50, with its type name
  * (T153_race_course.h leaves it out unless asked). */
@@ -125,6 +126,7 @@ void game_init(IOPLoadModuleBase *iop, int hot)
     g_002F00C0.load();
     car_list_load();
     course_table_init();
+    pc_course_pick_init();                  /* PC: the courses of the randomizer and the forcer */
     race_pool_assign(malloc(RACE_POOL_SIZE), RACE_POOL_SIZE);
     F_0022D320();
     loader_init();

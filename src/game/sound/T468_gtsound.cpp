@@ -11,6 +11,7 @@
 #include "game/sound/T468_gtsound.h"
 #include "engine/sound/spu_memory.h"            /* PC: the sound trace, the memory's size */
 #include "engine/io/file_missing.h"             /* PC: file_missing_wait (sound_bank_sizes) */
+#include "game/app/pc_volume.h"                 /* PC (2026-11-11): the player's level after the clamps */
 
 /* .sdata, in retail's order (all initialised: written where defined). */
 f32 g_seVolume = 1.0f;                          /* 0x00352B88 the effect volume */
@@ -88,7 +89,7 @@ void se_play_program(SoundProgram *p, int pan, f32 volume, int prio)
 {
     int vol = (int)(volume * g_seVolume * 16384.0f);    /* scaled, then the voice volume */
 
-    if (volume != 0.0f) {
+    if (volume != 0.0f && !pc_se_silent()) {    /* PC: or the player's level 0 (pc_volume.h) */
         SndVoiceParam vp;                   /* sp+0x00 */
 
         vol = (vol * p->volume) >> 14;
@@ -96,6 +97,7 @@ void se_play_program(SoundProgram *p, int pan, f32 volume, int prio)
             vol = SPU_VOLUME_UNITY - 1;
         else if (vol < -SPU_VOLUME_UNITY)
             vol = -SPU_VOLUME_UNITY;
+        vol = pc_se_out(vol);               /* PC: the player's level after the clamp (pc_volume.h) */
         snd_pan_volume(vp.vol.lr, vol, pan);    /* 0x00269750 */
         vp.pitch    = snd_note_to_pitch(p->note << 8, p->basePitch);    /* 0x002687B0 */
         vp.unk_10   = p->unk_0A;
@@ -134,12 +136,12 @@ void GtSoundHandle::play(int prio, f32 l, f32 r, f32 pitch)
 
     volR = (program->volume * volR) >> 14;
     volL = (program->volume * volL) >> 14;
-    if ((volL | volR) == 0) {
+    if ((volL | volR) == 0 || pc_se_silent()) {     /* PC: or the player's level 0 (pc_volume.h) */
         stop(0);
         return;
     }
-    lr[0] = u104_clamp_volume(volL);
-    lr[1] = u104_clamp_volume(volR);
+    lr[0] = pc_se_out(u104_clamp_volume(volL));     /* PC: the player's level after the clamp */
+    lr[1] = pc_se_out(u104_clamp_volume(volR));
     factor = (int)(pitch * 4096.0f);        /* 4.12 fixed point */
     notePitch = (snd_note_to_pitch(program->note << 8, program->basePitch) * factor) >> 12;
     if (voice >= 0) {
@@ -579,12 +581,12 @@ void GtSoundChannel::play(int prio, f32 l, f32 r, f32 pitch)
     volR = (int)(r * g_seVolume * 16384.0f);
     volL = (program->volume * volL) >> 14;
     volR = (program->volume * volR) >> 14;
-    if ((volL | volR) == 0) {
+    if ((volL | volR) == 0 || pc_se_silent()) {     /* PC: or the player's level 0 (pc_volume.h) */
         stop(0);
         return;
     }
-    lr[0] = u104_clamp_volume(volL);
-    lr[1] = u104_clamp_volume(volR);
+    lr[0] = pc_se_out(u104_clamp_volume(volL));     /* PC: the player's level after the clamp */
+    lr[1] = pc_se_out(u104_clamp_volume(volR));
     factor = (int)(pitch * 4096.0f);        /* 4.12 fixed point */
     notePitch = (snd_note_to_pitch(program->note << 8, program->basePitch) * factor) >> 12;
     if (voice >= 0) {

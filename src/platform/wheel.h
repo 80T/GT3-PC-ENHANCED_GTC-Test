@@ -4,7 +4,8 @@
  * Wheel 1 / 2 (the game's USB wheel ports 1 / 2, players 1 / 2) is a
  * Logitech Driving Force (USB 0x46D:0xC294, which GT3 knows) built through
  * the mapping of gt3pc.ini [Wheel1] / [Wheel2] (platform/input_map.h) from
- * the wheel's SDL joystick (platform/gamepad.h) and the keyboard and mouse.
+ * the wheel's SDL joystick (platform/gamepad.h), the devices its bindings
+ * name (pedals of their own, a shifter...) and the keyboard and mouse.
  * It is connected while its joystick is.  The steering and pedal dead zones
  * apply to the virtual steering (right - left) and pedals.  No force
  * feedback yet: the game's commands are taken and dropped. */

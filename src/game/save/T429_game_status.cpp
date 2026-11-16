@@ -56,6 +56,7 @@
 
 #include "game/save/pc_save_ext.h"              /* PC: the 8.0 stream's keyed lists */
 #include "game/app/pc_new_game.h"               /* PC: a new game's money, garage and unlocks (init) */
+#include "game/app/pc_challenge.h"              /* PC (2026-11-14): the money decay's licence pause */
 #include <vector>                               /* PC: the garage's heap blocks */
 
 using namespace gt2k_game;
@@ -229,6 +230,7 @@ GameStatus::~GameStatus()
     carList.unlinkAll();
     wheelList.unlinkAll();
     garage_blocks_free(this);                   /* PC: the heap slots */
+    pc_challenge_forget(this);                  /* PC (2026-11-14): its money decay pause */
 }
 
 // FUNC 0x00218CF0 gt2k_game::GameStatus::init
@@ -293,6 +295,10 @@ void GameStatus::init()
      * another */
     if (g_00352A94 == NULL || g_00352A94 == this)
         pc_new_game(this);
+    /* PC (2026-11-14): no money decay pause in a new game; the challenge
+     * panel's day (game/app/pc_challenge.h; the game's status only) */
+    pc_challenge_forget(this);
+    pc_challenge_refresh(this);
 }
 
 // FUNC 0x00218F08 gt2k_game::GameStatus::setRunningCarIndex
@@ -914,6 +920,11 @@ int GameStatus::checkHeader(const void *data, void *dest)
  *   ChampionshipSave (0xF2C)               as 7.1
  *   GameOptions (0x638 + 0x250)            as 7.1 (the play list's inline part)
  *   the play list      keyed: song code (8), played (1), enabled (1), order (2)
+ *   the sections       {u32 tag, u32 bytes, payload} (pc_save_ext.h), each
+ *                      only when it has data: PC_EXT_CHAMPIONSHIP, the
+ *                      suspended championship's entrants past 8 (ROADMAP 35);
+ *                      PC_EXT_CHALLENGE, the money decay's licence pause
+ *                      (2026-11-14, game/app/pc_challenge.h)
  * Each keyed list: u32 count, then {u16 key length, key, record}: the
  * entries holding data, then those a load kept (names the data lacked). */
 void GameStatus::pcWriteBody(PcSaveWriter *w)
@@ -942,6 +953,40 @@ void GameStatus::pcWriteBody(PcSaveWriter *w)
     PC_SAVE_BLOCK(w, ChampionshipSave::getSize(), championship.save(w->p));
     PC_SAVE_BLOCK(w, GameOptions::getSize(), options.save(w->p));
     options.music.saveKeyed(w);
+    championship.pcSaveSection(w);              /* PC (ROADMAP 35): its entrants past 8, if any */
+    pc_challenge_save_section(this, w);         /* PC (2026-11-14): the money decay's licence pause, if ahead */
+}
+
+/* PC (ROADMAP 35): the sections after the 8.0 body (pcWriteBody), from src
+ * to the data's end: each known tag to its record (PC_EXT_CHAMPIONSHIP:
+ * ChampionshipSave::pcLoadSection), an unknown one skipped; one that runs
+ * past the data ends them (logged).  A save without sections (any older
+ * one) has none.  Returns the end of what was read. */
+static const u8 *pc_load_sections(gt2k_game::GameStatus *status, const u8 *src, const u8 *end)
+{
+    while (src != NULL && end - src >= 8) {
+        u32 tag, bytes;
+        memcpy(&tag, src, 4);
+        memcpy(&bytes, src + 4, 4);
+        if ((u32)(end - src - 8) < bytes) {
+            printf("PC: GameStatus::load: section %u of %u bytes runs past the data: ignored\n", tag, bytes);
+            return src;
+        }
+        src += 8;
+        switch (tag) {
+        case PC_EXT_CHAMPIONSHIP:
+            status->getChampionshipSave()->pcLoadSection(src, bytes);
+            break;
+        case PC_EXT_CHALLENGE:                  /* PC (2026-11-14): game/app/pc_challenge.h */
+            pc_challenge_load_section(status, src, bytes);
+            break;
+        default:
+            printf("PC: GameStatus::load: section %u (%u bytes) unknown: skipped\n", tag, bytes);
+            break;
+        }
+        src += bytes;
+    }
+    return src;
 }
 
 // FUNC 0x00219F48 gt2k_game::GameStatus::load
@@ -1060,6 +1105,9 @@ const void *GameStatus::load(const void *data, void *dest)
         end = options.music.loadKeyed(end, dataEnd);
     else
         options.music.rebuildSaved();
+    pc_challenge_forget(this);                  /* PC (2026-11-14): no licence pause but its section's */
+    if (keyed)                                  /* PC (ROADMAP 35): the sections after the body */
+        end = pc_load_sections(this, end, dataEnd);
 
     menu.reset();
     setRunningCar(getRunningCar());
@@ -1068,6 +1116,7 @@ const void *GameStatus::load(const void *data, void *dest)
     if (getChampionshipSave()->active != 0)
         setRunningCar(getRunningCar());
     restoreRandomSeed(&hdr);
+    pc_challenge_refresh(this);                 /* PC (2026-11-14): the challenge panel's day (the game's status) */
     return end;
 }
 

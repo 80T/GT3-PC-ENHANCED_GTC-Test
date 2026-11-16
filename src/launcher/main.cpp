@@ -9,6 +9,14 @@
  *   gt3launcher.exe --install <image.iso> [--to <folder>]
  *   gt3launcher.exe --unpack <gt3.vol> [--to <folder>]
  *
+ * PC (2026-11-14, engines.h): the window is preceded by the engine selector,
+ * which starts this launcher's own window or another engine's launcher as
+ *
+ *   gt3launcher.exe --engine [--shared <folder>]
+ *
+ * --engine: no selector (the window at once); --shared: the folder whose
+ * gt3pc.ini is read and written, the selector's launcher's.
+ *
  * <folder> defaults to the launcher's folder.  The program is a GUI
  * program, so the shell does not wait for it: use "start /wait" in cmd, or
  * pipe its output in PowerShell (... | Out-Host).  Output goes to the
@@ -18,6 +26,7 @@
  *
  * Exit codes: 0 installed, 1 failed, 2 not a Gran Turismo 3 engine disc, 3
  * cancelled, 4 bad command line. */
+#include "engines.h"
 #include "install.h"
 #include "ui.h"
 #include "util.h"
@@ -219,19 +228,49 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int show)
     if (argv)
         LocalFree(argv);
 
-    if (args.empty())
-        return ui::run(show);
-
-    std::wstring iso, volume, folder;
+    std::wstring iso, volume, folder, shared;
+    bool engine = false;
     for (size_t i = 0; i < args.size(); i++) {
         const std::wstring &a = args[i];
         if (a == L"--help" || a == L"-h" || a == L"/?")
             return usage(std::wstring());
+        /* PC (2026-11-14): started by an engine selector (engines.h) */
+        if (a == L"--engine") {
+            engine = true;
+            continue;
+        }
+        if (a == L"--shared" && i + 1 < args.size()) {
+            shared = args[++i];
+            continue;
+        }
         if ((a == L"--install" || a == L"--unpack" || a == L"--to") && i + 1 < args.size()) {
             (a == L"--install" ? iso : a == L"--unpack" ? volume : folder) = args[++i];
             continue;
         }
         return usage(L"Unknown or incomplete argument: " + a);
+    }
+    if (iso.empty() && volume.empty() && folder.empty()) {
+        /* The window.  An engine started by a selector has none of its own
+         * (a selector never leads to another); else the selector first: this
+         * launcher's window, or another engine's launcher in its place. */
+        if (!engine) {
+            const std::wstring own = util::exe_folder();
+            engines::migrate(own);
+            for (;;) {
+                std::wstring launcher, other, error;
+                const engines::Choice c = engines::select(GetModuleHandleW(nullptr), own, show, &launcher, &other);
+                if (c == engines::Choice::exit)
+                    return 0;
+                if (c == engines::Choice::own)
+                    break;
+                if (engines::start(launcher, other, own, &error))
+                    return 0;
+                MessageBoxW(nullptr, (L"The engine's launcher could not be started: " + error + L".\n\n" + launcher).c_str(),
+                            L"Gran Turismo 3 A-Spec", MB_OK | MB_ICONERROR);
+            }
+            shared.clear();
+        }
+        return ui::run(show, shared);
     }
     if (iso.empty() == volume.empty())
         return usage(iso.empty() ? L"--to needs --install <image.iso> or --unpack <gt3.vol>."

@@ -154,7 +154,9 @@ public:
      * the cars' SPU window (load) given back. */
     ~CarSound();                            /* 0x001A69A8 */
     /* spuBase = the SPU allocation pointer (g_00352B8C), which advances by
-     * 0x25800. */
+     * 0x25800.  PC (ROADMAP 35): only while that slot ends below the core 0
+     * reverb (the first 8 cars); past them the pointer stays (no PS2 slot:
+     * load uses the cars' window). */
     void reserveSpu();                      /* 0x001A6A30 */
     /* Banks 0 and 1 share the reserved area (0 links 1): "sound/engine/
      * %05d" and "sound/<g_002C2088[kind]>/%05d" of code, loaded
@@ -164,7 +166,9 @@ public:
      * first: two banks larger than the 0x25800 bytes (or a slot past the
      * core 0 reverb: the 9th car on) go to an area of the cars' SPU window
      * above 2 MB, the car's own until it loads again or is destroyed; a
-     * missing or broken file is not queued (that bank stays silent). */
+     * missing or broken file is not queued (that bank stays silent).  With
+     * the window full only the banks that fit the car's PS2 slot load (none
+     * without a slot): nothing is written over another area. */
     void load(int code, int kind);          /* 0x001A6A60 */
     /* Unless playing: the pans reset, the engine voices started on their
      * banks (engine_setup), field_7CC = 0, playing = 1.  The enhanced
@@ -228,6 +232,18 @@ void car_sound_update_se_switch(int replay);    /* 0x001A6678 */
  * unless g_003521E8 is set.  Users: u051 / u052 (0x14 "count_d" the
  * countdown beep, 0x15 "count_s" the start).  (u059 race_se_play.) */
 void race_se_play(int se);                  /* 0x001A7750 */
+
+/* PC (ROADMAP 35, not the game's): the car sound budget.  In a race of more
+ * than 8 cars only 8 sound - the cars the views follow, the player's (car
+ * 0), then the nearest to the listener (the current view's eye), a sounding
+ * car counting 0.8 x its distance - chosen once a frame at car 0's call.
+ * From RaceEntryCar::updateSound (T121) before it builds the car's frame: 1
+ * when the car sounds (CarSound::start if the budget had stopped it), 0 when
+ * it is silent (CarSound::stop: its voices released; no frame).  Up to 8
+ * cars: always 1, nothing done (as retail).  (T176_car_sound.cpp.) */
+class RaceEntryCar;                         /* T121 (pointers only: this header must not include it) */
+class CameraManager;                        /* T383 */
+int car_sound_budget(RaceEntryCar *car, CameraManager *cm);
 
 /* ------------------------------------------------------------------------ */
 /* Data                                                                     */

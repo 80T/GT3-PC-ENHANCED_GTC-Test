@@ -142,5 +142,25 @@ u32  usb6F8SteerButtons(int x, int prevX);              /* 0x00230778 as usb46DS
  * the two above): left below 0x200 - deadZone, right above 0x200 +
  * deadZone, for the Logitech and the 0x6F8 wheels. */
 u32  usbWheelSteerButtons(int x, int deadZone);
+/* PC (2026-11-10): the 0xC294 wheel's raw word as a PS pad's (PADRAW_*) for
+ * the menus (MenuControl::emulatePressure): each button its own, the wheel's
+ * L3 / R3 as L1 / R1 (its paddles are the menus' up / down). */
+u32  usbC294MenuRaw(u32 raw);
+/* PC (2026-11-10): the 0xC294 wheel's raw bits (usbC294Buttons' table
+ * g_00341AB0; the hat's are control_internal.h's WHEEL_HAT_*). */
+enum {
+    C294RAW_L1       = 0x0001,
+    C294RAW_L2       = 0x0002,
+    C294RAW_L3       = 0x0004,
+    C294RAW_R1       = 0x0008,
+    C294RAW_R2       = 0x0010,
+    C294RAW_R3       = 0x0020,
+    C294RAW_TRIANGLE = 0x0400,
+    C294RAW_CROSS    = 0x0800,
+    C294RAW_SQUARE   = 0x1000,
+    C294RAW_CIRCLE   = 0x2000,
+    C294RAW_START    = 0x4000,
+    C294RAW_SELECT   = 0x8000
+};
 
 #endif /* GAME_T479_USB_STEERING_PORT_H */

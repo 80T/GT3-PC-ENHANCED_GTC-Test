@@ -122,7 +122,12 @@ EGCS_SIZE(CameraViewKind, 0x8);
  * too: +0x2D8..+0x2FF and +0x2484..+0x24BF are alignment (the enhanced
  * engine keeps its zoom spring at +0x2484 there).  (u047's
  * "CameraView" at CameraManager +0x4A0 is views[0].targetInfo; its obj134 is
- * camera.) */
+ * camera.)
+ * PC (ROADMAP 35): selector and chooser hold PC_RACE_CARS_MAX cars (0x130C /
+ * 0x18C bytes, PS2 0x178 / 0x60): size 0x3780, the members from unk_198 on
+ * sit later than shown (targetInfo +0x1334, chooser +0x1408, camera
+ * +0x1594, the cameras 0x12C0 later: onboard +0x15C0 .. heli +0x3580,
+ * input +0x3740, zoomSpring +0x3744). */
 class CameraView {
 public:
     /* Constructs Random (TargetChooser::rng, +0x2C8) and the ten cameras. */
@@ -154,7 +159,7 @@ public:
      * it, updateMode0 sets its target and reads it. */
     CameraZoomSpring     zoomSpring;        /* 0x2484 */
 };
-EGCS_SIZE(CameraView, 0x24C0);
+EGCS_SIZE(CameraView, 0x3780);              /* PC: PS2 0x24C0 (the selector's and chooser's tables of 7) */
 
 /* RaceCameraBase (typeinfo __tf14RaceCameraBase 0x0020A290, T383): its own
  * header, which the race display's includes too (its type name's place). */
@@ -169,7 +174,11 @@ EGCS_SIZE(CameraView, 0x24C0);
  * the enhanced engine's start fields use 0x9718..0x971F of it).
  *
  * view / player arguments index views[]; `current' is the view the
- * forwarders use (setCurrentView before drawing each screen). */
+ * forwarders use (setCurrentView before drawing each screen).
+ * PC (ROADMAP 35): progress (CarProgress, 0x18C) and the views (CameraView,
+ * 0x3780) hold PC_RACE_CARS_MAX cars: the members from views on sit later
+ * than shown and the class is larger (a runtime class: nothing reads it by
+ * offset). */
 /* The on / off members of CameraManager that egcs saw as bool (4 bytes
  * there, its own alias set; u092 matching: the store order of resetState
  * and update, and demoMode's loads and stores not ordered against the float
@@ -248,6 +257,8 @@ public:
     void  begin2D(RaceOrganization *org, GSBuffer *buf);   /* 0x00209130 */
     int   isOwnCar(RaceEntryCar *car);      /* 0x002091E0 the current view (mode 0) looks from car */
     int   F_00209220();                     /* 0x00209220 the current camera's virtual_9 */
+    int   pcCockpit();                      /* PC: the current view is the cockpit view: its slot 1 / 2, else 0 (OnBoardCamera::pcIsCockpit) */
+    OnBoardCamera *pcCustom();              /* PC (2026-11-14): the current view is a custom camera's: its onboard camera, else NULL (pc_customcam.h) */
     int   F_00209370(RaceOrganization *org, RaceEntryCar *car);   /* 0x00209370 virtual_12 for a car pointer */
     f32   F_00209498();                     /* 0x00209498 frameEffectLevel clamped to 0..1 */
     /* The camera switches of the mode handlers (org and input are not used). */

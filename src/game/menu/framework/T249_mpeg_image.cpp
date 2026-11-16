@@ -16,6 +16,9 @@
 #include "game/menu/framework/T259_menu_drawable.h"        /* gt2k_menu::Drawable */
 #include "engine/gfx/T514_gs_buffer.h"            /* GSBuffer */
 #include "engine/pgl/G001_flare.h"                /* gfx_* / gs_* / pgl_* (the GS driver) */
+#include "engine/media/native/media_services.h"     /* PC: gt3m_movie_aspect */
+#include "game/app/pc_aspect.h"                 /* PC: pc_movie_fit */
+#include "game/app/pc_still.h"                  /* PC: the stills */
 #include "game/menu/framework/render_base_internal.h"
 
 namespace gt2k_menu {
@@ -32,6 +35,7 @@ MpegImage::MpegImage(Tex1Image *tex)
     vh     = 1.0f;
     mirror = 0;
     pixels = NULL;
+    pcStill = 0;                            /* PC */
 }
 
 // FUNC 0x001CBEF0 gt2k_menu::MpegImage::MpegImage
@@ -44,6 +48,7 @@ MpegImage::MpegImage(MenuLayoutItem *res, PageLayout *layout)
     vh     = 1.0f;
     mirror = 0;
     pixels = NULL;
+    pcStill = 0;                            /* PC */
 }
 
 /* index.txt: gt2k_menu::MpegImage::virtual_0.  Frees the picture. */
@@ -63,6 +68,7 @@ MpegImage::~MpegImage()
 // FUNC 0x001CBFC8 gt2k_menu::MpegImage::setIpic
 void MpegImage::setIpic(Ipic *pic)
 {
+    pcStill = 0;                            /* PC */
     void *old = pixels;
     if (old != NULL) {
         pixels = NULL;
@@ -90,6 +96,16 @@ void MpegImage::setIpic(Ipic *pic)
     picHeight = pic->height;
 }
 
+/* PC (no original): see T249_mpeg_image.h. */
+int MpegImage::setStill(int slot, const char *name)
+{
+    setIpic(NULL);
+    if (pc_still_load(slot, name) == 0)
+        return 0;
+    pcStill = slot + 1;
+    return 1;
+}
+
 /* The texture coordinates of the movie frame: its buffer is the frame width
  * rounded up to 64, the texture texW x texH.
  * PC: an interlaced movie's field moved onto its own lines
@@ -101,6 +117,11 @@ void MpegImage::movieUV(PrimUV *uv)
     f32 sv = (f32)movie->buf.height / (f32)movie->texH;
     f32 su = (f32)gs_buffer_width(movie->buf.width) / (f32)movie->texW;
     f32 dv = movie->fieldOffset() / (f32)movie->texH;  /* PC */
+    if (movie->gpuFrame() != 0) {           /* PC: its picture fills its texture */
+        su = 1.0f;
+        sv = 1.0f;
+        dv = 0.0f;
+    }
 
     uv[0].u = su * u0;
     uv[0].v = sv * v0 + dv;
@@ -181,8 +202,66 @@ void MpegImage::drawIpic()
     tex.freeVram();
 }
 
+/* PC (no original): the movie frame as virtual_2 drew it, qw x qh about the
+ * item's centre, its colours masked (the alpha alone: black). */
+void MpegImage::drawMovie(f32 qw, f32 qh, u32 colorMask)
+{
+    u32 *colors = (u32 *)gfx_alloc_tail(1);
+    getColors(colors);
+    for (int i = 0; i < 4; i++)
+        colors[i] &= colorMask;
+    PrimVertex *verts = (PrimVertex *)gfx_alloc_tail(3);
+    if (mirror != 0)
+        F_001D01A0(verts, x.value, y.value, qw, qh);
+    else
+        setRectVertices(verts, x.value, y.value, qw, qh);
+    PrimUV *uv = (PrimUV *)gfx_alloc_tail(2);
+    movieUV(uv);
+    pgl_draw_strip(verts, NULL, colors, uv, 4);
+}
+
+/* PC (no original): the still, its host image set as uploadGpu (T253) sets the
+ * movie's and drawn as drawMovie: qw x qh about the item's centre, its colours
+ * masked.  Its picture fills the TEX0's square, so u0 .. vh are the picture's
+ * whatever its size. */
+void MpegImage::drawStill(f32 qw, f32 qh, u32 colorMask)
+{
+    gs_flush_dirty_regs();
+    gfx_texflush();
+    gfx_set_texture_buffer(0, pc_still_tbp(pcStill - 1) << 6, PSM_CT32, 0);
+    gfx_set_texture_size(PC_STILL_SIDE, PC_STILL_SIDE);
+    gfx_set_texture_region(PGL_REGION_U, 0, PC_STILL_SIDE - 1);
+    gfx_set_texture_region(PGL_REGION_V, 0, PC_STILL_SIDE - 1);
+    gfx_tex_param(PGL_TEXPARAM_WMS, PGL_WRAP_CLAMP);
+    gfx_tex_param(PGL_TEXPARAM_WMT, PGL_WRAP_CLAMP);
+    gfx_tex_param(PGL_TEXPARAM_TFX, PGL_TFX_MODULATE);
+    gfx_tex_param(PGL_TEXPARAM_MXL, 0);
+    gfx_tex_param(PGL_TEXPARAM_MMIN, PGL_FILTER_LINEAR);
+    gfx_tex_param(PGL_TEXPARAM_MMAG, PGL_FILTER_LINEAR);
+
+    u32 *colors = (u32 *)gfx_alloc_tail(1);
+    getColors(colors);
+    for (int i = 0; i < 4; i++)
+        colors[i] &= colorMask;
+    PrimVertex *verts = (PrimVertex *)gfx_alloc_tail(3);
+    setRectVertices(verts, x.value, y.value, qw, qh);
+    PrimUV *uv = (PrimUV *)gfx_alloc_tail(2);
+    uv[0].u = u0;
+    uv[0].v = v0;
+    uv[1].u = u0 + uw;
+    uv[1].v = v0;
+    uv[2].u = u0;
+    uv[2].v = v0 + vh;
+    uv[3].u = u0 + uw;
+    uv[3].v = v0 + vh;
+    pgl_draw_strip(verts, NULL, colors, uv, 4);
+}
+
 /* Slot 2, the draw (index.txt: gt2k_menu::MpegImage::virtual_2): the movie
- * frame (if the movie has one), else the picture, else the texture. */
+ * frame (if the movie has one), else the picture, else the texture.
+ * PC: the frame in its own shape ([Display] MovieAspect, pc_movie_fit), the
+ * rest of the item black; a movie's first picture as its still the same, so
+ * that the movie takes over without a jump. */
 // FUNC 0x001CC448 gt2k_menu::MpegImage::virtual_2
 void MpegImage::virtual_2()
 {
@@ -192,17 +271,17 @@ void MpegImage::virtual_2()
     if (g_002CDC10.lastFrame != NULL) {
         Drawable::virtual_2();
         g_002CDC10.upload();
-        u32 *colors = (u32 *)gfx_alloc_tail(1);
-        getColors(colors);
-        PrimVertex *verts = (PrimVertex *)gfx_alloc_tail(3);
-        if (mirror != 0)
-            F_001D01A0(verts, x.value, y.value, w, h);
-        else
-            setRectVertices(verts, x.value, y.value, w, h);
-        PrimUV *uv = (PrimUV *)gfx_alloc_tail(2);
-        movieUV(uv);
-        pgl_draw_strip(verts, NULL, colors, uv, 4);
+        f32 movieW = w, movieH = h;
+        if (pc_movie_fit((f32)gt3m_movie_aspect() * uw / vh, &movieW, &movieH) != 0)
+            drawMovie(w, h, 0xFF000000u);
+        drawMovie(movieW, movieH, 0xFFFFFFFFu);
         g_002CDC10.release();
+    } else if (pcStill != 0) {              /* PC */
+        f32 stillW = w, stillH = h;
+        const f32 aspect = pc_still_aspect(pcStill - 1);
+        if (aspect > 0.0f && pc_movie_fit(aspect * uw / vh, &stillW, &stillH) != 0)
+            drawStill(w, h, 0xFF000000u);
+        drawStill(stillW, stillH, 0xFFFFFFFFu);
     } else if (pixels != NULL) {
         drawIpic();
     } else if (texSet != NULL) {

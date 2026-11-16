@@ -1,12 +1,16 @@
 /* window.cpp - the game window of GT3 PC (window.h). */
 #include "platform/window.h"
+#include "platform/cockpit_osd.h"              /* PC (2026-11-08): the cockpit camera's calibration */
 #include "platform/debug_camera.h"
 #include "platform/frame_monitor.h"
 #include "platform/frame_step.h"
 #include "platform/input_map.h"
 #include "platform/log.h"
+#include "platform/screenshot.h"               /* PC (2026-11-15): the Screenshot hotkey */
 #include "platform/settings_menu.h"
+#include "platform/song_osd.h"
 #include "platform/system_menu.h"
+#include "platform/texture_menu.h"
 
 #include <windows.h>
 
@@ -42,6 +46,8 @@ std::atomic<HMONITOR> g_fullMonitor{nullptr};
  * destroy_screen, activate). */
 constexpr UINT kMsgScreen = WM_APP + 1;
 enum { kScreenCreate = 1, kScreenDestroy, kScreenActivate };
+/* PC: a device's press of a hotkey (press_hotkey; wParam the hotkey). */
+constexpr UINT kMsgHotkey = WM_APP + 2;
 struct ScreenArgs {
     int x, y, w, h;
     HWND hwnd;
@@ -175,6 +181,145 @@ void update_mouse(HWND hwnd, bool again)
     }
 }
 
+/* Hotkey h's action (gt3pc.ini [Hotkeys], input_map.h; defaults in the
+ * comments): its key going down (repeat: a held key's repeat), or a device's
+ * press (press_hotkey: never a repeat). */
+void run_hotkey(HWND hwnd, int h, bool repeat)
+{
+    switch (h) {
+    case input_map::kHotTextureMenu:
+        /* PC (2026-11-13): F10, not repeated: the texture interface
+         * (texture_menu.h), which takes its own keys only */
+        if (!repeat) {
+            system_menu::hide();
+            settings_menu::hide();
+            texture_menu::toggle();
+        }
+        break;
+    case input_map::kHotTextureToggle:
+        /* PC (2026-11-13): F12, not repeated: the replacement textures off /
+         * on (texture_menu.h) */
+        if (!repeat)
+            texture_menu::replace_key();
+        break;
+    case input_map::kHotTextureRefresh:
+        /* PC (2026-11-13): Ctrl+F10, not repeated: the texture folders read
+         * again (texture_menu.h) */
+        if (!repeat)
+            texture_menu::refresh_key();
+        break;
+    case input_map::kHotScreenshot:
+        /* PC (2026-11-15): F1, not repeated: a screenshot of the next picture
+         * (screenshot.h), the menus shown too (they are not in it) */
+        if (!repeat)
+            screenshot::request();
+        break;
+    case input_map::kHotSettingsMenu:
+        /* F2, not repeated: the settings menu, which takes the keys while it
+         * is shown (the game's held keys let go) */
+        if (!repeat) {
+            texture_menu::hide();           /* PC (2026-11-13) */
+            system_menu::hide();
+            settings_menu::toggle();
+            clear_keys();
+        }
+        break;
+    case input_map::kHotPause:
+        /* F5 (repeats too): pause / one tick; F6: run again (frame_step.h);
+         * with the settings menu shown too */
+        frame_step::key_step();
+        break;
+    case input_map::kHotResume:
+        if (!repeat)
+            frame_step::key_resume();
+        break;
+    case input_map::kHotFullscreen:
+        /* Alt+Enter, not repeated: windowed <-> full screen */
+        if (!repeat) {
+            settings::DisplayMode to = settings::DisplayMode::windowed;
+            if (cur_mode() == settings::DisplayMode::windowed) {
+                to = settings::display().mode;
+                if (to == settings::DisplayMode::windowed)
+                    to = settings::DisplayMode::borderless;
+            }
+            g_request = (int)to;
+        }
+        break;
+    case input_map::kHotFrameMonitor:
+        /* F3, not repeated: the frame time monitor (the menus shown too) */
+        if (!repeat)
+            frame_monitor::toggle();
+        break;
+    case input_map::kHotDebugCamera:
+        /* F7, not repeated: the debug camera, in a race (debug_camera.h) */
+        if (!repeat) {
+            debug_camera::key();
+            update_mouse(hwnd, false);
+        }
+        break;
+    case input_map::kHotFlickerCapture:
+    case input_map::kHotTrace:
+    case input_map::kHotFrameCapture:
+        /* F8 / F9 / F11, not repeated: the debug captures' (take_hotkey) */
+        if (!repeat)
+            g_hotPressed[h] = 1;
+        break;
+    case input_map::kHotSystemMenu:
+        /* Esc, not repeated: the Esc menu (Back, Restart, Exit), which takes
+         * the keys as the settings menu does */
+        if (!repeat) {
+            system_menu::toggle();
+            clear_keys();
+        }
+        break;
+    case input_map::kHotSongMenu:
+        /* PC: M / Select, not repeated: the race's song changer
+         * (song_osd.h); Comma / D-pad up, Period / D-pad down: its previous
+         * / next song while it is open */
+        if (!repeat)
+            song_osd::toggle();
+        break;
+    case input_map::kHotPreviousSong:
+    case input_map::kHotNextSong:
+        if (!repeat)
+            song_osd::step(h == input_map::kHotNextSong ? 1 : -1);
+        break;
+    case input_map::kHotCalibrationUp:
+    case input_map::kHotCalibrationDown:
+        /* PC (2026-11-08): the cockpit camera's calibration (cockpit_osd.h),
+         * while it is on: Up / Down the axis, Left / Right a step of it (a
+         * held key's repeats step on), F4 save, Delete cancel, 0 the axis
+         * to 0 */
+        if (!repeat)
+            cockpit_osd::axis_key(h == input_map::kHotCalibrationDown ? 1 : -1);
+        break;
+    case input_map::kHotCalibrationLeft:
+    case input_map::kHotCalibrationRight:
+        cockpit_osd::adjust_key(h == input_map::kHotCalibrationRight ? 1 : -1);
+        break;
+    case input_map::kHotCalibrationSave:
+    case input_map::kHotCalibrationCancel:
+    case input_map::kHotCalibrationReset:
+        if (!repeat) {
+            if (h == input_map::kHotCalibrationSave)
+                cockpit_osd::save_key();
+            else if (h == input_map::kHotCalibrationCancel)
+                cockpit_osd::cancel_key();
+            else
+                cockpit_osd::reset_key();
+        }
+        break;
+    }
+}
+
+/* PC: a panel's hotkey (the song changer's, the calibration's): the menus'
+ * own while one is shown. */
+bool panel_hotkey(int h)
+{
+    return h == input_map::kHotSongMenu || h == input_map::kHotPreviousSong || h == input_map::kHotNextSong ||
+           input_map::hotkey_shares_keys(h);
+}
+
 LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
     switch (msg) {
@@ -237,77 +382,45 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         const bool ctrl = GetKeyState(VK_CONTROL) < 0, alt = GetKeyState(VK_MENU) < 0,
                    shift = GetKeyState(VK_SHIFT) < 0;
         auto hot = [&](int h) { return input_map::is_hotkey(h, vk, ctrl, alt, shift); };
-        /* F2, not repeated: the settings menu, which takes the keys while it
-         * is shown (the game's held keys let go) */
-        if (hot(input_map::kHotSettingsMenu)) {
-            if (!repeat) {
-                system_menu::hide();
-                settings_menu::toggle();
-                clear_keys();
-            }
-            return 0;
-        }
-        /* F5 (repeats too): pause / one tick; F6: run again (frame_step.h);
-         * with the settings menu shown too */
-        if (hot(input_map::kHotPause)) {
-            frame_step::key_step();
-            return 0;
-        }
-        if (hot(input_map::kHotResume)) {
-            if (!repeat)
-                frame_step::key_resume();
-            return 0;
-        }
-        /* Alt+Enter, not repeated: windowed <-> full screen */
-        if (hot(input_map::kHotFullscreen)) {
-            if (!repeat) {
-                settings::DisplayMode to = settings::DisplayMode::windowed;
-                if (cur_mode() == settings::DisplayMode::windowed) {
-                    to = settings::display().mode;
-                    if (to == settings::DisplayMode::windowed)
-                        to = settings::DisplayMode::borderless;
-                }
-                g_request = (int)to;
-            }
-            return 0;
-        }
-        /* F3, not repeated: the frame time monitor (the menus shown too) */
-        if (hot(input_map::kHotFrameMonitor)) {
-            if (!repeat)
-                frame_monitor::toggle();
-            return 0;
-        }
-        /* F7, not repeated: the debug camera, in a race (debug_camera.h) */
-        if (hot(input_map::kHotDebugCamera)) {
-            if (!repeat) {
-                debug_camera::key();
-                update_mouse(hwnd, false);
-            }
-            return 0;
-        }
-        /* F8 / F9, not repeated: the debug captures' (take_hotkey) */
-        static const int kCaptures[] = {input_map::kHotFlickerCapture, input_map::kHotTrace};
-        for (int h : kCaptures)
+        /* (run_hotkey: what each does) F2, F5, F6, Alt+Enter, F3, F7, F8,
+         * F9: with the menus shown too */
+        static const int kFirst[] = {input_map::kHotSettingsMenu, input_map::kHotPause, input_map::kHotResume,
+                                     input_map::kHotFullscreen, input_map::kHotFrameMonitor,
+                                     input_map::kHotDebugCamera, input_map::kHotFlickerCapture,
+                                     input_map::kHotTrace, input_map::kHotFrameCapture,
+                                     input_map::kHotTextureMenu, input_map::kHotTextureRefresh,
+                                     input_map::kHotTextureToggle, input_map::kHotScreenshot};
+        for (int h : kFirst)
             if (hot(h)) {
-                if (!repeat)
-                    g_hotPressed[h] = 1;
+                run_hotkey(hwnd, h, repeat);
                 return 0;
             }
+        /* PC (2026-11-13): the texture interface's own keys while it is
+         * shown (the others go on to the game) */
+        if (texture_menu::shown() && msg == WM_KEYDOWN && texture_menu::key(vk, repeat))
+            return 0;
         if (settings_menu::shown() && msg == WM_KEYDOWN) {
             settings_menu::key(vk, repeat);
             return 0;
         }
-        /* Esc, not repeated: the Esc menu (Back, Restart, Exit), which takes
-         * the keys as the settings menu does */
+        /* Esc: the settings menu's own while it is shown */
         if (hot(input_map::kHotSystemMenu)) {
-            if (!repeat) {
-                system_menu::toggle();
-                clear_keys();
-            }
+            run_hotkey(hwnd, input_map::kHotSystemMenu, repeat);
             return 0;
         }
         if (system_menu::shown() && msg == WM_KEYDOWN) {
             system_menu::key(vk, repeat);
+            return 0;
+        }
+        /* PC: the song changer's and the calibration's keys: the menus' own
+         * while one is shown; the calibration's only while it is on (the
+         * arrows, Delete, 0 are the game's otherwise: hotkey_shares_keys) */
+        for (int h = 0; h < input_map::kHotkeyCount; h++) {
+            if (!panel_hotkey(h) || !hot(h))
+                continue;
+            if (input_map::hotkey_shares_keys(h) && !cockpit_osd::active())
+                break;
+            run_hotkey(hwnd, h, repeat);
             return 0;
         }
         if (wp < 256) {
@@ -372,6 +485,19 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         return 0;
     case WM_ERASEBKGND:
         return 1;
+    case kMsgHotkey: {
+        /* PC: a device's press (press_hotkey) as the key's, with the menus
+         * as the keys find them: the Esc menu's closes the settings menu (as
+         * the Guide button's hold, gamepad.h), the song changer's are the
+         * menus' while one is shown */
+        const int h = (int)wp;
+        if (panel_hotkey(h) && (settings_menu::shown() || system_menu::shown()))
+            return 0;
+        if (h == input_map::kHotSystemMenu)
+            settings_menu::hide();
+        run_hotkey(hwnd, h, false);
+        return 0;
+    }
     case kMsgScreen:
         if (wp == kScreenCreate) {
             ScreenArgs *a = (ScreenArgs *)lp;
@@ -491,6 +617,12 @@ bool take_key_press(int vk)
 bool take_hotkey(int h)
 {
     return h >= 0 && h < input_map::kHotkeyCount && g_hotPressed[h].exchange(0) != 0 && g_focus;
+}
+
+void press_hotkey(int h)
+{
+    if (g_hwnd != nullptr && h >= 0 && h < input_map::kHotkeyCount)
+        PostMessageW(g_hwnd, kMsgHotkey, (WPARAM)h, 0);
 }
 
 void mouse_wheel(uint32_t *up, uint32_t *down)

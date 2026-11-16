@@ -5,7 +5,10 @@
  * plugs into port 1, the second into port 2; unplugged, its port is free for
  * the next.  A wheel (a joystick SDL3 types as a wheel, or the one named by
  * gt3pc.ini [Wheel1] / [Wheel2] Device) is Wheel 1 / 2 instead, never a
- * pad.  SDL3.dll is loaded at start-up when it is next to the game (it is
+ * pad.  A joystick a binding names (input_map.h `@<name>': a wheel's pedals
+ * of their own, a shifter, a button box) is opened besides, the first of
+ * that name, for the bindings that read it; it stays a pad or a wheel too
+ * if it is one.  SDL3.dll is loaded at start-up when it is next to the game (it is
  * delay-loaded); without it the game runs with the keyboard alone.  A
  * thread of its own polls SDL (every 2 ms), so the pads read a recent state
  * at any time; the controllers work while the window is in the background,
@@ -15,6 +18,8 @@
  *
  * The Guide button (PS / Xbox / Home) of any controller is the menus': a
  * tap shows or hides the settings menu (F2), a hold of 1.5 s the Esc menu.
+ * PC: a hotkey's device binding (input_map.h [Hotkeys], after `;') pressed
+ * is that hotkey (window::press_hotkey).
  *
  * The DualShock 2 of State (the menus read it: the physical buttons, not
  * the mapping): the buttons by position (Cross = the bottom face button),
@@ -58,6 +63,18 @@ uint32_t take_pressed_raw(int port);
 /* The game's motors for `port`: small on (0 / 1), large 0..255. */
 void set_motors(int port, int small, int large);
 
+/* PC (2026-11-07): the controller's button names as its maker prints them
+ * (SDL's labels), for the overlays' hints (the settings menu, the Esc menu,
+ * the song changer): the four face buttons by position - south, east, west,
+ * north: CROSS, CIRCLE, SQUARE, TRIANGLE on a PlayStation controller; A, B,
+ * X, Y on an Xbox one; B, A, Y, X on a Nintendo one - and the Guide button
+ * (PS, XBOX, HOME; GUIDE else).  The controller in port 1's, else port 2's;
+ * a DualShock's (GUIDE) while none is connected.  Capitals.  Any thread. */
+struct ButtonNames {
+    const char *south, *east, *west, *north, *guide;
+};
+ButtonNames button_names();
+
 /* A wheel's joystick as SDL reads it. */
 struct Joystick {
     int buttonCount, axisCount, hatCount;
@@ -67,5 +84,30 @@ struct Joystick {
 };
 /* The joystick of Wheel 1 / 2 (`wheel' 0, 1); false when none. */
 bool read_wheel(int wheel, Joystick *out);
+
+/* The devices bindings name (input_map::device_name; ids 1 .. count, at
+ * most input_map::kMaxDevices), as read.  src: the bindings' view of them
+ * (input_map::Sources::devices), pointing into this struct: read in place,
+ * not copied. */
+struct Devices {
+    int count;
+    bool present[input_map::kMaxDevices];
+    bool gamepad[input_map::kMaxDevices];   /* SDL maps it as a gamepad: pad[] */
+    input_map::PadSource pad[input_map::kMaxDevices];
+    Joystick joy[input_map::kMaxDevices];
+    input_map::JoySource joySrc[input_map::kMaxDevices];
+    input_map::DeviceSource src[input_map::kMaxDevices];
+};
+void read_devices(Devices *out);
+/* Device `id' is connected. */
+bool device_present(int id);
+/* Their buttons seen down since the last call (a tap between two of the
+ * game's reads): [id - 1], pad SDL's gamepad buttons (bits), joy the
+ * joystick's. */
+struct DevicePresses {
+    uint32_t pad[input_map::kMaxDevices];
+    uint8_t joy[input_map::kMaxDevices][128];
+};
+void take_pressed_devices(DevicePresses *out);
 
 } // namespace gamepad

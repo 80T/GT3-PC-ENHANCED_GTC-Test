@@ -34,7 +34,7 @@ void CarProgress::init(RaceOrganization *org)
     length = 1.0f;
     ready = 0;
     frames = 0;
-    for (i = 0; i < 7; i++) {
+    for (i = 0; i < PC_RACE_CARS_MAX; i++) {    /* PC: every entry (was i < 7: 7 cars) */
         cars[i].prev = 0.0f;
         cars[i].cur = 0.0f;
         cars[i].lap = 0;

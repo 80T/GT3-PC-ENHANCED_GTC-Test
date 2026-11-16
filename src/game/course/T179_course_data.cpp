@@ -45,6 +45,7 @@
 #include "game/sound/car_sound_internal.h"                           /* FlareSourceData, RaceMiniMapData, CourseListEntry, the course table */
 #include "game/app/pc_frame.h"              /* PC: pc_anim_stepped (the dynamic frame rate) */
 #include "game/app/pc_detail.h"             /* PC: the render distance (course_draw) */
+#include "game/app/pc_course_scale.h"       /* PC: the course scale's draws */
 
 /* p moved by delta bytes. */
 template <class T> static inline T *reloc(T *p, int delta)
@@ -195,7 +196,15 @@ void course_draw_model(CourseData *cd, ModelSet *model)
         gfx_set_fog_params(0.0f, 1.0f);
         pgl_push_matrix();
         vu0_reset_translation();
+        /* PC (2026-11-11, user: the course scale "doesn't scale certain model
+         * sets correctly ... the course's background"): the course scale
+         * about the eye (game/app/pc_course_scale.h): the scenery at a
+         * distance seen where the stretched course would put it - nothing
+         * changes with the same scale on every axis; stretched or mirrored
+         * along one, it is too.  (The fog start 0: the same fog at any depth) */
+        pc_course_draw_begin(cd);
         modelset_draw_all(model);
+        pc_course_draw_end(cd);
         pgl_pop_matrix();
         pgl_pop_attrib();
     }
@@ -228,7 +237,16 @@ void F_001A9240(CourseData *cd)
     vu0_load_identity_regs();
     vu0_scale(COURSE_SKY_SCALE, COURSE_SKY_SCALE, COURSE_SKY_SCALE);
     pgl_mult_matrix(&saved.m[0][0]);
+    /* PC (2026-11-11, user: on a scaled course "the giant building in front
+     * is moving toward the camera and eventually clips into the main
+     * geometry"): model58 is scenery in world places (the eye's scale 0.01
+     * only fits its depth in the far clip: the picture is the same), so it
+     * takes the course scale in the world as the course does
+     * (game/app/pc_course_scale.h); unscaled, the stretched course passed
+     * its buildings */
+    pc_course_draw_begin(cd);
     modelset_draw_all(cd->model58);
+    pc_course_draw_end(cd);
     pgl_pop_matrix();
     pgl_pop_attrib();
 }
@@ -260,6 +278,7 @@ void course_draw(CourseData *cd, VisionList *v, CameraManager *cm, int flags)
 //   not NULL-tested).  Then all of model6C.
 void course_draw_parts(CourseData *cd, const u16 *parts, int flags)
 {
+    pc_course_draw_begin(cd);               /* PC: the course scale (game/app/pc_course_scale.h) */
     if (parts != 0) {
         int n = *parts++;
         modelset_begin_draw(cd->model04);
@@ -288,6 +307,7 @@ void course_draw_parts(CourseData *cd, const u16 *parts, int flags)
     }
     if (cd->model6C != 0)
         modelset_draw_all(cd->model6C);
+    pc_course_draw_end(cd);                 /* PC */
 }
 
 // FUNC 0x001A94C8 course_draw_reflection_a
@@ -300,6 +320,7 @@ void course_draw_reflection_a(CourseData *cd, f32 x, f32 y, f32 z)
         parts = 0;
     else
         parts = vision_nearest(cd->vis28, x, y, z)->parts;
+    pc_course_draw_begin(cd);               /* PC: the course scale (game/app/pc_course_scale.h) */
     if (parts != 0) {
         int n = *parts++;
         modelset_begin_draw(cd->model24);
@@ -311,9 +332,11 @@ void course_draw_reflection_a(CourseData *cd, f32 x, f32 y, f32 z)
             }
         }
         modelset_end_draw(cd->model24);
+        pc_course_draw_end(cd);             /* PC */
         return;
     }
     modelset_draw_all(cd->model24);
+    pc_course_draw_end(cd);                 /* PC */
 }
 
 // FUNC 0x001A9578 course_draw_reflection_b
@@ -325,6 +348,7 @@ void course_draw_reflection_b(CourseData *cd, f32 x, f32 y, f32 z)
         parts = 0;
     else
         parts = vision_nearest(cd->vis38, x, y, z)->parts;
+    pc_course_draw_begin(cd);               /* PC: the course scale (game/app/pc_course_scale.h) */
     if (parts != 0) {
         int n = *parts++;
         modelset_begin_draw(cd->model34);
@@ -336,9 +360,11 @@ void course_draw_reflection_b(CourseData *cd, f32 x, f32 y, f32 z)
             }
         }
         modelset_end_draw(cd->model34);
+        pc_course_draw_end(cd);             /* PC */
         return;
     }
     modelset_draw_all(cd->model34);
+    pc_course_draw_end(cd);                 /* PC */
 }
 
 
@@ -522,6 +548,8 @@ static inline u32 toc_word(const u8 *image, u32 off)
  * the empty TOC's word 1 read at address 4).  Set by course_table_init,
  * read by course_path. */
 static const char *s_pcCourseDir;
+/* PC: course_read_file_of's course and the course whose file it reads */
+static u64 s_pcReadCode, s_pcReadFile;
 
 // FUNC 0x001A98C8 course_table_init
 //   Builds the course table from the "courses/US" directory of the volume
@@ -590,8 +618,38 @@ int course_find(u64 code)
 //   The file name of course `code' (the first course's when absent).
 const char *course_file_name(u64 code)
 {
+    if (code == s_pcReadCode && code != 0)  /* PC: course_read_file_of */
+        code = s_pcReadFile;
     int i = course_find(code);
     return g_00352234[i].name;
+}
+
+/* PC (no original): see T179_course_data.h. */
+const char *course_table_name(u64 code)
+{
+    if (g_00352230 <= 0)
+        return NULL;
+    const CourseListEntry *e = &g_00352234[course_find(code)];
+    return e->code == code ? e->name : NULL;
+}
+
+/* PC (no original): see T179_course_data.h. */
+int course_table_size(void)
+{
+    return g_00352230;
+}
+
+/* PC (no original): see T179_course_data.h. */
+const char *course_table_at(int i)
+{
+    return g_00352234[i].name;
+}
+
+/* PC (no original): see T179_course_data.h. */
+void course_read_file_of(u64 code, u64 file)
+{
+    s_pcReadCode = code;
+    s_pcReadFile = file;
 }
 
 // FUNC 0x001A9A60 course_path

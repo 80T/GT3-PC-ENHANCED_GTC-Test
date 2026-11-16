@@ -2,7 +2,8 @@
  * conductor of a race (translation unit T305, unit u083),
  * 0x001ED000..0x001ED9F0; CarPairStates (T360).
  *
- * The conductor holds the eight cars (RaceCarState) and runs their frames
+ * The conductor holds the eight cars (RaceCarState; PC: PC_RACE_CARS_MAX,
+ * game/race/race_cars.h) and runs their frames
  * (update, T317), the car-to-car passes (T349), the slow car boost (T304),
  * the lap counter (T307), the race clock, the lap / checkpoint events and
  * records (T308, T303), the data logger's sector records (T306), the end of a
@@ -44,6 +45,7 @@
 #include "game/car/physics/T167_rigid_body.h"           /* CarBoxList (held by value) */
 #include "game/race/dynamics/T326_race_rule_options.h"    /* RaceRuleOptions (held by value) */
 #include "game/race/ai/T372_pit_lane.h"             /* pit_lane_contains (IsInsidePit*Area, inline) */
+#include "game/race/race_cars.h"                    /* PC: PC_RACE_CARS_MAX, the per-car arrays */
 
 
 class RaceOrganization;                     /* T125_race_organization.h (pointers only) */
@@ -66,7 +68,8 @@ class type_info;
  * follows the pair's proximity code near[i][j] & 0xF (kinds 1..6); a state
  * of the mirrored pair (j, i) blocks or is set by some transitions.
  * DynamicsConductor +0xBA34 (Lupo 2: GetRaceWatcher returns it).  u093
- * called it CarPairInfo, u083 bA34.  Not polymorphic.  Size 0xC4. */
+ * called it CarPairInfo, u083 bA34.  Not polymorphic.  Size 0xC4 (PC:
+ * 0xC04, the tables PC_RACE_CARS_MAX square). */
 class CarPairStates {
 public:
     void setOwner(DynamicsConductor *d);    /* 0x001F5918 (DynamicsConductor::initialize) */
@@ -77,14 +80,16 @@ public:
      * *other (-1: none). */
     int  strongest(int car, int *other);    /* 0x001F5C58 */
     /* No callers.  Bit j for every car j in a state with car; flags bit 1:
-     * state 1 counts too, bit 2: also cars on another lap. */
-    int  activeMask(int car, u16 flags);    /* 0x001F5DB8 */
+     * state 1 counts too, bit 2: also cars on another lap.  PC: u32 (was
+     * int), bit 31 for car 31 (game/race/race_cars.h). */
+    u32  activeMask(int car, u16 flags);    /* 0x001F5DB8 */
 
     DynamicsConductor *dc;                  /* 0x00 */
-    s16                timer[8][8];         /* 0x04 [i][j] frames, 0..300 */
-    u8                 state[8][8];         /* 0x84 [i][j] 0..3 */
+    /* PC: PC_RACE_CARS_MAX (was 8), races of up to 32 cars (game/race/race_cars.h) */
+    s16                timer[PC_RACE_CARS_MAX][PC_RACE_CARS_MAX];   /* 0x04 [i][j] frames, 0..300 */
+    u8                 state[PC_RACE_CARS_MAX][PC_RACE_CARS_MAX];   /* 0x84 (PC: 0x804) [i][j] 0..3 */
 };
-EGCS_SIZE(CarPairStates, 0xC4);
+EGCS_SIZE(CarPairStates, 0xC04);            /* PC: was 0xC4 (the 32 x 32 tables) */
 
 /* vtable _vt$17DynamicsConductor 0x0033CA20 (42 slots), vptr +0xE3A8 (egcs:
  * after all of its data).  typeinfo __tf17DynamicsConductor 0x001ED9B0
@@ -96,7 +101,8 @@ public:
     /* The base constructor of every conductor (the subclass constructors call
      * it): the eight cars (RaceCarState()), lines.data = NULL, the eight
      * CarBoxes of boxes (their constructor 0x001F42E0 is emitted in T317),
-     * then rules cleared and replaySpeed = 1. */
+     * then rules cleared and replaySpeed = 1.  (PC: PC_RACE_CARS_MAX cars
+     * and boxes.) */
     DynamicsConductor();                    /* 0x001F2A10 (T317) */
 
     /* ---- the virtual functions, slot order ---- */
@@ -272,6 +278,13 @@ public:
     /* License slot 13: a course out or a collision fails the test; in a stop
      * test (rules.licenseType 1) a stop in the box ends it. */
     void  licenseCheckStop(RaceCarState *car); /* 0x001EF780 */
+    /* PC (no original): the player's car (DRIVER_PAD) before the player has
+     * it - the computer driving the run-up of a rolling or corner start to
+     * the line (not CTRL_DRIVER yet), or the countdown not over: its faults
+     * (a course out, a collision) dropped, 1; else 0 (the faults stand).
+     * The license tests' and the time trial's checks take no fault until
+     * then (user: they failed before the player had control). */
+    int   pcFaultsBeforeControl(RaceCarState *car);
 
     /* ---- T308: the race progress ---- */
     u32   lapTime(RaceCarState *car);       /* 0x001EF8C8 ms since the car's last lap end */
@@ -355,7 +368,10 @@ public:
     u8              unk_0004[0x80];         /* 0x0004 */
     WearCurve       wear;                   /* 0x0084 (u077 DcSub84, u081 DcTyreSettings; u051 / u086 x3 +0x9C) */
     SlowCarBoost    boost;                  /* 0x00AC */
-    RaceCarState    cars[8];                /* 0x00C8 (u085 DynCar) */
+    /* PC: the per-car arrays below are PC_RACE_CARS_MAX (was 8; gateTime /
+     * gateCar their second index), races of up to 32 cars (game/race/
+     * race_cars.h): the members from course on sit later than shown */
+    RaceCarState    cars[PC_RACE_CARS_MAX]; /* 0x00C8 (u085 DynCar) */
     RaceCourse     *course;                 /* 0xB7A8 org's course */
     u8              mode;                   /* 0xB7AC initialize(mode): 2 a finish timer, 3 (? a replay); non-zero:
                                                no time records or difference events (u082 noRecord) */
@@ -363,18 +379,20 @@ public:
     u16             finishTimer;            /* 0xB7AE frames, event 1 at 0 (setFinishTimer) */
     f32             replaySpeed;            /* 0xB7B0 1.0 (the logger's replay: 1, 0.5, 0.25, 0); the fraction
                                                of the car_view_*_now accessors (u082 interp, u085 timeStep) */
-    f32             slip[8][8];             /* 0xB7B4 [car][other]: other's slipstream on car (T349; u085
-                                               pairValue) */
-    u8              near[8][8];             /* 0xB8B4 [car][other]: the proximity code (car_near_code; u085
-                                               pairKind) */
-    s8              gapLap[8][8];           /* 0xB8F4 [i][j]: laps of j ahead of i (updateGapTable) */
-    f32             gapDist[8][8];          /* 0xB934 [i][j]: course distance of j ahead of i */
+    f32             slip[PC_RACE_CARS_MAX][PC_RACE_CARS_MAX];   /* 0xB7B4 [car][other]: other's slipstream on
+                                               car (T349; u085 pairValue) */
+    u8              near[PC_RACE_CARS_MAX][PC_RACE_CARS_MAX];   /* 0xB8B4 [car][other]: the proximity code
+                                               (car_near_code; u085 pairKind) */
+    s8              gapLap[PC_RACE_CARS_MAX][PC_RACE_CARS_MAX]; /* 0xB8F4 [i][j]: laps of j ahead of i
+                                               (updateGapTable) */
+    f32             gapDist[PC_RACE_CARS_MAX][PC_RACE_CARS_MAX];    /* 0xB934 [i][j]: course distance of j
+                                               ahead of i */
     CarPairStates   pairs;                  /* 0xBA34 (u093 CarPairInfo pairs) */
-    u32             gateTime[4][8];         /* 0xBAF8 [checkpoint][order] ms (the battles, recordGate) */
+    u32             gateTime[4][PC_RACE_CARS_MAX];  /* 0xBAF8 [checkpoint][order] ms (the battles, recordGate) */
     s16             gateLap[4];             /* 0xBB78 the lap the times are of */
     s8              gateCount[4];           /* 0xBB80 times recorded */
     s8              gateDone[4];            /* 0xBB84 times reported */
-    s8              gateCar[4][8];          /* 0xBB88 the car of each time */
+    s8              gateCar[4][PC_RACE_CARS_MAX];   /* 0xBB88 the car of each time */
     CourseLines     lines;                  /* 0xBBA8 the computer drivers' lines (u083 CourseGates, u085
                                                CourseGrid, u086 CourseLines) */
     CarBoxList      boxes;                  /* 0xBBB4 the collision boxes, T373 (u083 CarAuxSet, u089 CarBoxList;
@@ -382,12 +400,15 @@ public:
     RaceRuleOptions rules;                  /* 0xE340 (u082 RaceRules, u077 tbl_E340) */
     u32             clock;                  /* 0xE380 1/3 ms, +50 a frame (u078 frame, u086 frames) */
     int             carCount;               /* 0xE384 */
-    int             order[8];               /* 0xE388 car indices by running position */
+    int             order[PC_RACE_CARS_MAX];    /* 0xE388 car indices by running position */
     /*  vptr                                   0xE3A8 */
 };
 /* The enhanced engine: eight RaceCarState 0x3C longer: the members from
- * course on sit 0x1E0 later than shown (GT3 0xE3AC). */
-EGCS_SIZE(DynamicsConductor, 0xE58C);
+ * course on sit 0x1E0 later than shown (GT3 0xE3AC; the enhanced engine
+ * 0xE58C).  PC: the arrays PC_RACE_CARS_MAX long, the CarBox without its
+ * reach tables (T376): 0x3B14C in the egcs layout (polymorphic: not
+ * checked). */
+EGCS_SIZE(DynamicsConductor, 0x3B14C);
 
 /* The inline accessors (0x001ED6A8..0x001ED990, see the top). */
 inline DynCarState *DynamicsConductor::getRunState(int car) { return &getCar(car)->st; }  /* 0x001ED990 */

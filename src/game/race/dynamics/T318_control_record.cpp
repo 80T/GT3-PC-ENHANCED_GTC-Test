@@ -48,7 +48,12 @@ enum {
     CHANGED_THROTTLE  = 0x004,              /* throttle */
     CHANGED_BRAKE     = 0x008,              /* brake */
     CHANGED_THROTTLE2 = 0x040,              /* throttle2 */
-    CHANGED_HANDBRAKE = 0x020               /* handbrake */
+    CHANGED_HANDBRAKE = 0x020,              /* handbrake */
+    /* PC (2026-11-09): unk_3, the player's clutch in the clutch mode
+     * (game/app/pc_clutch.h): a bit no GT3 record sets (the mask is a gamma
+     * code: any width), so a record made before reads as it did; a frame
+     * of one made since carries its clutch */
+    CHANGED_CLUTCH    = 0x200
 };
 
 /* The 0x8000 bytes of a slot, copied by value (a 32-byte block loop). */
@@ -214,6 +219,8 @@ void Recorder::play(CarInput *out)
                     readDelta(&cur.throttle2);
                 if (mask & CHANGED_HANDBRAKE)
                     readDelta(&cur.handbrake);
+                if (mask & CHANGED_CLUTCH)
+                    readDelta(&cur.unk_3);  /* PC (2026-11-09) */
                 run = readGamma();
             }
             run = run - 1;
@@ -317,6 +324,8 @@ void Recorder::record(const CarInput *in)
             mask |= CHANGED_THROTTLE2;
         if (cur.handbrake != in->handbrake)
             mask |= CHANGED_HANDBRAKE;
+        if (cur.unk_3 != in->unk_3)
+            mask |= CHANGED_CLUTCH;         /* PC (2026-11-09) */
         frames++;
         if (frames == 1 || mask != 0) {
             if (run != 0)
@@ -340,6 +349,8 @@ void Recorder::record(const CarInput *in)
                 writeDelta(&cur.throttle2, &in->throttle2);
             if (mask & CHANGED_HANDBRAKE)
                 writeDelta(&cur.handbrake, &in->handbrake);
+            if (mask & CHANGED_CLUTCH)
+                writeDelta(&cur.unk_3, &in->unk_3);     /* PC (2026-11-09) */
             if (!((u32)(bits.size() + 0x40) < capacity))
                 stop();
             run = 0;

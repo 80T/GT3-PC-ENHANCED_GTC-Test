@@ -10,6 +10,7 @@
 #include <mfidl.h>
 #include <mfreadwrite.h>
 
+#include <algorithm>
 #include <cstring>
 #include <mutex>
 #include <string>
@@ -43,9 +44,20 @@ std::wstring widen(const char *s)
     return w;
 }
 
+/* A path for the log (the ANSI code page's, its nearest characters). */
+std::string shown(const wchar_t *path)
+{
+    const int n = WideCharToMultiByte(CP_ACP, 0, path, -1, nullptr, 0, nullptr, nullptr);
+    std::string s(n > 0 ? (size_t)n : 1, '\0');
+    if (n > 0)
+        WideCharToMultiByte(CP_ACP, 0, path, -1, &s[0], n, nullptr, nullptr);
+    s.resize(strlen(s.c_str()));
+    return s;
+}
+
 /* A source reader of path with only the first stream of `stream' selected
  * (MF_SOURCE_READER_FIRST_VIDEO_STREAM / _AUDIO_STREAM). */
-IMFSourceReader *open_reader(const char *path, DWORD stream, bool videoProcessing)
+IMFSourceReader *open_reader(const wchar_t *path, DWORD stream, bool videoProcessing)
 {
     IMFAttributes *attr = nullptr;
     IMFSourceReader *reader = nullptr;
@@ -53,10 +65,10 @@ IMFSourceReader *open_reader(const char *path, DWORD stream, bool videoProcessin
         return nullptr;
     if (videoProcessing)
         attr->SetUINT32(MF_SOURCE_READER_ENABLE_VIDEO_PROCESSING, TRUE);
-    const HRESULT hr = MFCreateSourceReaderFromURL(widen(path).c_str(), attr, &reader);
+    const HRESULT hr = MFCreateSourceReaderFromURL(path, attr, &reader);
     release(attr);
     if (FAILED(hr)) {
-        pclog::write("movie: %s: Media Foundation cannot open it (0x%08lX)", path, (unsigned long)hr);
+        pclog::write("movie: %s: Media Foundation cannot open it (0x%08lX)", shown(path).c_str(), (unsigned long)hr);
         return nullptr;
     }
     reader->SetStreamSelection((DWORD)MF_SOURCE_READER_ALL_STREAMS, FALSE);
@@ -187,7 +199,7 @@ void Mp4VideoReader::close()
 bool Mp4VideoReader::open(const char *path)
 {
     close();
-    reader_ = open_reader(path, (DWORD)MF_SOURCE_READER_FIRST_VIDEO_STREAM, true);
+    reader_ = open_reader(widen(path).c_str(), (DWORD)MF_SOURCE_READER_FIRST_VIDEO_STREAM, true);
     if (reader_ == nullptr)
         return false;
     IMFMediaType *t = nullptr;
@@ -339,10 +351,16 @@ void Mp4AudioReader::close()
 
 bool Mp4AudioReader::open(const char *path)
 {
+    return open(widen(path).c_str());
+}
+
+bool Mp4AudioReader::open(const wchar_t *path)
+{
     close();
+    skipTo_ = -1;
     reader_ = open_reader(path, (DWORD)MF_SOURCE_READER_FIRST_AUDIO_STREAM, false);
     if (reader_ == nullptr) {
-        pclog::write("movie: %s: no audio stream", path);
+        pclog::write("movie: %s: no audio stream", shown(path).c_str());
         return false;
     }
     IMFMediaType *t = nullptr;
@@ -363,11 +381,31 @@ bool Mp4AudioReader::open(const char *path)
         release(cur);
     }
     if (FAILED(hr) || rate_ <= 0 || channels_ <= 0) {
-        pclog::write("movie: %s: its audio does not decode (0x%08lX; AAC is the format)", path, (unsigned long)hr);
+        pclog::write("movie: %s: its audio does not decode (0x%08lX; AAC / MP3 are the formats)", shown(path).c_str(),
+                     (unsigned long)hr);
         close();
         return false;
     }
     return true;
+}
+
+bool Mp4AudioReader::rewind()
+{
+    return seek(0);
+}
+
+bool Mp4AudioReader::seek(int64_t t)
+{
+    if (reader_ == nullptr)
+        return false;
+    PROPVARIANT v;
+    PropVariantInit(&v);
+    v.vt = VT_I8;
+    v.hVal.QuadPart = t;
+    const HRESULT hr = reader_->SetCurrentPosition(GUID_NULL, v);
+    PropVariantClear(&v);
+    skipTo_ = SUCCEEDED(hr) && t > 0 ? t : -1;
+    return SUCCEEDED(hr);
 }
 
 bool Mp4AudioReader::next(std::vector<int16_t> &out)
@@ -389,13 +427,22 @@ bool Mp4AudioReader::next(std::vector<int16_t> &out)
         BYTE *data = nullptr;
         DWORD len = 0;
         if (SUCCEEDED(sample->ConvertToContiguousBuffer(&buf)) && SUCCEEDED(buf->Lock(&data, nullptr, &len))) {
-            const int16_t *s = (const int16_t *)data;
             const size_t frames = len / (2u * (unsigned)channels_);
+            /* PC: after a seek, the frames before its time (the source lands
+             * on a frame of its own at or before it) */
+            size_t first = 0;
+            if (skipTo_ >= 0) {
+                const int64_t ahead = skipTo_ - ts;
+                first = ahead > 0 ? (size_t)std::min<int64_t>(ahead * rate_ / 10000000, (int64_t)frames) : 0;
+                if (first < frames)
+                    skipTo_ = -1;
+            }
+            const int16_t *s = (const int16_t *)data + first * (size_t)channels_;
             if (channels_ <= 2) {
-                out.insert(out.end(), s, s + frames * (size_t)channels_);
+                out.insert(out.end(), s, s + (frames - first) * (size_t)channels_);
             } else {
                 /* more than two: the front pair with the centre (L R C ...) */
-                for (size_t i = 0; i < frames; i++) {
+                for (size_t i = 0; i < frames - first; i++) {
                     const int16_t *f = s + i * (size_t)channels_;
                     const float c = 0.7071f * f[2];
                     const float l = (f[0] + c) * 0.6f, r = (f[1] + c) * 0.6f;

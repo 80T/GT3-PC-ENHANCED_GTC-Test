@@ -266,13 +266,12 @@ void ArcadeControl::load()
     carBuffer2 = menu_heap_allocate(MENU_CAR_BUFFER_SIZE, 0x40);
     pages.loadFile("menu/arcade.mbl");
     music_load();
-    /* PC: only when the data has them: the Japanese disc has no course
-     * stills (its code shows the course movies alone; the missing file was
-     * waited for forever).  NULL: no still (loadCourseImage,
-     * showClassPicture) */
+    /* PC: only when the data has them: an install's are PNG files by now
+     * (game/app/pc_still.h), and the Japanese disc has no course stills (its
+     * code shows the course movies alone; the missing file was waited for
+     * forever).  NULL: no archive (loadCourseImage, showClassPicture) */
     FileLoc loc;
     if (file_resolve("stream/course.ipic", &loc, &vol_device_object) == -1) {
-        printf("PC: stream/course.ipic not found: no course stills in the arcade menus\n");
         courseIpic = NULL;
         return;
     }

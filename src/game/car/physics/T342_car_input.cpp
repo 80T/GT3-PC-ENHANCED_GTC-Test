@@ -8,6 +8,7 @@
 #include "game/race/core/T153_race_course.h"          /* (seen: UnitArena<64>) */
 #include "game/car/physics/car_input_internal.h"
 #include "game/car/physics/T342_car_input.h"
+#include "game/app/pc_clutch.h"                     /* PC (2026-11-09): the clutch mode */
 // DATA_START 0x0033C6B0
 
 /* .data: the pedal ramps per frame (input_tuning_init sets them from
@@ -164,6 +165,8 @@ void car_clutch_from_input(RaceCarDynamics *car, CarInput *in, CarCtrlOut *out, 
         st->clutch = 0.0f;
         return;
     }
+    if (pc_clutch_from_input(car))
+        return;                             /* PC (2026-11-09): the player's own clutch (game/app/pc_clutch.h) */
     if (transMode == TRANS_MANUAL_CLUTCH) {
         f32 pedal = st->brake;
         st->brake = 0.0f;
@@ -656,6 +659,9 @@ void car_process_input(RaceCarDynamics *car, CarInput *in, CarCtrlOut *out)
     transMode = 0;
     if (st->driver != DRIVER_AUTO && st->ctrlMode == CTRL_DRIVER)
         transMode = st->transMode;
+    /* PC (2026-11-09): the clutch mode's GT3 MT runs a manual box's throttle
+     * - the reverse control not a throttle, R a gear (game/app/pc_clutch.h) */
+    transMode = pc_clutch_trans_mode(car, in, transMode);
     analog = 1;
     throttle = (u16)in->throttle;
     if ((in->flags & INPUT_ANALOG_THROTTLE) == 0) {
@@ -762,6 +768,7 @@ void car_process_input(RaceCarDynamics *car, CarInput *in, CarCtrlOut *out)
         out->shift = in->shift;
     else
         out->shift = 0;
+    pc_clutch_input(car, in, out);          /* PC (2026-11-09): the clutch mode's clutch and gate (pc_clutch.h) */
 
     /* ---- the handbrake */
     if ((in->flags & INPUT_ANALOG_HANDBRAKE) == 0) {

@@ -32,7 +32,8 @@ class CarModel;
 CarModel *F_00179460(CarModel *m);          /* 0x00179460 (T121_race_entry.h: T121's copy) */
 #include "game/car/model/race_car_model_internal.h"
 #include "libc.h"                           /* malloc, free, memcpy, strcpy */
-#include "game/car/model/T180_race_car_model.h"       /* RaceCarModel, g_002C2F50; + T446 CarModel, T449 RaceTireModel,
+#include "game/car/model/T180_race_car_model.h"
+#include "game/app/pc_headcam.h"            /* PC: pc_headcam_model (setData) */       /* RaceCarModel, g_002C2F50; + T446 CarModel, T449 RaceTireModel,
                                                T447 TireModelBase / the tyre and wheel files */
 #include "game/race/core/T123_race_setup.h"           /* g_002B3BF0, the race object pool */
 #include "game/effects/T159_flare.h"                /* FlareClass::addLight / drawReflection, CarLamp */
@@ -47,13 +48,17 @@ CarModel *F_00179460(CarModel *m);          /* 0x00179460 (T121_race_entry.h: T1
 #include "game/car/model/T455_car_model_info.h"       /* CarModelInfo, CarAxleSpec, carmodelinfo_tire */
 #include "game/car/model/T456_car_model_file.h"       /* CarModelFile, carmodelfile_relocate / _work_area */
 #include "engine/io/T504_file_queue.h"           /* file_req_alloc */
-#include "engine/io/T502_file_resolve.h"         /* PC: file_size_retry (the files' own sizes) */
+#include "engine/io/T502_file_resolve.h"         /* PC: file_size_retry (the files' own sizes); file_resolve */
+#include "game/car/model/T446_car_model.h"       /* PC (2026-11-11): car_model_path / car_model_load (the menu model) */
 #include "engine/io/T503_vol_thread.h"           /* PC: vol_device_object */
 #include "engine/pgl/G001_flare.h"                /* the pgl_* / gfx_* / vu0_* calls, PGL_* */
 #include "engine/media/G002_mpeg_frameq.h"          /* expf */
 #include "engine/gfx/T451_model_set.h"            /* PC: modelset_pose_anims */
 #include "game/enhanced/rendering.h"            /* PC: ENH_RENDER_CAR_ANIMS (pcPoseBegin) */
 #include "game/app/pc_frame.h"                  /* PC: pc_anim_stepped / pc_anim_offset (the dynamic frame rate) */
+#include "game/app/pc_menu_wheels.h"            /* PC (2026-11-12): the menu wheels */
+#include "game/app/pc_menu_tires.h"             /* PC (2026-11-13): the menu tyres */
+#include "game/car/model/T447_tire_model_base.h"    /* PC (2026-11-12): WheelFile2, wheel_file_path / _relocate */
 
 /* The brake is on (st.brake > 0) as 1 / 0: ? an inline of the car state in
  * the original; addLamps / drawLampReflections keep it as a bool (retail:
@@ -123,6 +128,33 @@ static void race_model_free_parts(RaceCarModel *m)
     m->pcWheelFile = NULL;
     m->pcWheelSize = 0;
     m->pcTireWork = NULL;
+    /* PC (2026-11-11): the cockpit camera's menu model (pcLoadMenu) */
+    if (m->pcMenuFile != NULL)
+        free(m->pcMenuFile);
+    m->pcMenuFile = NULL;
+    m->pcMenuColors = 0;
+    m->pcMenuState = 0;
+    m->pcMenuDraw = 0;
+    /* PC (2026-11-12): the menu wheel (pcLoadMenuWheel) */
+    if (m->pcMenuWheel != NULL)
+        free(m->pcMenuWheel);
+    m->pcMenuWheel = NULL;
+    m->pcMenuWheelSize = 0;
+    m->pcMenuWheelState = 0;
+    for (int i = 0; i < 4; i++)
+        m->pcMenuWheelFast[i] = 0;
+    m->pcWheelName[0] = '\0';
+    /* PC (2026-11-13): the menu tyre (pcLoadMenuTire) and its packets */
+    for (int i = 0; i < 4; i++)
+        m->tires[i].pcClearMenu();
+    pc_menu_tire_release((TireFile2 *)m->pcMenuTire);   /* (shared with the other cars on that tyre) */
+    if (m->pcMenuTireWork != NULL)
+        free(m->pcMenuTireWork);
+    m->pcMenuTire = NULL;
+    m->pcMenuTireSize = 0;
+    m->pcMenuTireState = 0;
+    m->pcTireNumber = -1;
+    m->pcMenuTireWork = NULL;
 }
 
 // FUNC 0x001A9B90 RaceCarModel::onModelLoaded
@@ -202,6 +234,21 @@ RaceCarModel::RaceCarModel()
     pcWheelFile = NULL;
     pcWheelSize = 0;
     pcTireWork = NULL;
+    pcMenuFile = NULL;                      /* PC (2026-11-11): no menu model yet */
+    pcMenuColors = 0;
+    pcMenuState = 0;
+    pcMenuDraw = 0;
+    pcMenuWheel = NULL;                     /* PC (2026-11-12): no menu wheel yet */
+    pcMenuWheelSize = 0;
+    pcMenuWheelState = 0;
+    for (int i = 0; i < 4; i++)
+        pcMenuWheelFast[i] = 0;
+    pcWheelName[0] = '\0';
+    pcMenuTire = NULL;                      /* PC (2026-11-13): no menu tyre yet */
+    pcMenuTireSize = 0;
+    pcMenuTireState = 0;
+    pcTireNumber = -1;
+    pcMenuTireWork = NULL;
 }
 
 // FUNC 0x001A9E18 RaceCarModel::~RaceCarModel
@@ -262,6 +309,26 @@ RaceCarModel &RaceCarModel::copyFrom(const RaceCarModel &src)
             wheelLoaded = 0;
         }
     }
+    /* PC (2026-11-12): src's menu wheel (a buffer of its own, relocated by
+     * itself as the wheel file above) and its wheel's name */
+    memcpy(pcWheelName, src.pcWheelName, sizeof(pcWheelName));
+    if (src.pcMenuWheel != NULL) {
+        pcMenuWheel = race_model_copy_part("menu wheel", src.pcMenuWheel, src.pcMenuWheelSize);
+        if (pcMenuWheel != NULL) {
+            pcMenuWheelSize = src.pcMenuWheelSize;
+            pcMenuWheelState = 1;
+            wheel_file_relocate((WheelFile2 *)pcMenuWheel);
+        }
+    }
+    /* PC (2026-11-13): src's tyre number and its menu tyre (the shared
+     * file: one more user; setupTires builds the packets) */
+    pcTireNumber = src.pcTireNumber;
+    if (src.pcMenuTire != NULL) {
+        pc_menu_tire_addref((TireFile2 *)src.pcMenuTire);
+        pcMenuTire = src.pcMenuTire;
+        pcMenuTireSize = src.pcMenuTireSize;
+        pcMenuTireState = 1;
+    }
     setupTires();
     return *this;
 }
@@ -311,6 +378,7 @@ void RaceCarModel::setData(CarModelFile *file)
     data = file;
     if (file != NULL) {
         carmodelfile_relocate(file);
+        pc_headcam_model(file);             /* PC (2026-11-07): where the driver's head is (game/app/pc_headcam.h) */
         carModel.setModel(data->body, 0);
     } else {
         /* quirk: retail gives back a NULL block (g_002C2F50.release(NULL)).
@@ -334,6 +402,7 @@ void RaceCarModel::loadTire(const int *parts, int flag)
             CarModelInfo *info = data->info;
             char *buf = (char *)data->tire;
             int number = carmodelinfo_tire(info, parts[i], flag);
+            pcTireNumber = number;          /* PC (2026-11-13): for the menu tyre (pcLoadMenuTire) */
             if (number == info->defaultTire)
                 break;
             /* PC: into a buffer of the file's own size (was over the car
@@ -377,6 +446,11 @@ void RaceCarModel::setTireData(void *buf)
 //   onWheelLoaded).  Caller: RaceEntryCar::loadWheel (u042).
 void RaceCarModel::loadWheel(const char *name)
 {
+    /* PC (2026-11-12): the name, for the menu wheel (pcLoadMenuWheel) */
+    if (name != NULL) {
+        strncpy(pcWheelName, name, sizeof(pcWheelName) - 1);
+        pcWheelName[sizeof(pcWheelName) - 1] = '\0';
+    }
     if (wheelLoaded == 0 && data != NULL) { /* PC: data: as loadTire */
         /* PC: into a buffer of the file's own size (was over the car
          * file's wheel part, the last one: a bigger file ran over the
@@ -492,6 +566,14 @@ void RaceCarModel::setupTires()
         GearCalc *gear = &car->params.gear;
         tire->setSizeProfile(gear->tyreWidth[wheel >> 1], gear->tyreRadius[wheel >> 1],
                              gear->tyreSidewall[wheel >> 1]);
+        /* PC (2026-11-13): the brake behind this wheel (game/car/model/
+         * pc_brake_fit.h): measured for an axle's first tyre - the wheel's
+         * part, the brake and the size are the axle's - and taken by the
+         * other; before build, which places the heat glow by it */
+        if ((wheel & 1) == 0)
+            tire->pcFitBrake((WheelFile2 *)pcMenuWheel);
+        else
+            tire->pcCopyFit(tires[wheel - 1]);
         work = tire->build(work);
     }
     /* PC: RACE_TIRE_WORK_SIZE is meant to be ample; say so if it was not */
@@ -499,6 +581,51 @@ void RaceCarModel::setupTires()
     if (used > (u32)RACE_TIRE_WORK_SIZE)
         printf("PC: car model tyres: work space overrun, %u bytes of 0x%x\n", used,
                (u32)RACE_TIRE_WORK_SIZE);
+    /* PC (2026-11-13): the menu tyres' packets, if their file is read */
+    pcBuildMenuTires();
+}
+
+/* PC (2026-11-13, no original): the menu tyre's file ([Graphics] MenuTires,
+ * game/app/pc_menu_tires.h), once: "menu/tire/n<k>" of the tyre the race
+ * uses - loadTire's number, else the car file's default (its own tyre part
+ * is that tyre) - the one file the cars on that tyre share
+ * (pc_menu_tire_acquire: read the first time, logged there). */
+void RaceCarModel::pcLoadMenuTire()
+{
+    if (pcMenuTireState != 0 || data == NULL)
+        return;
+    pcMenuTireState = 2;
+    const int number = pcTireNumber >= 0 ? pcTireNumber : data->info->defaultTire;
+    TireFile2 *t = pc_menu_tire_acquire(number, &pcMenuTireSize);
+    if (t == NULL)
+        return;
+    pcMenuTire = t;
+    pcMenuTireState = 1;
+}
+
+/* PC (2026-11-13, no original): the four tyres' menu packets
+ * (RaceTireModel::pcBuildMenu) into a work space of their own, once the
+ * menu tyre's file is read and the tyres are set up (setupTires: their
+ * files, brakes and sizes).  Built again by every setupTires: into the same
+ * space, as the race tyres' (the renderer is told of each packet written). */
+void RaceCarModel::pcBuildMenuTires()
+{
+    if (pcMenuTire == NULL || data == NULL || tires[0].wheelFile == NULL || tires[0].tireFile == NULL)
+        return;
+    if (pcMenuTireWork == NULL) {
+        pcMenuTireWork = memalign(0x40, PC_MENU_TIRE_WORK_SIZE);
+        if (pcMenuTireWork == NULL) {
+            printf("PC: menu tyres: no memory for their work space (0x%x bytes), the race tyres drawn\n",
+                   (u32)PC_MENU_TIRE_WORK_SIZE);
+            return;
+        }
+    }
+    void *work = pcMenuTireWork;
+    for (int wheel = 0; wheel < 4; wheel++)
+        work = tires[wheel].pcBuildMenu(work, (TireFile2 *)pcMenuTire);
+    u32 used = (u32)((u8 *)work - (u8 *)pcMenuTireWork);
+    if (used > (u32)PC_MENU_TIRE_WORK_SIZE)
+        printf("PC: menu tyres: work space overrun, %u bytes of 0x%x\n", used, (u32)PC_MENU_TIRE_WORK_SIZE);
 }
 
 // FUNC 0x001AA3A0 RaceCarModel::loadBodyMatrix
@@ -602,6 +729,16 @@ void RaceCarModel::drawBody(f32 t, int withMatrix)
 {
     CarModel *body = &carModel;
     body->color = colorIndex;
+    /* PC (2026-11-11): the menu model's body in the cockpit view (pcMenuDraw,
+     * pcLoadMenu): CarModel::draw reads the body and its colour count, the
+     * rest is the car's state; both put back after */
+    ModelSet *pcRaceBody = body->model;
+    const int pcRaceColors = body->colorCount;
+    const int pcMenu = pcMenuDraw != 0 && pcMenuFile != NULL && pcRaceBody != NULL;
+    if (pcMenu) {
+        body->model = pcMenuFile->body;
+        body->colorCount = pcMenuColors;
+    }
     pgl_push_matrix();
     body->beginFade();
     if (withMatrix != 0)
@@ -609,6 +746,127 @@ void RaceCarModel::drawBody(f32 t, int withMatrix)
     body->draw();
     body->endFade();
     pgl_pop_matrix();
+    if (pcMenu) {
+        body->model = pcRaceBody;
+        body->colorCount = pcRaceColors;
+    }
+}
+
+/* PC (2026-11-11, no original): the car's menu model ("menu/cars/<name>",
+ * car_model_path kind 2) for the cockpit camera (pc_headcam.h; PC
+ * 2026-11-15: per car model, [CockpitMenuModels]), once: read whole into a buffer of its size
+ * (car_model_load, blocking: ~0.4 - 0.6 MB, from RacePS2Base::virtual_3 at
+ * the race's first frame), relocated, its glass shells found
+ * (pc_headcam_menu_file: no driver in a menu model), its colour count taken
+ * (CarModel::setModel's).  A car without the file (a transplanted one) or
+ * without a body in it (the US ho0100's) keeps the race body, logged once.
+ * Checked over the US cars through these functions (scratchpad menumodel):
+ * 286 of 287 load, 6.8 ms each on average, 17 ms at most; the colour count
+ * is the race model's but for ty0028 (6 / 5: the race car's index fits). */
+void RaceCarModel::pcLoadMenu(u64 code)
+{
+    if (pcMenuState != 0)
+        return;
+    pcMenuState = 2;
+    char path[0x100];
+    car_model_path(code, path, 2);
+    FileLoc loc;
+    if (file_resolve(path, &loc, &vol_device_object) == -1) {
+        printf("PC: cockpit menu model %s: not found, the race model drawn\n", path);
+        return;
+    }
+    CarModelFile *file = (CarModelFile *)car_model_load(code, NULL, 1, 0);
+    if (file == NULL) {
+        printf("PC: cockpit menu model %s: not read, the race model drawn\n", path);
+        return;
+    }
+    carmodelfile_relocate(file);
+    if (file->body == NULL) {
+        printf("PC: cockpit menu model %s: no body, the race model drawn\n", path);
+        free(file);
+        return;
+    }
+    pc_headcam_menu_file(file);
+    CarModel colors;
+    colors.setModel(file->body, 0);
+    pcMenuColors = colors.colorCount;
+    colors.clearModel();
+    pcMenuFile = file;
+    pcMenuState = 1;
+    printf("PC: cockpit menu model %s: %u bytes, %d colours\n", path, (u32)loc.size, pcMenuColors);
+}
+
+/* PC (2026-11-12, no original): the menu wheel ([Graphics] MenuWheels,
+ * game/app/pc_menu_wheels.h), once.  An aftermarket wheel (loadWheel's name):
+ * "menu/wheel/<name>" read whole.  The car's own: the wheel part of its menu
+ * file "menu/cars/<name>" (car_model_load, ~0.4 MB, as pcLoadMenu), copied
+ * into a buffer of its size, the rest freed - the part as saved (its own base
+ * at +4: wheel files relocate by themselves, as copyFrom's copies).  That part
+ * is "menu/wheel/<code>" for 281 of the 287 US cars; five use another car's
+ * wheel, and a transplanted car's menu file may carry a wheel of its own.
+ * Checked: the race / menu wheel files' flags (mirroring, the rear part, the
+ * variations) are the same for every car and every named wheel. */
+void RaceCarModel::pcLoadMenuWheel(u64 code)
+{
+    if (pcMenuWheelState != 0)
+        return;
+    pcMenuWheelState = 2;
+    char path[0x100];
+    FileLoc loc;
+    if (pcWheelName[0] != '\0') {
+        wheel_file_path(path, pcWheelName, 1);
+        if (file_resolve(path, &loc, &vol_device_object) == -1) {
+            printf("PC: menu wheel %s: not found, the race wheel drawn\n", path);
+            return;
+        }
+        WheelFile2 *w = (WheelFile2 *)file_read_blocking(path, NULL, 0, 1, &vol_device_object);
+        if (w == NULL || loc.size < 0x20 || memcmp(w, "GTTW", 4) != 0) {
+            printf("PC: menu wheel %s: not read (or not a wheel file), the race wheel drawn\n", path);
+            if (w != NULL)
+                free(w);
+            return;
+        }
+        wheel_file_relocate(w);
+        pcMenuWheel = w;
+        pcMenuWheelSize = loc.size;
+        pcMenuWheelState = 1;
+        printf("PC: menu wheel %s: %u bytes\n", path, (u32)loc.size);
+        return;
+    }
+    car_model_path(code, path, 2);
+    if (file_resolve(path, &loc, &vol_device_object) == -1) {
+        printf("PC: menu wheel of %s: no menu file, the race wheel drawn\n", path);
+        return;
+    }
+    CarModelFile *file = (CarModelFile *)car_model_load(code, NULL, 1, 0);
+    if (file == NULL) {
+        printf("PC: menu wheel of %s: not read, the race wheel drawn\n", path);
+        return;
+    }
+    /* (as saved: the part's address less the file's) */
+    const u32 at = (u32)file->wheel - (u32)file->base;
+    const u8 *part = (const u8 *)file + at;
+    u32 size = 0;
+    if (file->wheel != NULL && at >= 0x18 && at + 0x20 <= loc.size && memcmp(part, "GTTW", 4) == 0)
+        size = ((const WheelFile2 *)part)->size;
+    if (size < 0x20 || at + size > loc.size) {
+        printf("PC: menu wheel of %s: no wheel part, the race wheel drawn\n", path);
+        free(file);
+        return;
+    }
+    void *w = memalign(0x40, size);
+    if (w == NULL) {
+        printf("PC: menu wheel of %s: no memory for %u bytes, the race wheel drawn\n", path, size);
+        free(file);
+        return;
+    }
+    memcpy(w, part, size);
+    free(file);
+    wheel_file_relocate((WheelFile2 *)w);
+    pcMenuWheel = w;
+    pcMenuWheelSize = size;
+    pcMenuWheelState = 1;
+    printf("PC: menu wheel of %s: %u bytes\n", path, size);
 }
 
 // FUNC 0x001AA7A0 RaceCarModel::drawTires
@@ -669,7 +927,27 @@ void RaceCarModel::drawTires(int blur, f32 scale, f32 t, int lod)
         f32 steer = car_wheel_steer(car, wheel, t) * RAD_TO_DEG;
         f32 camber = car_wheel_camber(car, wheel, t) * RAD_TO_DEG;
         f32 heat = car_brake_heat_sq(car, wheel, t);
+        /* PC (2026-11-12): the menu wheel (game/app/pc_menu_wheels.h) while
+         * this wheel turns slower than the setting's speed (km/h at the
+         * tread: its spin, m/s) */
+        WheelFile2 *pcMenu = NULL;
+        if (pcMenuWheel != NULL && pc_menu_wheels()) {
+            const f32 kmh = fabsf(car->st.wheel[wheel].spin) * 3.6f;
+            pcMenuWheelFast[wheel] = (u8)pc_menu_wheel_fast(pcMenuWheelFast[wheel], kmh);
+            if (pcMenuWheelFast[wheel] == 0)
+                pcMenu = (WheelFile2 *)pcMenuWheel;
+        }
+        pc_menu_wheel_set(pcMenu);
+        /* PC (2026-11-13): a menu wheel read after the tyres were set up
+         * (MenuWheels turned on in a race): the brake behind it too */
+        if (pcMenu != NULL && tire->pcFitMenu != pcMenu) {
+            if ((wheel & 1) != 0 && tires[wheel - 1].pcFitMenu == pcMenu)
+                tire->pcCopyFit(tires[wheel - 1]);
+            else
+                tire->pcFitBrake(pcMenu);
+        }
         tire->draw(lod, steer, camber, spin, heat * scale, blurPasses, blurAngle);
+        pc_menu_wheel_set(NULL);
         pgl_pop_matrix();
     }
     body->endFade();

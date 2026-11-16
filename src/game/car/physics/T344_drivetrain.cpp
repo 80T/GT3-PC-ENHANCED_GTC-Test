@@ -8,6 +8,9 @@
 #include "game/car/physics/T344_drivetrain.h"
 #include "game/car/physics/drivetrain_internal.h"
 #include "game/enhanced.h"                          /* ENH_PHYSICS_* */
+#include "game/app/pc_car_tuning.h"                 /* PC: the power multiplier (the electric motor) */
+#include "game/app/pc_shift.h"                      /* PC (2026-11-08): the realistic gear shift's clutch */
+#include "game/app/pc_clutch.h"                     /* PC (2026-11-09): its clutch mode's */
 
 /* Each wheel's torque: -tyreRadius[axle] x (driveOut + brakeOut), less the
  * brake torque against the spin. */
@@ -317,6 +320,13 @@ void car_drive_torque(RaceCarState *car)
         state = st->clutchState;
         if (state == CLUTCH_LOCKED) {
             drive = engineTq;
+        } else if ((state == CLUTCH_SHIFT && pc_shift_drive(car, engineTq, &drive)) ||
+                   (state == CLUTCH_SLIP && pc_clutch_drive(car, engineTq, &drive))) {
+            /* PC (2026-11-08): a realistic shift's clutch, signed (game/
+             * app/pc_shift.h: out, nothing; snapping in, the engine taken to
+             * the wheels' speed); PC (2026-11-09) the clutch mode's player's
+             * clutch, slipping (game/app/pc_clutch.h: what it passes) */
+            st->engineSpeed = st->engineSpeed + (engineTq - drive) * gc->inertiaInv * dt;
         } else {
             if (state == CLUTCH_SHIFT) {
                 drive = gc->clutchTorque;
@@ -824,6 +834,16 @@ static void gearbox_cvt_rates()
     g_cvtRate150b = (f32)g_cvtRateBytes[3] * 0.01f;
 }
 
+/* PC (no original): the rates above made on the calling thread, a game
+ * thread in the game's FPU mode as at their first use, before
+ * DynamicsConductor::update runs the cars on worker threads (the lazy
+ * set-up is the only shared write of car_drivetrain_step;
+ * game/race/dynamics/pc_physics_threads.h). */
+void gearbox_cvt_rates_init()
+{
+    gearbox_cvt_rates();
+}
+
 /* The CVT / clutchless controller (Lupo 2 L2 0x001DFA38; GT3Hooks
  * GB_CvtTorque), with the clutch locked and a forward gear: the ratio
  * factor (RaceCarState.cvtRatio, the engine speed over the wheels' engine
@@ -901,7 +921,9 @@ f32 gearbox_cvt_torque(RaceCarState *car)
  * 5000 rpm), plus a correction above 1000 rpm; the engine curve only drives
  * a servo of the motor's speed toward a target (none below 3 km/h, 1000 rpm
  * up to 10 km/h, then up to the shift limit at 130 km/h; x the throttle in
- * D).  Updates the engine (motor) speed; returns the drive torque. */
+ * D).  Updates the engine (motor) speed; returns the drive torque.
+ * PC: a driving torque (> 0) x the car's power multiplier
+ * (game/app/pc_car_tuning.h), as engine_output's. */
 f32 gearbox_electric_torque(RaceCarState *car)
 {
     CarRunState *st = &car->st;
@@ -941,7 +963,10 @@ f32 gearbox_electric_torque(RaceCarState *car)
     om = st->engineSpeed;
     if (104.71974f < om && 52.35987f < w)
         drive = drive + (((st->engineTorque - tq) * a) * om) / w;
-    return drive - loss;
+    drive = drive - loss;
+    if (drive > 0.0f)
+        drive *= pc_car_tuning(car, PC_TUNE_POWER);    /* PC */
+    return drive;
 }
 
 /* ---- the Honda Dualnote --------------------------------------------------- */

@@ -44,6 +44,9 @@ bool take_key_press(int vk);
  * down since the last call, and the window has the focus.  The other
  * hotkeys the window thread acts on itself. */
 bool take_hotkey(int h);
+/* PC: a device's press of hotkey h (its [Hotkeys] binding after `;',
+ * gamepad.cpp's thread): the window thread acts on it as on its key. */
+void press_hotkey(int h);
 /* The mouse wheel's notches up and down over the window so far (counts
  * that only grow: a reader compares them with the last it saw). */
 void mouse_wheel(uint32_t *up, uint32_t *down);

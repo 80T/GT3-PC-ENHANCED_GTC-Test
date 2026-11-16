@@ -39,6 +39,7 @@
 #include "game/common/T494_text_utils.h"           /* format_time */
 #include "engine/text/T496_font.h"                 /* Font, the system font g_002F1968 */
 #include "game/menu/records/results_internal.h"                           /* RESULT_FRAME_TIME, RESULT_*_COLOR */
+#include "game/app/pc_frame.h"                         /* PC: g_pcTickFrame (the blink once a tick) */
 
 // FUNC 0x001759C8 ResultImplementRecords::start
 //   enabled unless the race is a replay; 5 s delay, 10 s timer.
@@ -112,7 +113,10 @@ const char *ResultImplementRecords::getRecordTitle()
 // FUNC 0x00175C30 ResultImplementRecords::render
 //   Nothing until the delay is over; the place and the title only for
 //   places 0..11 (unsigned compare: -1, no place, skips them); then
-//   drawRecord.  The title alternates every frame between orange and grey.
+//   drawRecord.  The title alternates every frame between orange and grey
+//   (PC: every tick, 60 Hz as on the PS2: the frames drawn between ticks keep
+//   its colour, game/app/pc_frame.h; it flickered at the display's rate,
+//   user report).
 void ResultImplementRecords::render(GSBuffer &buf, RaceOrganization &org)
 {
     if (enabled == 0)
@@ -126,7 +130,8 @@ void ResultImplementRecords::render(GSBuffer &buf, RaceOrganization &org)
         drawShadowText(race_rank_name(recordPlace + 1), 320, 150, 3, 3,
                        RESULT_TEXT_COLOR, RESULT_SHADOW_COLOR);
         g_002F1968.setSpacing(0.0f, 0.0f);
-        blink = blink ^ 1;
+        if (g_pcTickFrame)                  /* PC: once a tick */
+            blink = blink ^ 1;
         g_002F1968.setStyle("sw_20");
         g_002F1968.setPos(320, 200);
         if (blink != 0)

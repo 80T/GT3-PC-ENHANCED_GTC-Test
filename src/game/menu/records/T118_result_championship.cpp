@@ -56,7 +56,10 @@ void ResultChampionship::start(RaceOrganization &org, int replay)
 //   Per frame.  Calls RaceResultBase::update directly (not ResultArcade's:
 //   no waitEnd here, the states below replace it).  Once the board is in
 //   place (isDone) the state machine runs; the board's frame runs whenever
-//   the board is active.
+//   the board is active.  PC (ROADMAP 35): in a race of more than 6 cars
+//   both boards show the top 6 (ResultBoard::setup; the rows past them are
+//   not written), the player's row highlighted only when it is among them
+//   (ResultBoard::highlight).
 void ResultChampionship::update(RaceOrganization &org, Control *pad)
 {
     RaceResultBase::update(org, pad);
@@ -164,7 +167,7 @@ void ResultChampionship::sortStandings(RaceOrganization &org)
     head = NULL;
     RaceEntryCar *car = org.entries->rankTop;
     RaceDataBase *db = org.raceDB;
-    while (car != NULL) {
+    while (car != NULL && rank < PC_RACE_CARS_MAX) {    /* PC: standings[PC_RACE_CARS_MAX] */
         int before = car->points;
         ChampionshipStanding *s = &standings[rank];
         int points = before + db->getChampionshipPoint(rank);

@@ -21,6 +21,10 @@
 #include "game/car/model/tire_model_internal.h"
 #include "game/car/model/T449_race_tire_model.h"
 #include "game/app/pc_detail.h"                 /* PC: the levels of detail off */
+#include "game/app/pc_menu_wheels.h"            /* PC (2026-11-12): the menu wheels */
+#include "game/app/pc_menu_tires.h"             /* PC (2026-11-13): the menu tyres */
+#include "game/car/model/pc_brake_fit.h"        /* PC (2026-11-13): the brake behind the wheel */
+#include <math.h>
 
 /* The brake file and whether its textures are linked: uninitialised C++
  * globals, which egcs writes as zeros at the end of the file's output (here
@@ -124,6 +128,10 @@ RaceTireModel::RaceTireModel()
 {
     /* implicit: TireModelBase, ~TireModelBase, RaceTirePacket (compiler-generated: bases, members,
      * deleting form) */
+    pcPushRace = 0.0f;                      /* PC (2026-11-13): no brake fit yet */
+    pcPushMenu = 0.0f;
+    pcFitMenu = NULL;
+    pcMenuTire = NULL;                      /* PC (2026-11-13): no menu tyre built */
 }
 
 // FUNC 0x00221F98 RaceTireModel::~RaceTireModel
@@ -170,6 +178,87 @@ void RaceTireModel::setBrake(f32 radius, f32 offset, f32 angleDeg, int discNo, i
     caliperAngle = angleDeg * 0.017453292f;     /* pi / 180 */
 }
 
+/* PC (2026-11-13, no original): the disc and caliper quads as rings (pc_brake_fit.h),
+ * as setDiscVertices / setCaliperVertices place them: the disc on its plane
+ * out to its radius (the quad's corners beyond are clear texels), the
+ * caliper 5 mm nearer, from the nearest point of its quad outward. */
+static void pc_brake_rings(RaceTireModel *m, PcRadial *out)
+{
+    const f32 inv = 1.0f / m->rim;
+    const f32 plane = m->discOffset + m->width * 0.5f;
+    const f32 scale = m->discRadius * inv;
+    pc_radial_clear(out, kPcRadialMax);
+    pc_radial_flat(out, plane * inv, 0.0f, scale);
+    if (m->caliper >= 0 && g_00352ACC != NULL && g_00352ACC->calipers != NULL) {
+        const BrakeCaliper *c = &g_00352ACC->calipers[m->caliper];
+        const f32 u0 = fabsf(c->centerU) - c->halfU, v0 = fabsf(c->centerV) - c->halfV;
+        const f32 u1 = fabsf(c->centerU) + c->halfU, v1 = fabsf(c->centerV) + c->halfV;
+        const f32 nu = u0 > 0.0f ? u0 : 0.0f, nv = v0 > 0.0f ? v0 : 0.0f;
+        /* (the quad's far corners are clear texels - up to 1.3 rim radii
+         * out on some cars, past the tyre: a caliper is taken to reach
+         * kCaliperOut of the disc's radius, its bridge over the disc's edge) */
+        const f32 kCaliperOut = 1.15f;
+        f32 farthest = sqrtf(u1 * u1 + v1 * v1);
+        if (farthest > kCaliperOut)
+            farthest = kCaliperOut;
+        pc_radial_flat(out, (plane - 0.005f) * inv, sqrtf(nu * nu + nv * nv) * scale, farthest * scale);
+    }
+}
+
+/* PC (2026-11-13, no original): see T449_race_tire_model.h.  (The rings are
+ * the game thread's, as the tyres' set-up and draws.) */
+void RaceTireModel::pcFitBrake(WheelFile2 *menuWheel)
+{
+    static PcRadial brake;
+    pcPushRace = 0.0f;
+    pcPushMenu = 0.0f;
+    pcFitMenu = menuWheel;
+    if (!pc_brake_fit_on() || wheelFile == NULL || wheelFile->model == NULL || !(rim > 0.0f))
+        return;
+    pc_brake_rings(this, &brake);
+    PcBrakeFit race, level1, menu;
+    for (int level = 0; level < RACE_TIRE_HEXAGON; level++) {
+        const PcRadial *wheel = pc_radial_wheel(wheelFile->model, wheel_file_lod(wheelFile, position), level);
+        const f32 push = pc_brake_fit(wheel, &brake, rim, width, level == 0 ? &race : &level1);
+        if (push > pcPushRace)
+            pcPushRace = push;
+    }
+    if (level1.gap < race.gap) {
+        race.gap = level1.gap;
+        race.limited = level1.limited;
+    }
+    const bool withMenu = menuWheel != NULL && menuWheel->model != NULL;
+    if (withMenu) {
+        const PcRadial *wheel = pc_radial_wheel(menuWheel->model, wheel_file_lod(menuWheel, position), 0);
+        pcPushMenu = pc_brake_fit(wheel, &brake, rim, width, &menu);
+    }
+    /* the log: a brake moved (every fit with GT3PC_BRAKE_FIT_LOG=1) */
+    if (pcPushRace > 0.0f || pc_brake_fit_log())
+        printf("PC: brake fit: a race tyre's %s brake (disc %d, caliper %d): the race wheel's back %+.1f mm from it, "
+               "moved back %.1f mm%s\n",
+               position / 2 ? "rear" : "front", disc, caliper, race.gap * 1000.0f, pcPushRace * 1000.0f,
+               race.limited ? " (limited)" : "");
+    if (withMenu && (pcPushMenu > 0.0f || pc_brake_fit_log()))
+        printf("PC: brake fit: a race tyre's %s brake (disc %d, caliper %d): the menu wheel's back %+.1f mm from it, "
+               "moved back %.1f mm while menu wheels are on%s%s\n",
+               position / 2 ? "rear" : "front", disc, caliper, menu.gap * 1000.0f, pcPushMenu * 1000.0f,
+               menu.limited ? " (limited)" : "", menu.own ? " (the wheel has a brake of its own there)" : "");
+}
+
+void RaceTireModel::pcCopyFit(const RaceTireModel &other)
+{
+    pcPushRace = other.pcPushRace;
+    pcPushMenu = other.pcPushMenu;
+    pcFitMenu = other.pcFitMenu;
+}
+
+f32 RaceTireModel::pcBrakePush()
+{
+    if (pcFitMenu != NULL && pcPushMenu > pcPushRace && pc_menu_wheels())
+        return pcPushMenu;
+    return pcPushRace;
+}
+
 // FUNC 0x002220B8 RaceTireModel::build
 //   Sets up the three levels from the tables (segments, bevel, shadow,
 //   inside / brake, wheel level, x0) and builds each into the work space
@@ -186,6 +275,43 @@ void *RaceTireModel::build(void *work)
         work = packets[level].virtual_1(work);
     }
     return work;
+}
+
+/* PC (2026-11-13, no original): see T449_race_tire_model.h.  The menus'
+ * build (MenuTireModel::build, T450): 30 segments, bevelled, x0 0.001.  The
+ * tyre file is the menu one while the strips are built (its repeats round
+ * the tyre and its F1 flag shape them; the 39 pairs' are the same). */
+enum { PC_MENU_TIRE_SEGMENTS = 30 };
+static const f32 kPcMenuTireX0 = 0.001f;
+
+void *RaceTireModel::pcBuildMenu(void *work, TireFile2 *menuTire)
+{
+    pcMenuTire = menuTire;
+    if (menuTire == NULL)
+        return work;
+    TireFile2 *race = tireFile;
+    tireFile = menuTire;
+    for (int level = 0; level < RACE_TIRE_HEXAGON; level++) {
+        pcMenuPackets[level].setup(this, PC_MENU_TIRE_SEGMENTS, 1, g_00340FF0[level], g_00341000[level],
+                                   g_00341010[level], kPcMenuTireX0);
+        work = pcMenuPackets[level].virtual_1(work);
+    }
+    tireFile = race;
+    return work;
+}
+
+void RaceTireModel::pcClearMenu()
+{
+    pcMenuTire = NULL;
+    for (int level = 0; level < RACE_TIRE_HEXAGON; level++) {
+        RaceTirePacket *p = &pcMenuPackets[level];
+        p->packetOut = NULL;
+        p->packetIn = NULL;
+        p->packetShadow = NULL;
+        p->discPacket = NULL;
+        p->caliperPacket = NULL;
+        p->built = 0;
+    }
 }
 
 // FUNC 0x002221C8 RaceTireModel::screenSize
@@ -244,7 +370,12 @@ void RaceTireModel::draw(int lod, f32 steer, f32 camber, f32 spin, f32 glow,
         drawCylinder(steer, camber, spin);
         return;
     }
-    if (packets[lod].built == 0)
+    /* PC (2026-11-13): the menu tyre's packets at levels 0 and 1 while
+     * [Graphics] MenuTires is on and they are built (pcBuildMenu) */
+    const bool pcMenu = lod < RACE_TIRE_HEXAGON && pcMenuTire != NULL && pcMenuPackets[lod].packetOut != NULL &&
+                        pc_menu_tires();
+    RaceTirePacket *pcPacket = pcMenu ? &pcMenuPackets[lod] : &packets[lod];
+    if (pcPacket->built == 0)
         return;
     pgl_push_matrix();
     f32 spinRad = spin * 0.017453292f;      /* pi / 180 */
@@ -270,8 +401,13 @@ void RaceTireModel::draw(int lod, f32 steer, f32 camber, f32 spin, f32 glow,
     gfx_set_texture_function(PGL_TFX_MODULATE);
     gfx_depth_mask(1);
     gfx_set_frame_write_mask(GS_WRITE_RGBA);
-    RaceTirePacket *packet = &packets[lod];
+    RaceTirePacket *packet = pcPacket;      /* PC (2026-11-13): was &packets[lod] */
+    /* PC (2026-11-13): the menu tyre's file (its texture) for its packets' draw */
+    TireFile2 *pcRaceTire = tireFile;
+    if (pcMenu)
+        tireFile = pcMenuTire;
     packet->draw(blurPasses, spinRad, glow, blur);
+    tireFile = pcRaceTire;
     gfx_enable(PGL_CAP_VU1_PROG_33E);
     gfx_depth_mask(1);
     gfx_set_frame_write_mask(GS_WRITE_RGBA);
@@ -371,6 +507,31 @@ void RaceTirePacket::setup(RaceTireModel *m, int nseg, int bevel, int shadow, in
         hexagon = 0;
 }
 
+/* PC (2026-11-12, no original): a menu wheel (game/app/pc_menu_wheels.h) in
+ * place of the race wheel: in the packet's matrix (moved by -width / 2,
+ * scaled by the rim, mirrored as the race wheel file says, the tyre's spin),
+ * as TireModelBase::drawWheel draws a wheel file - its variation, its part
+ * for the position - without the race wheel's level callback (the menu
+ * wheels have one level).  Mirrored once more if its file's mirroring were
+ * not the race wheel's (no car's are: a transplanted file's may). */
+static void pc_draw_menu_wheel(WheelFile2 *w, RaceTireModel *m)
+{
+    const int flip = wheel_file_mirrored(w, m->position) != wheel_file_mirrored(m->wheelFile, m->position);
+    const int cull = gfx_get_cull_face();
+    if (flip) {
+        pgl_push_matrix();
+        vu0_scale(1.0f, 1.0f, -1.0f);
+        gfx_cull_face(gfx_other_cull_mode(cull));
+    }
+    modelset_set_callback(NULL);
+    wheel_file_select(w, m->color, m->position);
+    modelset_draw_part(w->model, wheel_file_lod(w, m->position));
+    if (flip) {
+        gfx_cull_face(cull);
+        pgl_pop_matrix();
+    }
+}
+
 // FUNC 0x002227E0 RaceTirePacket::draw
 //   In the current matrix (turned by RaceTireModel::draw): moved by
 //   -width / 2 along x, scaled by the rim radius (pgl_set_scale), mirrored
@@ -403,9 +564,12 @@ void RaceTirePacket::draw(int blurPasses, f32 spinRad, f32 glow, f32 blur)
         gfx_cull_face(gfx_other_cull_mode(mode));
     }
     bindPassCallback();
+    /* PC (2026-11-12): the menu wheel, at levels 0 and 1 (game/app/
+     * pc_menu_wheels.h): the race wheel's face (and its blur) not made */
+    WheelFile2 *pcMenu = callback.lod < RACE_TIRE_HEXAGON ? pc_menu_wheel_now() : NULL;
     GSBuffer faceBuf;                       /* sp+0x00 */
     TexSet faceTex;                         /* sp+0x40 */
-    if (m->faceVisible != 0)
+    if (m->faceVisible != 0 && pcMenu == NULL)
         drawWheelTexture(&faceBuf, &faceTex, blurPasses, blur);
     {
         GSBuffer treadBuf;                  /* sp+0x80 */
@@ -438,9 +602,13 @@ void RaceTirePacket::draw(int blurPasses, f32 spinRad, f32 glow, f32 blur)
     gfx_alpha_func_raw(PGL_ATEST_GREATER, 0x20);
     if (m->faceVisible != 0 && hexagon == 0) {
         gfx_set_frame_write_mask(GS_WRITE_RGBA);
-        modelset_set_callback(&callback);
-        m->drawWheel();
-        modelset_set_callback(NULL);
+        if (pcMenu != NULL) {
+            pc_draw_menu_wheel(pcMenu, m);  /* PC (2026-11-12) */
+        } else {
+            modelset_set_callback(&callback);
+            m->drawWheel();
+            modelset_set_callback(NULL);
+        }
     }
     gfx_cull_face(mode);
     gfx_disable(PGL_CAP_SCALE);
@@ -464,7 +632,8 @@ void RaceTirePacket::setDiscVertices(f32 spinRad)
     sincosf(-spinRad, &s, &c);
     f32 invRim = 1.0f / m->rim;
     f32 scale = invRim * m->discRadius;
-    f32 x = (m->discOffset + m->width * 0.5f) * invRim;
+    /* PC (2026-11-13): + pcBrakePush, the disc behind the wheel (pc_brake_fit.h) */
+    f32 x = (m->discOffset + m->pcBrakePush() + m->width * 0.5f) * invRim;
     s = s * scale;
     c = c * scale;
     if (flip != 0)
@@ -508,7 +677,8 @@ void RaceTirePacket::setCaliperVertices(f32 spinRad)
     f32 scale = invRim * m->discRadius;
     f32 halfU = cal->halfU;
     f32 halfV = cal->halfV;
-    f32 x = ((m->discOffset + m->width * 0.5f) - 0.005f) * invRim;
+    /* PC (2026-11-13): + pcBrakePush, as the disc */
+    f32 x = ((m->discOffset + m->pcBrakePush() + m->width * 0.5f) - 0.005f) * invRim;
     s = s * scale;
     c = c * scale;
     f32 centerV = cal->centerV;
@@ -568,6 +738,19 @@ void RaceTirePacket::drawTreadBlur(GSBuffer *buf, int blurPasses, f32 blur)
     if (!(callback.lod < RACE_TIRE_HEXAGON))
         return;
     pgl_push_attrib(PGL_ATTRIB_TARGET);
+    /* PC (2026-11-13): the first sprite takes all of the tread texture,
+     * whatever its size - 128 x 64 for the race tyres (the same numbers as
+     * before), 256 x 128 for a menu tyre's (game/app/pc_menu_tires.h), of
+     * which the 128 x 64 source took the first quarter.  The buffer stays
+     * 128 x 64 GS pixels, the race's: it is drawn at the output scale (576
+     * x 231 pixels at 150 % of 1080p), more than the menu texture has, and a
+     * buffer of the texture's size was four times the VRAM - the allocator
+     * (T513, first fit over a free list in release order) then gave it
+     * another block most frames, each one a new render target on the PC (17
+     * MB with 8x MSAA, kept 600 frames: 92 of them in a two-player race,
+     * stalls of 100 .. 400 ms; user report "a major stutter") */
+    const u64 pcTex0 = m->tireFile->tex->tex->tex0;
+    const f32 pcWf = (f32)(1 << (int)((pcTex0 >> 26) & 0xF)), pcHf = (f32)(1 << (int)((pcTex0 >> 30) & 0xF));
     buf->psm = GS_PSMCT32;
     buf->width = TREAD_BLUR_W;
     blur = blur * 0.5f;
@@ -592,7 +775,7 @@ void RaceTirePacket::drawTreadBlur(GSBuffer *buf, int blurPasses, f32 blur)
     int passes = 2;
     pgl_color4f(1.0f, 1.0f, 1.0f, 1.0f);
     gfx_disable(PGL_CAP_BLEND);
-    gs_draw_textured_sprite_f(0.0f, 0.0f, 128.0f, 64.0f, 0.0f, 0.0f, 128.0f, 64.0f);
+    gs_draw_textured_sprite_f(0.0f, 0.0f, 128.0f, 64.0f, 0.0f, 0.0f, pcWf, pcHf);   /* PC: (the source was 128 x 64) */
     buf->setTexture();
     gfx_tex_param(PGL_TEXPARAM_WMS, PGL_WRAP_REPEAT);
     gfx_tex_param(PGL_TEXPARAM_WMT, PGL_WRAP_CLAMP);
@@ -923,7 +1106,10 @@ void RaceTirePacket::buildGlow(TStripBuilder *sb)
     RaceTireModel *m = owner;
     f32 rim = m->rim;
     f32 scale = m->discRadius / rim;
-    f32 x = ((m->discOffset + m->width * 0.5f) - 0.001f) / rim;
+    /* PC (2026-11-13): + pcBrakePush, as the disc: the place found when the
+     * tyre was set up (a menu wheel read later, or MenuWheels switched in a
+     * race, may move the disc a little more than its glow) */
+    f32 x = ((m->discOffset + m->pcBrakePush() + m->width * 0.5f) - 0.001f) / rim;
     f32 pos[3];                             /* sp+0x00 */
     f32 uv[2];                              /* sp+0x10 */
     u32 rgba;                               /* sp+0x20 */

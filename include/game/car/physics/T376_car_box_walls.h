@@ -25,7 +25,7 @@ struct WallSeg;                             /* T167 */
  * pose at the start of the step (pos), at its end (next), the swept bounding
  * box, the hits found and the car's state copied in and out (T374).  One per
  * entry in the box list (DynamicsConductor +0xBBB4 + 0xC, T373).  0x4F0
- * bytes. */
+ * bytes (PC: 0x4B0, without the reach tables). */
 struct CarBox {
     /* The two empty loops over v[8] / e[8] (BoxVertex / BoxEdge have empty
      * inline constructors).  Defined in T317, after DynamicsConductor's
@@ -95,15 +95,19 @@ struct CarBox {
     f32           inertia;                  /* 0x48C the car's yaw inertia x 10 */
     f32           chamfer[2];               /* 0x490 the cut of the front / rear corners (0.2 x width) */
     CarBox       *boxes;                    /* 0x498 the list's box[0] */
-    f32           reach[8];                 /* 0x49C radius + boxes[j].radius */
-    f32           reach2[8];                /* 0x4BC its square */
-    f32           dt;                       /* 0x4DC the frame time */
-    int           impactTimer;              /* 0x4E0 frames the car's impact is held */
-    f32           impactPeak;               /* 0x4E4 */
-    int           soundTimer;               /* 0x4E8 */
-    f32           soundLevel;               /* 0x4EC */
+    /* PC: no reach[8] (0x49C, radius + boxes[j].radius) / reach2[8] (0x4BC,
+     * its square): one entry per box of the list, they would be
+     * PC_RACE_CARS_MAX long (game/race/race_cars.h); car_box_reach2 (T374)
+     * computes the square from the radii where T375 tests it, the same
+     * floats (two radii set by car_box_init, summed and squared in single
+     * precision either way); reach had no readers */
+    f32           dt;                       /* 0x4DC (PC: 0x49C) the frame time */
+    int           impactTimer;              /* 0x4E0 (PC: 0x4A0) frames the car's impact is held */
+    f32           impactPeak;               /* 0x4E4 (PC: 0x4A4) */
+    int           soundTimer;               /* 0x4E8 (PC: 0x4A8) */
+    f32           soundLevel;               /* 0x4EC (PC: 0x4AC) */
 };
-EGCS_SIZE(CarBox, 0x4F0);
+EGCS_SIZE(CarBox, 0x4B0);                   /* PC: was 0x4F0 (the reach tables dropped) */
 
 /* Corners sliding along a wall (flags bit 0) move on to the next / previous
  * segment; a box still moving into the wall is put back on it, its velocity

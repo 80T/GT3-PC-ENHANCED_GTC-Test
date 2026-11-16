@@ -3,6 +3,7 @@
 #include "game/sound/gtsound_internal.h"
 #include "game/sound/T463_music_seq.h"
 #include "game/app/pc_sound.h"              /* PC: the sound flush per game tick */
+#include "platform/settings.h"              /* PC: the player's menu music volume */
 
 /* The data, in retail's order: initialised words are written where they are
  * defined.  The group table's names are written just before it, each in the
@@ -45,6 +46,24 @@ static ThreadCtx  g_musicThread;                /* 0x00353268 the music thread *
 static Sequence   g_musicSequence;              /* 0x0049D1B0 the sequence player (0x2A8 bytes) */
 /* (16-aligned: retail's 0x0049D460 follows the sequence's end 0x0049D458) */
 alignas(16) static u8         g_musicThreadStack[0x1000];  /* 0x0049D460 */
+
+/* PC: the player's volume of the menus' music ([Audio] MenuBgm) on the
+ * sequenced music too - its groups are all menus' (the menus' streamed
+ * music has it through pdibgm, T521).  s_pcGameVolume: the game's volume
+ * last set (music_set_volume); s_pcSent: the master volume sent (the
+ * game's x the player's), -1 none yet.  The music thread sends it again
+ * when the player's changes (the settings menu: heard at once). */
+static f32 s_pcGameVolume = 1.0f;
+static int s_pcSent = -1;
+
+static int music_pc_volume(void)
+{
+    int vol = (int)(s_pcGameVolume * ((f32)settings::volume(settings::Volume::menuBgm) / 100.0f) * 16384.0f);
+
+    if (!(vol < SPU_VOLUME_UNITY))
+        vol = SPU_VOLUME_UNITY - 1;
+    return vol;
+}
 
 // FUNC 0x0022AF18 music_inf_relocate
 void music_inf_relocate(MusicInf *inf)
@@ -100,6 +119,12 @@ void music_thread(void *arg)
     while (g_musicThreadQuit == 0) {
         WaitSema(g_musicVblankSema);
         pc_sound_flush_begin();             /* PC: this flush's block time (game/app/pc_sound.h) */
+        if (s_pcSent >= 0 && music_pc_volume() != s_pcSent) {
+            s_pcSent = music_pc_volume();   /* PC: the player's menu music volume changed */
+            seq_set_master_volume(s_pcSent);
+            printf("music: sequenced menu music at %d%% of the game's\n",
+                   settings::volume(settings::Volume::menuBgm));
+        }
         seq_update();                       /* 0x002691F0 */
         snd_flush();                        /* 0x00269530 */
         pdibgm_update();                    /* 0x0025CA78 */
@@ -190,14 +215,15 @@ BgmTrackList music_get_tracks(int group)
     return *g;
 }
 
-/* 1.0 = 0x4000, clamped to 0x3FFF (no lower bound). */
+/* 1.0 = 0x4000, clamped to 0x3FFF (no lower bound).
+ * PC: x the player's menu music volume (music_pc_volume). */
 // FUNC 0x0022B2F8 music_set_volume
 void music_set_volume(f32 volume)
 {
-    int vol = (int)(volume * 16384.0f);
+    s_pcGameVolume = volume;                /* PC */
+    int vol = music_pc_volume();            /* PC: was (int)(volume * 16384.0f), clamped */
 
-    if (!(vol < SPU_VOLUME_UNITY))
-        vol = SPU_VOLUME_UNITY - 1;
+    s_pcSent = vol;
     seq_set_master_volume(vol);             /* 0x00268BF8 (u16: andi 0xFFFF) */
 }
 

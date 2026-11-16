@@ -96,7 +96,7 @@
 #define RB_RESTING_POINTS   3               /* contact counters at RB_CONTACT_RESTING: no motion */
 #define RB_CONTACT_RESTING  2
 #define RB_BOX_PLANES       5               /* the 4 sides and the top of a car box */
-#define RB_MAX_CAR_BOXES    8               /* CarBoxList::box[8] */
+#define RB_MAX_CAR_BOXES    PC_RACE_CARS_MAX    /* CarBoxList::box[8].  PC: PC_RACE_CARS_MAX (was 8, game/race/race_cars.h via T167_rigid_body.h) */
 
 /* WallSeg::flags: WALL_* (T167). */
 

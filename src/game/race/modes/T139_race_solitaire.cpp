@@ -40,6 +40,7 @@
 #include <new>                              /* placement new (race_solitaire_construct); "bad_alloc" */
 #include "libc.h"                           /* memset */
 #include "libpad.h"                         /* SCE_PADselect (Control::curButtons.raw[0], T477) */
+#include "engine/input/T479_usb_steering_port.h"    /* PC (2026-11-10): usbC294MenuRaw (a wheel's SELECT) */
 #define GAME_T153_EMITS_TYPEINFO            /* UnitArena<64>'s type name, first defined */
 #define GAME_T180_INLINE_BLOCK_ACCESSORS    /* RaceCarModel::allocBlock / freeBlock inline (T180's header,
                                                through T154's; retail expands them) */
@@ -697,7 +698,14 @@ void RaceSolitaire::virtual_28(float dt)
     RaceBasic::virtual_28(dt);
 
     RaceInput *in = virtual_25();
-    if (in->rawButtonDown(0) & SCE_PADselect)
+    u32 rawDown = in->rawButtonDown(0);
+    /* PC (2026-11-10, user: "Fix the ghost too"): a lone wheel's raw word is
+     * not a pad's (T479 usbC294MenuRaw, as the menus' T214): retail's SELECT
+     * bit (0x100) is the wheel's hat left, so its D-pad left toggled the
+     * ghost and its SELECT did not */
+    if (in->rawUSBType() == USB_WHEEL_C294 && in->rawPSType() == 0)
+        rawDown = usbC294MenuRaw(rawDown);
+    if (rawDown & SCE_PADselect)
         showGhost = 1 - showGhost;
 
     race_display_poll_events(org);

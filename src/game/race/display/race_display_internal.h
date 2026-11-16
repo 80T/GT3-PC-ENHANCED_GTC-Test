@@ -125,21 +125,23 @@ enum {
     RD_BACK_SHAPE     = 0x41                /* a filled shape (corners cut) */
 };
 
-/* Colours (0xAABBGGRR, alpha 0x80 = opaque). */
+/* Colours (0xAABBGGRR, alpha 0x80 = opaque).  PC: those the settings can
+ * change go through pc_hud_color. */
+#include "game/app/pc_hud_color.h"
 #if ENH_HUD_TEXT_LOOK
-#define RD_COLOR_TEXT    0x80C0C0C0u        /* Lupo 2's grey (hud.md C12; L2 0x0018F43C, 0x00192520) */
+#define RD_COLOR_TEXT    pc_hud_color(kHudMessages, 0x80C0C0C0u)    /* Lupo 2's grey (hud.md C12; L2 0x0018F43C, 0x00192520) */
 #else
-#define RD_COLOR_TEXT    0x80D0D0D0u        /* the title, the car name, "@start", "@finish" */
+#define RD_COLOR_TEXT    pc_hud_color(kHudMessages, 0x80D0D0D0u)    /* the title, the car name, "@start", "@finish" */
 #endif
-#define RD_COLOR_WARNING 0x800000F0u        /* red: "WRONG WAY" */
-#define RD_COLOR_MESSAGE 0x801880D0u        /* amber: "AUTO DRIVE" (RaceValueDisplayBase's default too) */
-#define RD_COLOR_WIN     0x801880D0u        /* amber: "PLAYER %d WIN!" */
-#define RD_COLOR_EVENT   0x802BCC49u        /* the event board's messages (RaceEventDisplay's default) */
-#define RD_COLOR_BEHIND  0x800000F0u        /* red: a difference >= 0 */
-#define RD_COLOR_AHEAD   0x80FF8080u        /* blue: a difference < 0 */
+#define RD_COLOR_WARNING pc_hud_color(kHudWarnings, 0x800000F0u)    /* red: "WRONG WAY" */
+#define RD_COLOR_MESSAGE pc_hud_color(kHudText, 0x801880D0u)        /* amber: "AUTO DRIVE" (RaceValueDisplayBase's default too) */
+#define RD_COLOR_WIN     pc_hud_color(kHudText, 0x801880D0u)        /* amber: "PLAYER %d WIN!" */
+#define RD_COLOR_EVENT   pc_hud_color(kHudEvents, 0x802BCC49u)      /* the event board's messages (RaceEventDisplay's default) */
+#define RD_COLOR_BEHIND  pc_hud_color(kHudGapBehind, 0x800000F0u)   /* red: a difference >= 0 */
+#define RD_COLOR_AHEAD   pc_hud_color(kHudGapAhead, 0x80FF8080u)    /* blue: a difference < 0 */
 #define RD_COLOR_OPAQUE  0x80FFFFFFu        /* pgl_color: opaque white */
 /* The enhanced engine (hud.md C16, C18). */
-#define RD_COLOR_TIME_UP 0x800000F0u        /* red: the time limit below 10 s, "GAME OVER" (Lupo 2) */
+#define RD_COLOR_TIME_UP pc_hud_color(kHudWarnings, 0x800000F0u)    /* red: the time limit below 10 s, "GAME OVER" (Lupo 2) */
 #define RD_COLOR_POD     0x80FF8080u        /* blue: "the Pod sat down" (L2 0x00191FD4) */
 
 /* The enhanced engine: the time limit's offset (hud.md C16).  Lupo 2 shows

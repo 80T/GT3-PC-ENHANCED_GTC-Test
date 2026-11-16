@@ -11,6 +11,7 @@
 #include "game/race/core/T153_race_course.h"          /* (seen: UnitArena<64>) */
 #include "game/race/dynamics/dynamics_conductor_internal.h"
 #include "game/race/dynamics/T310_dynamics_conductor_battlemp.h"
+#include "game/app/pc_course_pick.h"        /* PC: pc_race_laps */
 // DATA_START 0x0033CEA0
 
 // FUNC 0x001F03A8 DynamicsConductorBattleMP::DynamicsConductorBattleMP
@@ -24,7 +25,7 @@ DynamicsConductorBattleMP::DynamicsConductorBattleMP()
 // FUNC 0x001F03E8 DynamicsConductorBattleMP::virtual_29
 int DynamicsConductorBattleMP::virtual_29()
 {
-    return org->option.splitBattle.raceLaps;
+    return pc_race_laps(org, org->option.splitBattle.raceLaps);    /* PC: the lap forcer's (game/app/pc_course_pick.h) */
 }
 
 // FUNC 0x001F03F8 DynamicsConductorBattleMP::SetSlowCarBoostParameters

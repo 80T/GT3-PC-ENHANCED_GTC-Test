@@ -6,6 +6,7 @@
  */
 #include "game/race/display/race_meters_internal.h"
 #include "game/app/pc_aspect.h"                 /* PC: pc_hud_shift (drawMap) */
+#include "game/app/pc_course_scale.h"           /* PC: pc_course_map_unscale (drawCar) */
 
 /* T164's data starts unreferenced: "bad_alloc" (<new>, the first item of
  * its .rodata, before "1pcar_dot") and the "" of T157's inline
@@ -126,6 +127,8 @@ void RaceMiniMap::drawMap(RaceOrganization *org, int targetCar)
         otherColor = MINIMAP_POINTER_OTHER;
         shownColor = MINIMAP_POINTER_SHOWN;
     }
+    otherColor = pc_hud_color(kHudMapOthers, otherColor);   /* PC */
+    shownColor = pc_hud_color(kHudMapShown, shownColor);
     pgl_push_matrix();
     vu0_scale(scaleX, scaleY, 1.0f);
     pgl_color(MINIMAP_DOT_COLOR);
@@ -176,6 +179,7 @@ void RaceMiniMap::drawCar(RaceEntryCar *car, Tex1Image *dot, u32 color)
     }
     worldX = car_view_x(state, 0.0f);
     worldZ = car_view_z(state, 0.0f);
+    pc_course_map_unscale(data, &worldX, &worldZ);  /* PC: onto the map's own scale (game/app/pc_course_scale.h) */
     data->project(&offX, &offY, worldX, worldZ);
     centerX = x + (mapW >> 1);
     centerY = y + (mapH >> 1);

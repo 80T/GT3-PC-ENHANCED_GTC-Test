@@ -70,6 +70,7 @@
                                                gfx_* / vu0_* calls, strip_batch_*, strip_draw, PGL_* */
 #include "engine/media/G002_mpeg_frameq.h"          /* cosf, sinf */
 #include "game/enhanced.h"                          /* ENH_HUD_* (ref/enhanced/survey/hud.md) */
+#include "game/app/pc_hud_color.h"                  /* PC: pc_hud_color */
 
 /* ======================================================================== */
 /* Named constants                                                          */

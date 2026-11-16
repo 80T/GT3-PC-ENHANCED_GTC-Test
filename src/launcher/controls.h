@@ -23,6 +23,11 @@
  *                combination, Alt+F4, and (without modifiers) a key a
  *                control's keyboard slot has are refused.  A right-click or
  *                Delete: none; Reset to defaults all of them.
+ *                PC: beside the key a device's button each (Controller /
+ *                device): a click waits for an input as a slot 0's (Esc
+ *                cancels) - a gamepad's, by position on any controller, or
+ *                any other joystick's on it by name; another hotkey's is
+ *                refused.
  * Every change is written to gt3pc.ini at once.
  *
  * ui.cpp makes the tab's page (a panel: panel.h) and passes the tab's

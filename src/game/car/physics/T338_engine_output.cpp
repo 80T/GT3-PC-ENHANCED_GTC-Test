@@ -1,18 +1,31 @@
 /* T338 - the engine's output per frame: 0x001E1768..0x001E1B28. */
 #include "game/car/physics/car_engine_internal.h"
 #include "game/car/physics/T338_engine_output.h"
+#include "game/app/pc_car_tuning.h"                 /* PC: the power multiplier */
+#include "game/app/pc_rev_cut.h"                    /* PC (2026-11-08): the realistic rev limiter */
 
 /* The rev limiter (cuts at the redline, back 500 rpm below), then the
  * torque load x (engineTorque + frictionTorque) - frictionTorque (u082: engine_torque_at and
  * engine_scale of the frame: the engine's torque and its friction, ?)
- * through the power limit at the engine speed.  Callers: engine_update. */
+ * through the power limit at the engine speed.  Callers: engine_update.
+ * PC: a driving torque (> 0) x the car's power multiplier
+ * (game/app/pc_car_tuning.h): the power at every rpm and the engine's
+ * power limit scaled, the engine braking (< 0) kept.
+ * PC (2026-11-08): in a race with the realistic rev limiter
+ * (game/app/pc_rev_cut.h) a cut of a time instead: the step's torque x the
+ * fuel's share of the step, the friction kept. */
 // FUNC 0x001E1768 engine_output
 f32 engine_output(RaceCarState *car, f32 load)
 {
     DynCarState *st = &car->st;
     CarEngine *e = &car->params.engine;
     f32 torque = 0.0f;
+    const f32 pcPower = pc_car_tuning(car, PC_TUNE_POWER);  /* PC */
+    f32 pcFuel;                             /* PC (2026-11-08) */
 
+    if (pc_rev_cut(car, &pcFuel)) {
+        torque = pcFuel * load * (st->engineTorque + st->frictionTorque);   /* PC: (limiterOn set) */
+    } else {
     /* the state read into an int first: retail reloads limiterOn after the
      * update (the same field read twice as one byte load lets GCSE carry
      * the stored values instead) */
@@ -26,7 +39,11 @@ f32 engine_output(RaceCarState *car, f32 load)
     }
     if (st->limiterOn == 0)
         torque = load * (st->engineTorque + st->frictionTorque);
-    return engine_power_limit(e, torque - st->frictionTorque, st->engineSpeed);
+    }
+    torque = engine_power_limit(e, torque - st->frictionTorque, st->engineSpeed);
+    if (torque > 0.0f)
+        torque *= pcPower;                  /* PC: the drive x the multiplier (its power limit too) */
+    return torque;
 }
 
 /* Without a turbo the throttle goes straight through.  With one: the spool

@@ -627,8 +627,11 @@ static void testPrims()
     b = prim::texturedSprite(c, 0, 0, 64, 32, 0, 0, 64, 32, v);
     CHECK(v[0].u == 8 && v[0].v == 8 && v[1].u == 64 * 16 + 8 && v[1].v == 32 * 16 + 8, "sprite UV");
     CHECK(prim::windowX(v[0].x, ofx) == 10.0f && prim::windowY(v[0].y, ofy) == 20.0f, "sprite window origin");
-    CHECK(b.prim == (prim::PRIM_SPRITE | prim::PRIM_TME | prim::PRIM_FST | prim::PRIM_IIP | prim::PRIM_ABE) &&
-          v[0].rgba == c.colorTex, "textured sprite prim / colour");
+    /* (PC, 2026-10-29: the colour is pgl_color's in full, PRIM_FULL_COLOR -
+     * docs/renderer.md "Full colours") */
+    CHECK(b.prim == (prim::PRIM_SPRITE | prim::PRIM_TME | prim::PRIM_FST | prim::PRIM_IIP | prim::PRIM_ABE |
+                     prim::PRIM_FULL_COLOR) &&
+          v[0].rgba == prim::fullColor(c), "textured sprite prim / colour");
     b = prim::texturedSpriteF(c, 0.5f, 0.0f, 64.0f, 32.0f, 0.25f, 0.0f, 64.0f, 32.0f, v);
     CHECK(prim::windowX(v[0].x, ofx) == 10.5f && v[0].u == 4 + 8, "sprite_f");
     c.winX = 0;

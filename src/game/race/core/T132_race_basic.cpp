@@ -40,6 +40,7 @@
 #include "game/camera/T383_camera_manager.h"       /* CameraManager (views) */
 #include "game/race/core/T413_race_input.h"           /* RaceInput (virtual_25) */
 #include "engine/input/T474_control.h"              /* Control::getButtonsOn, CONTROL_START */
+#include "engine/input/T479_usb_steering_port.h"    /* PC (2026-11-10): C294RAW_* (a wheel's logo buttons) */
 #include "game/data/T487_race_mode_database.h"   /* RaceModeDatabase g_002F00C0 */
 #include "game/menu/records/T116_race_result_base.h"     /* RaceResultBase (RaceBasic::subDisplay) */
 #include "game/race/pause/T168_pause_base.h"           /* PauseBase */
@@ -147,6 +148,22 @@ void RaceBasic::virtual_35()
     RacePS2Base::virtual_35();
 }
 
+#if ENH_HUD_LOGO_LOOK
+/* The replays' logo toggle (RaceBasic::virtual_28): exactly the four
+ * buttons held, the last of them newly.  A pad's are its L1, R1, L2 and R2.
+ * PC (2026-11-10, user: "Replay logo toggle needs L2/L3/R2/R3"): a lone
+ * wheel's raw word is its own (T479 C294RAW_*), where the pad's four bits
+ * were its L1, L2, L3 and R1; its L1 / R1 paddles are the replay's up /
+ * down (T413), so its four are L2, L3, R2 and R3. */
+static bool pc_logo_combo(const Control &c)
+{
+    u32 logoButtons = PADRAW_L2 | PADRAW_R2 | PADRAW_L1 | PADRAW_R1;
+    if (c.rawUSBType() == USB_WHEEL_C294 && c.rawPSType() == 0)
+        logoButtons = C294RAW_L2 | C294RAW_L3 | C294RAW_R2 | C294RAW_R3;
+    return c.rawButtons(0) == logoButtons && (c.rawButtonDown(0) & logoButtons) != 0;
+}
+#endif
+
 // FUNC 0x001811B8 RaceBasic::virtual_28
 //   (index.txt: RaceBasicWithRaceDisplay::virtual_28) The update: the base,
 //   the result sequence, then START outside background mode: pause, or in
@@ -172,10 +189,15 @@ void RaceBasic::virtual_28(f32 dt)
     /* Lupo 2 (L2 0x0017F548..0x0017F62C): in a replay the four shoulder
      * buttons pressed together (the pad's raw bits, the last of them newly)
      * toggle the race display's mini logo, which gates the logo and the car
-     * name panel (hud.md C14) */
+     * name panel (hud.md C14).  Lupo 2 reads RacePS2Base's input, slot 0x15:
+     * the SECOND player's pad and wheel (steering[1]), as the menus' debug
+     * pause reads the second pad (T247).
+     * PC (2026-11-10, user: "That replay logo toggle doesn't work on
+     * controller or wheel"): the race's player too (virtual_25: slot 0x14,
+     * the first pad and wheel, whose START pauses above) */
     if (replayMode != RACE_LIVE) {
-        if (input.rawButtons(0) == (PADRAW_L2 | PADRAW_R2 | PADRAW_L1 | PADRAW_R1)
-            && (input.rawButtonDown(0) & (PADRAW_L2 | PADRAW_R2 | PADRAW_L1 | PADRAW_R1)) != 0) {
+        RaceInput *player = virtual_25();
+        if (pc_logo_combo(*player) || (player != &input && pc_logo_combo(input))) {
             RaceDisplay *rd = dynamic_cast<RaceDisplay *>(raceDisplay);
 
             if (rd != NULL)

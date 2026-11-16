@@ -90,6 +90,10 @@
 #include "game/race/core/race_ps2_base_internal.h"                           /* the unit's constants */
 #include "game/app/pc_frame.h"                  /* PC: pc_frame_request_interpolation */
 #include "game/app/pc_debugcam.h"               /* PC: pc_debugcam_race */
+#include "game/app/pc_race_songs.h"             /* PC: the race's song changer */
+#include "game/app/pc_headcam.h"                /* PC (2026-11-11): the cockpit camera's menu model */
+#include "game/app/pc_menu_wheels.h"            /* PC (2026-11-12): the menu wheels */
+#include "game/app/pc_menu_tires.h"             /* PC (2026-11-13): the menu tyres */
 
 /* ======================================================================== */
 /* RaceEntryPS2                                                             */
@@ -113,10 +117,13 @@ void RaceEntryPS2::operator delete(void *p, size_t size)
 // FUNC 0x0017CF80 RaceEntryPS2::RaceEntryPS2
 //   RaceEntryBase::RaceEntryBase, the vptr (+0x1C), then a capacity of 7
 //   cars stored inline.
+//   PC: PC_RACE_CARS_MAX (game/race/race_cars.h), the slots cleared.
 RaceEntryPS2::RaceEntryPS2()
 {
-    capacity = 7;
+    capacity = PC_RACE_CARS_MAX;            /* PC: was 7 */
     cars = slots;
+    for (int i = 0; i < PC_RACE_CARS_MAX; i++)
+        slots[i] = NULL;                    /* PC */
 
     /* implicit: RaceEntryBase (the base's constructor) */
 }
@@ -271,6 +278,7 @@ int RacePS2Base::virtual_42()
 void RacePS2Base::virtual_8(int replay)
 {
     endRequested = 0;
+    pc_replay_speed_reset();                /* PC: each replay from the normal speed */
     RaceBase::virtual_8(replay);
     F_001A9180(org->course->data);
 
@@ -416,7 +424,8 @@ void RacePS2Base::virtual_29(f32 dt)
     RaceBase::virtual_29(dt);
     RaceOrganization *organization = org;
     CameraManager *cameras = virtual_6();
-    PcDebugcamBypass pcSoundAtCamera;       /* PC: the sounds heard at the game's camera, not the debug camera's */
+    /* PC: under the debug camera the sounds are heard at it (game/app/
+     * pc_debugcam.h: its view, its motion for the Doppler) */
 
     if (backgroundMode == 0) {
         pgl_matrix_mode(PGL_MTX_MODELVIEW);
@@ -435,10 +444,13 @@ void RacePS2Base::virtual_29(f32 dt)
     }
     if (backgroundMode == 0) {
         ambientSound.update(organization);
+        pc_debugcam_listener_tick();        /* PC: the debug camera's eye for the next tick's Doppler */
         /* PC: the race runs (this is not called while paused) and is not
          * behind a menu: frames between the ticks, interpolated
          * (game/app/pc_frame.h) */
         pc_frame_request_interpolation();
+        if (replayMode == RACE_REPLAY)
+            pc_replay_speed_request();      /* PC: L2 / R2 step its speed */
     }
 }
 
@@ -478,11 +490,57 @@ void RacePS2Base::virtual_3()
         if (car->applyPendingModel() != 0)
             car->model.state = car->state;
     }
+    /* PC (2026-11-11): the cockpit camera's menu model of each car a view
+     * follows, read the first frame it is followed while the setting is on
+     * (game/app/pc_headcam.h), so that the view button swaps nothing: here,
+     * where the models change between the frames' draws.  PC (2026-11-15):
+     * the setting is the car model's (the calibrator's), so the one turned
+     * on while calibrating is read at the next frame too */
+    if (pc_headcam_on()) {
+        CameraManager *cm = virtual_6();
+        const int views = cm->getViewCount();
+        for (int v = 0; v < views && v < 4; v++) {
+            RaceEntryCar *car = cm->views[v].targetInfo.car[0];
+            if (car != NULL && car->model.data != NULL && car->model.pcMenuState == 0 && pc_headcam_menu_model(car))
+                car->model.pcLoadMenu(car->info.getModelCode());
+        }
+    }
+    /* PC (2026-11-12): the menu wheels of a race whose cars were set up
+     * without them ([Graphics] MenuWheels turned on in the race;
+     * game/app/pc_menu_wheels.h) */
+    if (pc_menu_wheels()) {
+        for (int i = 0; i < entries->count; i++) {
+            RaceEntryCar *car = entries->cars[i];
+            if (car != NULL && car->model.data != NULL && car->model.pcMenuWheelState == 0)
+                car->model.pcLoadMenuWheel(car->info.getModelCode());
+        }
+    }
+    /* PC (2026-11-13): the menu tyres of a race whose cars were set up
+     * without them ([Graphics] MenuTires turned on in the race; game/app/
+     * pc_menu_tires.h): their file read and their packets built here,
+     * between the frames' draws (new packets: nothing drawn is written) */
+    if (pc_menu_tires()) {
+        for (int i = 0; i < entries->count; i++) {
+            RaceEntryCar *car = entries->cars[i];
+            if (car != NULL && car->model.data != NULL && car->model.pcMenuTireState == 0) {
+                car->model.pcLoadMenuTire();
+                car->model.pcBuildMenuTires();
+            }
+        }
+    }
 }
 
 /* ======================================================================== */
 /* RaceBGMPS2                                                               */
 /* ======================================================================== */
+
+/* PC: the race's music for the player's volume of it (pdibgm_pc_music): a
+ * race's (replayMode 0 and 3, as getVolume) or a replay's (the demo's too). */
+static int pc_race_music(RaceBase *race)
+{
+    int mode = race->replayMode;
+    return (mode == RACE_LIVE || mode == RACE_REPLAY_ALT) ? PDIBGM_MUSIC_RACE : PDIBGM_MUSIC_REPLAY;
+}
 
 // FUNC 0x0017DC50 RaceBGMPS2::operator new
 //   From the race pool, 16-byte aligned.  Unreferenced.
@@ -511,6 +569,7 @@ RaceBGMPS2::RaceBGMPS2()
     playlist2.init();
     song = 0;
     resetMarkers(1.0f);
+    pc_race_songs_begin(this);              /* PC: no songs heard, the song changer closed */
 }
 
 // FUNC 0x0017DD28 RaceBGMPS2::~RaceBGMPS2
@@ -520,6 +579,7 @@ RaceBGMPS2::RaceBGMPS2()
 RaceBGMPS2::~RaceBGMPS2()
 {
     /* implicit: ~RaceBGMBase (the base / member destructors) */
+    pc_race_songs_end(this);                /* PC: the song changer closed */
 }
 
 // FUNC 0x0017DD80 RaceBGMPS2::isDemoWithoutPreview
@@ -565,8 +625,10 @@ void RaceBGMPS2::resetMarkers(f32 volume)
 //   before markerHit is stored (retail's load / store order).
 void RaceBGMPS2::update()
 {
-    if (org->race->backgroundMode == 0)
+    if (org->race->backgroundMode == 0) {
+        pdibgm_pc_music(pc_race_music(org->race));      /* PC */
         pdibgm_set_volume(getVolume());
+    }
 
     int pos, id, ended;
     f32 now = pdibgm_get_status(&pos, &id, &ended) + BGM_LOOKAHEAD;
@@ -607,6 +669,25 @@ void RaceBGMPS2::update()
         id = songId;
     }
     songId = id;
+
+    /* PC: the song changer (game/app/pc_race_songs.h, platform/song_osd.h)
+     * in a live race: the race song playing on its panel, a step asked for -
+     * on, the next song (play, as a song's end); back, the one before - while
+     * a race song plays (not the race's jingles) */
+    RaceBase *race = org->race;
+    if (race->replayMode == RACE_LIVE && race->backgroundMode == 0 && isDemoWithoutPreview() == 0) {
+        int track = song != 0 ? (int)(song - bgm_get_tracks(BGM_GROUP_SONGS).tracks) : -1;
+        int step = pc_race_songs_frame(&playlist2, track);
+        if (step > 0 && track >= 0) {
+            play(BGM_GROUP_SONGS, 0);
+        } else if (step < 0 && track >= 0) {
+            int back = pc_race_songs_back(&playlist2, track);
+            if (back >= 0) {
+                playTrack(back, 0, (getVolume() != 0.0f) ? 1.0f : 0.0f);
+                update();
+            }
+        }
+    }
 }
 
 // FUNC 0x0017E0B8 RaceBGMPS2::getMarkerTime
@@ -664,6 +745,7 @@ void RaceBGMPS2::play(int code, int arg)
 
     if (race->backgroundMode != 0)
         return;
+    pdibgm_pc_music(pc_race_music(race));               /* PC */
 
     if (isDemoWithoutPreview() != 0) {
         stop();
@@ -678,18 +760,27 @@ void RaceBGMPS2::play(int code, int arg)
         stop();
         return;
     }
-    if (code == BGM_GROUP_SONGS)
-        scale *= (organization->race->replayMode == 0) ? BGM_SONG_VOLUME_RACE
-                                                       : BGM_SONG_VOLUME_REPLAY;
+    /* PC: the songs play straight, as the rest of the race's music: the
+     * player's volume of it (pdibgm_pc_music; [Audio] RaceBgm / ReplayBgm,
+     * 50 % by default) instead of BGM_SONG_VOLUME_RACE (0.5) /
+     * BGM_SONG_VOLUME_REPLAY (0.7) of it, the original's for the songs alone */
 
     int index = -1;
     if (code == BGM_GROUP_SONGS) {
-        MusicEntry *next = playlist2.next();
+        /* PC: after the song changer's step back, the songs heard after it
+         * again (game/app/pc_race_songs.h) */
+        index = pc_race_songs_forward();
+        if (index >= 0) {
+            playTrack(index, 0, scale);
+        } else {
+        MusicEntry *next = playlist2.nextThere();       /* PC: was next() */
         if (next != 0) {
             findMusicInfo(&next->code, (u32 *)&index);
             playTrack(index, 0, scale);
+            pc_race_songs_heard(index);                 /* PC */
         } else {
             stop();
+        }
         }
     } else {
         bgm_play(code, index, scale, arg);

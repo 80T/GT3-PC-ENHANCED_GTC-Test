@@ -2,15 +2,21 @@
  * (pc_detail.h).  No original: new PC code. */
 #include "game/app/pc_detail.h"
 #include "game/course/T453_vision_list.h"
+#include "engine/gfx/T451_model_set.h"         /* modelset_pc_full_detail */
 #include "engine/pgl/G001_flare.h"              /* pgl_get_matrix, vu0_scale */
 #include "platform/settings.h"
+#include "platform/settings_menu.h"             /* notice */
 
+#include <ctype.h>
 #include <math.h>
+#include <stdio.h>
 #include <unordered_map>
 #include <vector>
 
-void pc_fov_apply(int replay)
+void pc_fov_apply(int replay, int cockpit)
 {
+    if (cockpit)
+        return;                             /* PC (2026-11-09): the cockpit camera's own (pc_detail.h) */
     const int pct = replay ? settings::replay_fov_percent() : settings::fov_percent();
     if (pct == 100)
         return;
@@ -27,9 +33,46 @@ void pc_fov_apply(int replay)
     vu0_scale(k, k, 1.0f);
 }
 
+f32 pc_fov_percent(void)
+{
+    return (f32)settings::fov_percent();
+}
+
 int pc_lod(void)
 {
-    return settings::lod_enabled() ? 1 : 0;
+    /* PC: as the models' (T451 modelset_pc_full_detail: [Graphics] Lod, or
+     * the road reflection's own) */
+    return modelset_pc_full_detail() ? 0 : 1;
+}
+
+int pc_reflection_full(void)
+{
+    return settings::reflection_detail() == settings::ReflectionDetail::full ? 1 : 0;
+}
+
+void pc_reflection_scale(int screenW, int screenH, int reflW, int reflH, f32 *dx, f32 *dy)
+{
+    *dx = 1.0f;
+    *dy = 1.0f;
+    const settings::ReflectionResolution r = settings::reflection_resolution();
+    if (r == settings::ReflectionResolution::normal || reflW <= 0 || reflH <= 0)
+        return;
+    const f32 share = r == settings::ReflectionResolution::half ? 0.5f : 1.0f;
+    const f32 x = (f32)screenW * share / (f32)reflW, y = (f32)screenH * share / (f32)reflH;
+    *dx = x > 1.0f ? x : 1.0f;
+    *dy = y > 1.0f ? y : 1.0f;
+}
+
+int pc_replay_blur_steps(void)
+{
+    switch (settings::replay_depth_of_field()) {
+    case settings::ReplayDepthOfField::reduced:
+        return 1;
+    case settings::ReplayDepthOfField::off:
+        return 0;
+    default:
+        return 2;                           /* the original's ReplayBlur::farSteps */
+    }
 }
 
 int pc_rear_view_bumper(void)
@@ -42,6 +85,20 @@ int pc_rear_view_chase(void)
     return settings::rear_view(settings::RearViewCamera::chase) ? 1 : 0;
 }
 
+int pc_extra_cameras(void)
+{
+    return settings::extra_cameras() ? 1 : 0;
+}
+
+void pc_camera_notice(const char *name)
+{
+    char text[32];
+    snprintf(text, sizeof(text), "CAMERA: %s", name);
+    for (char *c = text; *c != '\0'; c++)
+        *c = (char)toupper((unsigned char)*c);
+    settings_menu::notice(text, 1.5);
+}
+
 f32 pc_render_scale(void)
 {
     return (f32)settings::render_distance() / 100.0f;
@@ -52,6 +109,13 @@ f32 pc_render_scale(void)
 static const VisionList *s_list;
 static f32 s_extra;
 static std::unordered_map<const VisionPoint *, std::vector<u16>> s_unions;
+
+void pc_vision_parts_reset(void)
+{
+    s_unions.clear();
+    s_list = NULL;
+    s_extra = 0.0f;
+}
 
 const u16 *pc_vision_parts(VisionList *v, f32 x, f32 y, f32 z, f32 extra)
 {

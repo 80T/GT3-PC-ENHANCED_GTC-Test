@@ -38,6 +38,8 @@
 #include "engine/pgl/G001_flare.h"                /* pgl_matrix_mode, vu0_load_identity_regs, vu0_apply_matrix */
 #include "game/race/core/race_entry_internal.h"                           /* the car sound frame's constants, g_002B2CC0 */
 #include "engine/sound/spu_memory.h"              /* PC: snd_trace_level (the sound trace) */
+#include "game/app/pc_menu_wheels.h"               /* PC (2026-11-12): the menu wheels */
+#include "game/app/pc_menu_tires.h"                /* PC (2026-11-13): the menu tyres */
 
 /* A position (four floats) copied with a count-down loop (retail: li 3,
  * li -1, bne; a for over an index is reversed into bgez).  The pointers
@@ -269,6 +271,15 @@ void RaceEntryCar::loadSound()
 //   Caller: RaceBase::virtual_8.
 void RaceEntryCar::setupTires()
 {
+    /* PC (2026-11-12): the menu wheel ([Graphics] MenuWheels, game/app/
+     * pc_menu_wheels.h), read with the race (after loadWheel: its name) */
+    if (pc_menu_wheels() && model.data != NULL)
+        model.pcLoadMenuWheel(info.getModelCode());
+    /* PC (2026-11-13): the menu tyre ([Graphics] MenuTires, game/app/
+     * pc_menu_tires.h), read with the race (after loadTires: its number);
+     * setupTires builds its packets */
+    if (pc_menu_tires() && model.data != NULL)
+        model.pcLoadMenuTire();
     model.setupTires();
 }
 
@@ -379,6 +390,8 @@ f32 g_002B2CC0[4] = { 0.0f, 0.0f, 0.0f, 1.0f };    /* 0x002B2CC0 */
 //   mode (F_001DE050, LISTEN_*) and a Doppler factor as their pitch.
 //   noCrashSound != 0 (or another car's view) mutes the crash sounds, not skids.
 //   In a split screen the view that follows the car is made current first.
+//   PC (ROADMAP 35): then the car sound budget (car_sound_budget, T176): a
+//   car out of it in a race of more than 8 cars is silent this frame.
 //   Matching (u042): 81.7%, 738 of 792 instructions; kept honest (no
 //   fakematch).  What matches: the copies as a count-down loop on local
 //   pointers (copy_pos), the seven wheel voices written out with their own
@@ -444,6 +457,15 @@ void RaceEntryCar::updateSound(CameraManager *cm, int noCrashSound)
         }
     }
 
+    /* PC (ROADMAP 35): the car sound budget (T176 car_sound_budget): in a
+     * race of more than 8 cars only the cars the views follow, the player's
+     * and the nearest to the listener sound (8 in all); the others are
+     * stopped there and build no frame here, so they take no voice of the
+     * mixer's 126, and start again when they come near.  Up to 8 cars it
+     * returns 1 and does nothing: as retail. */
+    if (car_sound_budget(this, cm) == 0)
+        return;
+
     RaceCarState *st = state;
     CarSound *snd = &sound;
     DynCarState *run = &st->st;
@@ -462,7 +484,12 @@ void RaceEntryCar::updateSound(CameraManager *cm, int noCrashSound)
      * listener -> car direction, c the speed of sound per frame; the
      * listener's speed from the camera's last two eye positions. */
     f32 doppler = 1.0f;
-    if (cm->views[cm->current].camera->doppler != 0) {
+    /* PC: under the debug camera its own motion (its eye at the last tick)
+     * and always a Doppler: the game camera's cuts do not restart the
+     * voices (game/app/pc_debugcam.h) */
+    f32 pcPrev[3];
+    const int pcDebug = pc_debugcam_listener_prev(cm->current, pcPrev);
+    if (pcDebug || cm->views[cm->current].camera->doppler != 0) {
         f32 camX = cm->getPositionX();
         f32 dx = x - camX;
         f32 camY = cm->getPositionY();
@@ -476,9 +503,12 @@ void RaceEntryCar::updateSound(CameraManager *cm, int noCrashSound)
         dy = dy / dist;
         dz = dz / dist;
         VariableCameraBase *cam = cm->views[cm->current].camera;
-        f32 listen = dx * (camX - cam->position[1].x)       /* the listener's speed */
-                   + dy * (camY - cam->position[1].y)
-                   + dz * (camZ - cam->position[1].z);
+        const f32 prevX = pcDebug ? pcPrev[0] : cam->position[1].x;    /* PC: the debug camera's (above) */
+        const f32 prevY = pcDebug ? pcPrev[1] : cam->position[1].y;
+        const f32 prevZ = pcDebug ? pcPrev[2] : cam->position[1].z;
+        f32 listen = dx * (camX - prevX)                     /* the listener's speed */
+                   + dy * (camY - prevY)
+                   + dz * (camZ - prevZ);
         f32 vx = x - car_view_x_now(st);
         f32 vy = y - car_view_y_now(st);
         f32 vz = z - car_view_z_now(st);
@@ -778,8 +808,12 @@ int RaceEntryBase::addEntry(RaceEntryCar *car)
 
 // FUNC 0x00178B08 RaceEntryBase::canAddEntry
 //   (slot 2.)  The car is not looked at here.
+//   PC: refused once the list is full (capacity: RaceEntryPS2's
+//   PC_RACE_CARS_MAX; retail had no bound and wrote past its 7 slots).
 int RaceEntryBase::canAddEntry(RaceEntryCar *car)
 {
+    if (capacity > 0 && count >= capacity)
+        return 0;                           /* PC */
     return 1;
 }
 

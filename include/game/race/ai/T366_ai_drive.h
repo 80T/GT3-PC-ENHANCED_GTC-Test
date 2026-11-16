@@ -71,7 +71,7 @@ void ai_apply_outputs(AIDriver *ai);                                            
  * tyres' slip angle), the throttle of the state (full, corner, braking, the
  * pit lane) x ai_brake_factor, then the traffic (ai_avoid_traffic) from
  * (rank x 100 + 5000) ms of the conductor's clock on (clock / 3: the clock
- * counts 1/3 ms). */
+ * counts 1/3 ms; PC: the rank at most 6, races of up to 32 cars). */
 void ai_drive(AIDriver *ai);                                                    /* 0x001F7AE0 */
 /* The enhanced engine (race_logic.md A6): the heading of `line' at course
  * distance dist (yaw 0 along +y), from its points at dist and 0.5 m on

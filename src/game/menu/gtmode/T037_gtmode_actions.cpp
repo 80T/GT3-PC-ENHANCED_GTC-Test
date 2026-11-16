@@ -63,6 +63,7 @@
 #include "game/menu/gtmode/T037_gtmode_actions.h"       /* the actions, g_0029A180, g_00351294 */
 #include "game/menu/gtmode/T037_tumble_car.h"           /* TumbleCar: the last class defined */
 #include "game/menu/gtmode/gtmode_main_internal.h"
+#include "game/app/pc_challenge.h"              /* PC (2026-11-14): the money decay (a day passed) */
 
 using namespace gt2k_menu;
 
@@ -287,6 +288,7 @@ void action_go_race(void *ctx, ButtonData *rec, int index, PageLayout *layout)
     gt2k_game::MenuStatus *menu = getGameStatus()->getMenuStatus();
     menu->nextMode = menu->raceMode;
     getGameStatus()->day++;
+    pc_challenge_day_passed();              /* PC (2026-11-14): the money decay (game/app/pc_challenge.h) */
 }
 
 /* "go_preview": the menu demo race. */
@@ -304,6 +306,7 @@ void action_go_license(void *ctx, ButtonData *rec, int index, PageLayout *layout
     menu->setEvent(rec->name);
     menu->nextMode = MAIN_MODE_LICENSE_TEST;
     getGameStatus()->day++;
+    pc_challenge_day_passed();              /* PC (2026-11-14): the money decay (game/app/pc_challenge.h) */
 }
 
 /* "go_machine_test": the machine test rec->name; a day passes. */
@@ -314,6 +317,7 @@ void action_go_machine_test(void *ctx, ButtonData *rec, int index, PageLayout *l
     menu->setEvent(rec->name);
     menu->nextMode = MAIN_MODE_MACHINE_TEST;
     getGameStatus()->day++;
+    pc_challenge_day_passed();              /* PC (2026-11-14): the money decay (game/app/pc_challenge.h) */
 }
 
 /* "go_free_run": the race "ATAF0001" on the course rec->name (MenuStatus::
@@ -326,6 +330,7 @@ void action_go_free_run(void *ctx, ButtonData *rec, int index, PageLayout *layou
     menu->nextMode = MAIN_MODE_FREE_RUN;
     menu->setStr84(rec->name);
     getGameStatus()->day++;
+    pc_challenge_day_passed();              /* PC (2026-11-14): the money decay (game/app/pc_challenge.h) */
 }
 
 // FUNC 0x001263D0 action_go_replay_theater

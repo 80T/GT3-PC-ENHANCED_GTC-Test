@@ -11,6 +11,11 @@
 #include "game/race/core/T153_race_course.h"          /* RaceCourse::getContact (seen: UnitArena<64>) */
 #include "game/car/physics/T330_dyn_car_init.h"
 #include "game/car/physics/car_param_internal.h"
+#include "game/app/pc_car_tuning.h"                 /* PC: the race's surface grips (the build) */
+#include "game/app/pc_rev_cut.h"                    /* PC (2026-11-08): the realistic rev limiter's cut */
+#include "game/app/pc_shift.h"                      /* PC (2026-11-08): the realistic gear shift's */
+#include "game/app/pc_clutch.h"                     /* PC (2026-11-09): its clutch mode's */
+#include "game/app/pc_rake.h"                       /* PC (2026-11-14): a rolling start's direction */
 // DATA_START 0x0033C3C0
 
 // FUNC 0x001DD0C8 DynCarState_setDriver
@@ -291,6 +296,9 @@ void DynCar_resetState(RaceCarState *car)
     st->engineTorque = 0.0f;
     st->frictionTorque = 0.0f;
     st->limiterOn = 0;
+    pc_rev_cut_reset(car);                  /* PC (2026-11-08): the realistic limiter's cut over too */
+    pc_shift_reset(car);                    /* PC (2026-11-08): and a realistic shift */
+    pc_clutch_reset(car);                   /* PC (2026-11-09): and the clutch mode's clutch */
     DynCar_clearFaults(car);
     car->topSpeed = 0.0f;
     zero = car->topSpeed;       /* re-read; the stores below use that register */
@@ -356,8 +364,16 @@ void DynCar_setInitialSpeed(RaceCarState *car, f32 v)
     int i;
 
     st->yawRate = 0.0f;
-    for (i = 0; i < 3; i++)
-        st->vel[i] = st->rot[0][i] * v;
+    {
+        /* PC (2026-11-14): along the body's forward axis without its rest
+         * pitch (game/app/pc_rake.h: a car whose axle heights differ would
+         * start with a vertical speed of v x sin of it); every other car the
+         * body's own, as before */
+        f32 level[3][3];
+        const f32 *forward = pc_rake_axes(car, level[0], level[1], level[2]) ? level[0] : st->rot[0];
+        for (i = 0; i < 3; i++)
+            st->vel[i] = forward[i] * v;
+    }
     DynCar_setSpeed(car, v);
     car_set_gear(st, car_gear_for_speed(car, v));
     idleSpeed = (f32)p->engine.idle * RPM_TO_RADS;
@@ -485,7 +501,9 @@ int DynCar_initialize(RaceCarState *car, CarSpec *spec, int sector, int driver,
     st->carIndex = carIdx;
     DynCarState_setDriver(st, driver);
     ai = &car->ai;
+    pc_surface_build_begin(org);            /* PC: the tyres take the race's surface grips */
     ret = CarDynamics_init(p, spec, st->driver, NULL, &dc->rules, cond);
+    pc_surface_build_end();                 /* PC */
     ai_load_params(ai, p->driveClass, dc->getCourseKind());
     if (st->driver != 0)
         ai_apply_rules(ai, p->driveClass);

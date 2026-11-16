@@ -11,8 +11,10 @@
  * its usual rate (the GPU and the CPU kept at their clocks: idle, they fell
  * to their power-saving ones and the resume stuttered while they rose); else
  * nothing is drawn and the last picture is presented again (the F2 / F3
- * overlays and this one's indicator stay alive) until a step or F6.  A step
- * runs one tick and draws its frame at the tick (no interpolation).  The sound freezes with
+ * overlays and this one's indicator stay alive) until a step, F6 or the debug
+ * camera coming on (pc_debugcam_step_frames: then the frames go on till the
+ * pause ends).  A step runs one tick and draws its frame at the tick (no
+ * interpolation).  The sound freezes with
  * the game: the music thread is woken only by the stepped ticks (no timer
  * flushes), and the output stops mixing (a 5 ms fade; the voices and the BGM
  * stream hold where they are) until F6.  Other game threads (loading, the

@@ -18,6 +18,16 @@
 #include "game/race/core/T121_race_entry.h"           /* RaceEntryBase, RaceEntryCar */
 #include "game/race/core/T124_race_information.h"     /* RaceInformation; T484 RaceDataBase, T115 RaceOption */
 #include "game/race/core/T125_race_organization.h"    /* RaceOrganization (race_organization_create, the set-up slots) */
+#include "game/app/pc_course_scale.h"                 /* PC: pc_course_scale_bind */
+#include "game/app/pc_course_pick.h"                  /* PC: pc_course_force, pc_race_run_bind */
+#include "game/app/pc_car_tuning.h"                   /* PC: pc_car_tuning_bind */
+#include "game/app/pc_rev_cut.h"                      /* PC (2026-11-08): pc_rev_cut_bind */
+#include "game/app/pc_shift.h"                        /* PC (2026-11-08): pc_shift_bind */
+#include "game/app/pc_race_cars.h"                    /* PC: pc_race_cars (the cars of a race) */
+#include "game/race/core/T152_race_gtmode_information.h"  /* PC: RaceGTmodeInformation */
+#include "game/race/modes/T133_race_single_player.h"  /* PC: RaceSinglePlayerInformation */
+#include "game/race/modes/T135_race_arcade_demo.h"    /* PC: RaceArcadeDemoInformation */
+#include "game/race/modes/T151_race_championship.h"   /* PC: RaceChampionshipInformation (pcChosenCars) */
 
 /* The race object pool (.data 0x002B3BF0, 0x18 bytes: a public object with a
  * constructor, zero in the file).  egcs generates its static initialiser
@@ -45,6 +55,7 @@ void *race_pool_assign(void *base, u32 size)
 //   0x8C8)).  A refused entry (addEntry -1) is deleted (virtual destructor).
 RaceOrganization *race_organization_create(RaceInformation *info)
 {
+    pc_course_force(info);                  /* PC: [Debug] CourseForcer: a race entered on the forced course */
     RaceCourse *course = new RaceCourse;    /* RaceCourse::operator new(0x14) */
     RaceDataBase *db = new RaceDataBase;    /* operator new(0x28) */
     /* implicit: operator new, operator delete (new RaceDataBase and the
@@ -60,6 +71,19 @@ RaceOrganization *race_organization_create(RaceInformation *info)
     org->setCourseCode(info->getCourseCode());
     org->timeLimit = info->getTimeLimit();
     int n = info->getEntryCount();
+    /* PC: a race with opponents (the GT mode's, the arcade's: not the
+     * attract mode's demos) runs [Game] RaceCars' cars when it would run 6
+     * (or fewer, with RaceCarsOverride; game/app/pc_race_cars.h) */
+    if ((dynamic_cast<RaceGTmodeInformation *>(info) != NULL ||
+         dynamic_cast<RaceSinglePlayerInformation *>(info) != NULL) &&
+        dynamic_cast<RaceArcadeDemoInformation *>(info) == NULL) {
+        const int own = n;
+        RaceChampionshipInformation *champ = dynamic_cast<RaceChampionshipInformation *>(info);
+        const int chosen = champ != NULL ? champ->pcChosenCars() : 0;
+        n = chosen > 0 ? chosen : pc_race_cars(n);  /* (a championship keeps the cars it drew) */
+        if (n != own)
+            printf("PC: race cars: %d (the race's own %d%s)\n", n, own, chosen > 0 ? "; the championship's" : "");
+    }
     for (int i = 0; i < n; i++) {           /* (loop.c reverses it: bnel at the bottom) */
         RaceEntryCar *car = entries->createEntry();
         if (org->entries->addEntry(car) != -1)
@@ -67,6 +91,11 @@ RaceOrganization *race_organization_create(RaceInformation *info)
         else if (car != 0)
             delete car;
     }
+    pc_course_scale_bind(course, NULL);     /* PC: the settings' course scale (a saved race's: T149) */
+    pc_race_run_bind(org, info);            /* PC: the forcers' / the randomizer's laps and time (a saved race's: T149) */
+    pc_car_tuning_bind(org, info);          /* PC: the car multipliers (a saved race's: T149) */
+    pc_rev_cut_bind(org, info);             /* PC (2026-11-08): the rev limiter (a saved race's: T149) */
+    pc_shift_bind(org, info);               /* PC (2026-11-08): the gear shifts (a saved race's: T149) */
     info->setupOrganization(org);
     org->updateColorIndices();              /* F_0017A900 */
     return org;

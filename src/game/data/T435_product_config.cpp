@@ -8,6 +8,7 @@
 #include "game/data/T435_product_config.h"
 #include "platform/language.h"                  /* PC: language::product_config (product_config_init) */
 #include "platform/settings.h"                  /* PC: [Debug] UnlockArcade (the merged course lists) */
+#include "game/app/pc_product_config.h"         /* PC: pc_product_config_load (the database) */
 #include <vector>                               /* PC: the merged course lists */
 
 /* The arcade modes' course list names (T010: ArcadeControl::getModeName). */
@@ -84,7 +85,11 @@ ProductConfig::ProductConfig(const char *path)
     table1C = 0;
     prizes = 0;
     services = 0;
-    buf = file_read_blocking(path, 0, 0, 1, &vol_device_object);
+    /* PC: the config's database when there (gameconf/<config>.sqlite3: built
+     * into the .gcf's layout, game/app/pc_product_config.h), else the file */
+    buf = pc_product_config_load(path);
+    if (buf == 0)
+        buf = file_read_blocking(path, 0, 0, 1, &vol_device_object);
     hdr = gcf_relocate_header((GcfHeader *)buf);
     for (i = 0; i < hdr->count; i++) {
         void *data = hdr->sections[i].data;

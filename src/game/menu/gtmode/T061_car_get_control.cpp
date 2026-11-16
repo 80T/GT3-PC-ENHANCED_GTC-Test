@@ -65,6 +65,8 @@
 #include "game/data/T482_car_equipments.h"       /* CarEquipments */
 #include "engine/io/T503_vol_thread.h"           /* file_read_blocking, vol_device_object */
 #include "game/menu/framework/T212_menu_car.h"             /* PC: menu_car_buffer_need */
+#include "game/app/pc_prize_cars.h"              /* PC: the prize car randomizer */
+#include "game/app/pc_menu_race_model.h"         /* PC (2026-11-12): [Debug] MenuRaceModel */
 #include "game/menu/gtmode/car_get_internal.h"
 
 /* T105's not_car_get without its class (retail T061 has no NotCarGetControl
@@ -95,7 +97,9 @@ const char *car_get_load_car(const char *code, CarModelFile *buf, u32 color, Car
 
     if (equip.setCar(nameToCode(code)) != 1)
         return NULL;                        /* (CarEquipments::~CarEquipments, flags 2, on both returns) */
-    car_model_path(equip.getModelCode(), path, CAR_MODEL_MENU);
+    /* PC (2026-11-12): or the race model, as car_get_prizes chose
+     * (pc_menu_race_model_prizes) */
+    car_model_path(equip.getModelCode(), path, pc_menu_race_model_prizes() ? 0 : CAR_MODEL_MENU);
     /* PC (ROADMAP 18): the whole file into buf's place (s_carModelPlace:
      * car_get_prizes made it as big as the sets' biggest model needs), not
      * CAR_MODEL_BUF_SIZE bytes of it; nothing past the place */
@@ -245,6 +249,19 @@ void CarGetControl::run()
 
 } /* namespace gt2k_menu */
 
+/* PC (ROADMAP 23): car j of the race's prize set i: the prize car
+ * randomizer's (*replaced = 1: a random colour, as a regional replacement
+ * gets), else the set's own (ProductConfig::prizeCarCode). */
+static const char *car_get_code(PrizeCarList *prizes, int i, int j, int *replaced)
+{
+    const char *code = pc_prize_car(i, j);
+    if (code == NULL)
+        return product_config()->prizeCarCode(prizes->getSet(i), j, replaced);
+    if (replaced != NULL)
+        *replaced = 1;
+    return code;
+}
+
 /* PC (ROADMAP 18): the bytes of one car's place in car_get_prizes' block:
  * CAR_MODEL_BUF_SIZE, or what the biggest menu model of the race's sets
  * needs with the tyres built after it (menu_car_buffer_need, T212). */
@@ -257,9 +274,9 @@ static u32 car_get_model_stride(PrizeCarList *prizes, int nSets)
         for (int j = 0; j < cars && j < CAR_GET_MAX_CARS; j++) {
             CarEquipments equip;
             char path[0x40];
-            if (equip.setCar(nameToCode(product_config()->prizeCarCode(set, j, NULL))) != 1)
+            if (equip.setCar(nameToCode(car_get_code(prizes, i, j, NULL))) != 1)  /* PC (ROADMAP 23): the drawn car */
                 continue;
-            car_model_path(equip.getModelCode(), path, CAR_MODEL_MENU);
+            car_model_path(equip.getModelCode(), path, pc_menu_race_model_prizes() ? 0 : CAR_MODEL_MENU);
             u32 need = (menu_car_buffer_need(path, NULL) + 0x3F) & ~0x3Fu;
             if (stride < need)
                 stride = need;
@@ -296,11 +313,20 @@ int car_get_prizes(const char *race, int arg)
     }
     if (most < 1 || most > CAR_GET_MAX_CARS)    /* (one unsigned compare of most - 1) */
         return 0;
+    /* PC (ROADMAP 23): the prize car randomizer draws the cars of each set
+     * that gives them (settings::prize_car_randomizer; pc_prize_cars.h) */
+    if (pc_prize_draw_begin()) {
+        for (i = 0; i < nSets; i++) {
+            if (prize_reason_valid(prizes.getReason(i)) != 0)
+                pc_prize_draw_set(i, prizes.getSet(i), product_config()->prizeCarCount(prizes.getSet(i)));
+        }
+    }
 
     CarModelFile *models[CAR_GET_MAX_CARS]; /* sp+0x40 */
     memset(models, 0, sizeof(models));
     /* PC (ROADMAP 18): each car's place and the picture sized from their
      * files (the retail sizes at least) */
+    pc_menu_race_model_set_prizes(pc_menu_race_model());   /* PC (2026-11-12): these prizes' models */
     u32 stride = car_get_model_stride(&prizes, nSets);
     s_carModelPlace = stride;
     u32 envSize = PRIZE_GET_IMG_SIZE;
@@ -341,10 +367,12 @@ int car_get_prizes(const char *race, int arg)
         for (int j = 0; j < cars; j++) {
             int replaced = 0;               /* sp+0xF84 */
             u32 color = (u32)-1;            /* a replaced (regional) car: a random colour */
-            const char *code = product_config()->prizeCarCode(set, j, &replaced);
+            const char *code = car_get_code(&prizes, i, j, &replaced);  /* PC (ROADMAP 23): was prizeCarCode(set, j, &replaced) */
             if (replaced != 1)
                 color = product_config()->prizeCarColor(set, j);
             f32 weight = (f32)product_config()->prizeCarWeight(set, j);
+            if (pc_prize_car(i, j) != NULL)
+                weight = 1.0f;                  /* PC (ROADMAP 23): a drawn car: an even chance */
             weights[j] = weight;
             if (weight < 1.0f)
                 weights[j] = 1.0f;

@@ -27,6 +27,7 @@
 #include "engine/gfx/T451_model_set.h"            /* ModelSet, modelset_* */
 #include "game/course/T453_vision_list.h"          /* VisionList, VisionPoint, vision_nearest */
 #include "engine/gfx/T514_gs_buffer.h"            /* GSBuffer */
+#include "game/app/pc_course_scale.h"              /* PC: the course scale */
 
 /* .rodata start ("bad_alloc", the type names: no code references them).
  * The section is 64-aligned (the model): it starts at 0x00339500, after 48
@@ -448,11 +449,17 @@ void envmapDrawScene(CourseData *course, CameraBase *cam, u16 *parts)
     cam->applyView();                       /* the view */
     pgl_push_matrix();
     vu0_reset_translation();
+    /* PC (2026-11-11): the course scale about the eye, as the views'
+     * backdrops (course_draw_model, T179): after the view, before the sky's
+     * own turn (the turn places it in the world, the world is scaled) */
+    pc_course_draw_begin(course);
     vu0_rotate_x(course->env->skyRotX);
     vu0_rotate_y(course->env->skyRotY);
     modelset_draw_all(course->envSky);
+    pc_course_draw_end(course);
     pgl_pop_matrix();
     gs_clear_buffers(PGL_CLEAR_DEPTH);
+    pc_course_draw_begin(course);           /* PC: the course scale (game/app/pc_course_scale.h) */
     if (parts != NULL) {
         n = *parts;
         modelset_begin_draw(course->envModel);
@@ -463,6 +470,7 @@ void envmapDrawScene(CourseData *course, CameraBase *cam, u16 *parts)
     } else {
         modelset_draw_all(course->envModel);
     }
+    pc_course_draw_end(course);             /* PC */
     pgl_pop_matrix();
 }
 
@@ -513,7 +521,8 @@ void envmapRender(GSBuffer *target, CourseData *course, DynamicEnvmapCamera *cam
         /* the scene, turned view * 120 degrees about z */
         pgl_matrix_mode(PGL_MTX_PROJECTION);
         vu0_load_identity_regs();
-        pgl_frustum(-0.5f, 0.5f, -0.753778f, 0.904534f, 0.005f, 200.0f, 0.1599f);
+        pgl_frustum(-0.5f, 0.5f, -0.753778f, 0.904534f, 0.005f,
+                    200.0f * pc_course_far_factor(course), 0.1599f);   /* PC: x the course scale's far factor */
         pgl_matrix_mode(PGL_MTX_MODELVIEW);
         vu0_load_identity_regs();
         vu0_rotate_x(79.97501f);

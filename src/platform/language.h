@@ -49,6 +49,10 @@ int chosen();
 /* This run's car database files: kind 0 the parameters (paramdb), 1 the
  * strings (paramstr), 2 the unicode strings (paramunistr). */
 const char *car_database(int kind);
+/* This run's car database as SQLite (database/paramdb<r>.sqlite3, which the
+ * launcher makes of those files: game/app/pc_param_db.h), "" when it has
+ * none (the files are read). */
+const char *param_database();
 /* This run's product config (gameconf/...). */
 const char *product_config();
 

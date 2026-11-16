@@ -34,6 +34,7 @@
 #include "game/sound/T177_race_ambient_sound.h"   /* this translation unit */
 #include "game/sound/car_sound_internal.h"                           /* sound_voice_priority, RUNWAY_ATTR2_*, AMBIENT_REVERB_* */
 #include "engine/sound/spu_memory.h"              /* PC: snd_trace_level (the sound trace) */
+#include "game/app/pc_volume.h"                   /* PC (2026-11-11): the player's level after the clamps */
 
 /* max.s / min.s: volatile asm statements, as every max.s / min.s of the
  * image behaves (u018, u032, u044).  GCC 14: the C ternaries. */
@@ -208,7 +209,16 @@ void RaceAmbientSound::update(RaceOrganization *org)
         side[1] = cam->matrix[1][0];
         side[2] = cam->matrix[2][0];
         pos[3] = 1.0f;
-        if (cam->doppler != 0) {
+        /* PC: under the debug camera its own axis and motion (its eye at
+         * the last tick; game/app/pc_debugcam.h) */
+        f32 pcPrev[3];
+        if (pc_debugcam_listener_prev(cameras->current, pcPrev)) {
+            pc_debugcam_side(cameras->current, side);
+            vel[0] = pos[0] - pcPrev[0];
+            vel[1] = pos[1] - pcPrev[1];
+            vel[2] = pos[2] - pcPrev[2];
+            vel[3] = 1.0f;
+        } else if (cam->doppler != 0) {
             /* the eye's motion since the last frame */
             vel[0] = pos[0] - cam->position[1].x;
             vel[1] = pos[1] - cam->position[1].y;
@@ -268,6 +278,7 @@ void RaceAmbientSound::update(RaceOrganization *org)
         channel_set(&mix.ch[1], 1.0f, 1.0f, 1.0f);
 
     f32 gain = g_003521E0 * g_003521E4;
+    PcSeLevelScope pcLevel(g_pcRaceSeLevel);  /* PC: the player's level, after the clamps (pc_volume.h) */
     channel_pitch(&mix.ch[4], 1.0f);
     tunnelLevel = tunnelLevel * gain;
     tunnel2Level = tunnel2Level * gain;

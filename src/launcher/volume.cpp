@@ -110,4 +110,36 @@ bool list_files(const Reader &read, uint64_t volume_size, std::vector<File> *fil
     return true;
 }
 
+std::string course_region(const std::string &language)
+{
+    if (_stricmp(language.c_str(), "JP") == 0)
+        return "JP";
+    if (_stricmp(language.c_str(), "US") == 0)
+        return "US";
+    if (_stricmp(language.c_str(), "BR") == 0)
+        return "UK";
+    return "EU";
+}
+
+bool flat_courses(const std::vector<File> &files)
+{
+    bool flatFiles = false, courseFolders = false;
+    for (const File &f : files)
+        if (f.path.size() > 8 && _strnicmp(f.path.c_str(), "courses/", 8) == 0) {
+            if (f.path.find('/', 8) != std::string::npos)
+                courseFolders = true;
+            else if (_stricmp(f.path.c_str() + 8, ".list") != 0)
+                flatFiles = true;
+        }
+    return flatFiles && !courseFolders;
+}
+
+std::string unified_path(const std::string &path, bool flatCourses, const std::string &region)
+{
+    if (flatCourses && path.size() > 8 && _strnicmp(path.c_str(), "courses/", 8) == 0 &&
+        path.find('/', 8) == std::string::npos && _stricmp(path.c_str() + 8, ".list") != 0)
+        return path.substr(0, 8) + region + "/" + path.substr(8);
+    return path;
+}
+
 } // namespace volume

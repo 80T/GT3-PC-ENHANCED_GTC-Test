@@ -8,6 +8,7 @@
  * car's frame. */
 #include "game/car/physics/car_motion_internal.h"
 #include "game/car/physics/T300_car_tyre_grip.h"
+#include "game/app/pc_car_tuning.h"                 /* PC: the grip multiplier */
 
 /* Returns 0 (nothing done) when the curve's last wear x3 is 0 or the car
  * has DYN_FLAG_COUNTED_GROUND.  The wear is clamped to x3.  Between the
@@ -84,7 +85,9 @@ f32 tyre_load_per_width(CarParams *p, int wheel, f32 load)
 /* grip = load x loadCurve(load / width) [x wearGrip] x axleGrip x the
  * tyre's surface factor x camberCurve(+-(roll - groundRoll) + camber): the
  * body's roll on the ground counts with one sign on the left wheels (0, 2)
- * and the other on the right ones. */
+ * and the other on the right ones.
+ * PC: x the car's grip multiplier (game/app/pc_car_tuning.h; the surfaces'
+ * grips are in surfaceGrip). */
 // FUNC 0x001EA1E8 car_wheel_grip
 void car_wheel_grip(RaceCarState *car)
 {
@@ -93,6 +96,7 @@ void car_wheel_grip(RaceCarState *car)
     int wearOn = car_wear_grip(st, p, &car->dc->wear);
     f32 sideRoll[2];
     f32 roll = st->roll - st->groundRoll;
+    const f32 pcGrip = pc_car_tuning(car, PC_TUNE_GRIP);    /* PC */
 
     sideRoll[1] = roll;
     sideRoll[0] = -roll;
@@ -108,7 +112,7 @@ void car_wheel_grip(RaceCarState *car)
         grip *= p->axleGrip[axle];
         f32 camberAngle = sideRoll[i & 1] + p->camber[axle];
         f32 camberGrip = curveLookupLinear(&p->camberCurve[axle], camberAngle);
-        w->grip = grip * tyre->surfaceGrip[w->surface] * camberGrip;
+        w->grip = grip * tyre->surfaceGrip[w->surface] * camberGrip * pcGrip;   /* PC: x the multiplier */
     }
 }
 

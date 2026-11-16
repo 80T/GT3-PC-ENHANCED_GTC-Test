@@ -60,6 +60,7 @@
 #include "game/race/core/T123_race_setup.h"           /* race_organization_create */
 #include "game/race/core/T125_race_organization.h"    /* RaceOrganization */
 #include "game/race/core/T129_race_base.h"            /* RaceBase, race_destroy, g_00351DF0 */
+#include "game/app/pc_race_cars.h"                    /* PC: PC_REPLAY_DATA_SIZE */
 #include "game/race/core/T130_race_ps2_base.h"        /* RacePS2Base (T173 RaceSmoke::reset) */
 #include "game/race/modes/T139_race_solitaire.h"       /* RaceSolitaire */
 #include "game/race/core/T149_race_replay_information.h"  /* RaceReplayInformation */
@@ -1073,7 +1074,7 @@ int logger_run(RaceOrganization *org, int unused)
         /* Declared after the LoggerControl's block: the frame puts the
          * control first (sp+0x10, its slot reused by info), then raw
          * (sp+0xE60), then kind / index (sp+0x427E0), as retail. */
-        u8 raw[0x41980];
+        u8 raw[PC_REPLAY_DATA_SIZE + 0x40];  /* PC: was 0x41980 (game/app/pc_race_cars.h) */
         RaceOrganization *raceOrg = race->org;
         int kind = 0;
         int index;
@@ -1128,7 +1129,7 @@ int logger_run_without_race(void)
 // FUNC 0x00136FC0 logger_main
 void logger_main(void)
 {
-    u8 raw[0x41980];
+    u8 raw[PC_REPLAY_DATA_SIZE + 0x40];     /* PC: was 0x41980 (game/app/pc_race_cars.h) */
     RaceSolitaire *race = NULL;
     g_00351564 = 0;
     g_00351548 = 1;

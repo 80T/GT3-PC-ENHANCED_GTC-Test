@@ -12,6 +12,7 @@
 #include "game/menu/framework/menu_item_internal.h"
 #include "engine/input/T472_analog_curve.h"         /* g_003416F8 (the analog stick curve) */
 #include "engine/input/T474_control.h"              /* base Control, ControlButton, PADRAW_*, CHAN_* */
+#include "engine/input/T479_usb_steering_port.h"    /* PC (2026-11-10): usbC294MenuRaw */
 #include "game/menu/framework/T214_menu_control.h"
 
 namespace gt2k_menu {
@@ -200,6 +201,14 @@ void MenuControl::emulatePressure()
 
     u32 buttons = getButtons() & 0xFF;
     u32 raw = curButtons.raw[0];
+    /* PC (2026-11-10, user: with the wheel, the sliders' "L3 maps correctly
+     * but R3 doesn't do anything"): a wheel's raw word is not a pad's
+     * (retail read it as one: its R3 came out as circle, L2 as R2...); the
+     * wheel's buttons as the pad's, its L3 / R3 as L1 / R1 (T479
+     * usbC294MenuRaw; the only wheel the PC reports).  A lone wheel only:
+     * merged with a pad (T478, an i.LINK node's) the word is the pad's */
+    if (rawUSBType() == USB_WHEEL_C294 && rawPSType() == 0)
+        raw = usbC294MenuRaw(raw);
     if (raw & PADRAW_TRIANGLE) buttons |= MENU_BUTTON_TRIANGLE;
     if (raw & PADRAW_CIRCLE)   buttons |= MENU_BUTTON_CIRCLE;
     if (raw & PADRAW_CROSS)    buttons |= MENU_BUTTON_CROSS;

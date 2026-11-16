@@ -32,6 +32,7 @@
 #include "game/menu/arcade/T020_arcade_helpers.h"       /* arcade_fade_out (the items given up on a refresh) */
 #include "game/menu/arcade/T029_arcade_movies.h"        /* g_00292930 (the background movie) */
 #include "game/menu/framework/T250_ipic.h"                 /* IpicArchive (the course stills) */
+#include "game/app/pc_still.h"                             /* PC: PC_STILL_COURSE */
 #include "game/menu/framework/T253_menu_bg_movie.h"        /* MenuBgMovie g_002CDC10 */
 #include "game/menu/framework/T233_menu_sound.h"           /* menu_play_se */
 #include "game/data/T435_product_config.h"       /* product_config: the course lists */
@@ -115,16 +116,20 @@ const char *ArcadeControl::F_0010E200(const char *name)
 
 /* Stops the background movie (stopAndWait: the stream stopped, its feeder
  * thread ended), then shows the current course's still from courseIpic in
- * mpegCourse (IpicArchive on the stack; find's result is not checked). */
+ * mpegCourse (IpicArchive on the stack; find's result is not checked).
+ * PC: its movie's first picture, or a PNG, comes first (game/app/pc_still.h). */
 // FUNC 0x0010E240 gt2k_menu::ArcadeControl::loadCourseImage
 void ArcadeControl::loadCourseImage()
 {
     g_002CDC10.stopAndWait();
-    if (courseIpic == NULL)
-        return;                             /* PC: no course stills (ArcadeControl::load) */
     ProductConfig *config = product_config();
     int index = course.value;
     const char *name = config->courseName(index, getModeName());
+    /* PC (the Japanese menus may have no such item: their code has no still) */
+    if (mpegCourse != NULL && mpegCourse->setStill(PC_STILL_COURSE, name) != 0)
+        return;
+    if (courseIpic == NULL)
+        return;                             /* PC: no course stills (ArcadeControl::load) */
     IpicArchive archive((const IpicArchiveData *)courseIpic);
     archive.find(&ipic, name);
     mpegCourse->setIpic(&ipic);

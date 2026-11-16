@@ -13,6 +13,7 @@
 
 #include "game/game.h"
 #include <stddef.h>                         /* size_t */
+#include "game/race/race_cars.h"            /* PC: PC_RACE_CARS_MAX */
 #include "game/race/modes/T133_race_single_player.h"   /* base RaceSinglePlayer */
 #include "game/car/model/T184_car_icon_maker.h"       /* CarIcon (held by value) */
 #include "game/race/pause/T169_race_pause.h"           /* RacePause (held by value) */
@@ -49,7 +50,7 @@ public:
     /* The car icons (F_001AE3F8, T184), given to the race display. */
     virtual void virtual_43();                              /* [43] +0x164 0x00183178 */
 
-    CarIcon     icons[7];                   /* 0x16EC0 one per car */
+    CarIcon     icons[PC_RACE_CARS_MAX];    /* 0x16EC0 one per car (PC: was 7; game/race/race_cars.h) */
     RacePause   pause;                      /* 0x2509C */
     ReplayPause replayPause;                /* 0x25348 (mode 0) */
     DynamicsConductorFreePractice dcFree;   /* 0x25888 RaceBase::dc points here (never destroyed) */

@@ -6,13 +6,16 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
 #include <mutex>
+#include <thread>
 #include <vector>
 
 #include "engine/sound/native/ads_stream.h"
+#include "engine/sound/native/bgm_files.h"
 #include "engine/sound/native/spu2.h"
 
 using namespace spu2;
@@ -158,7 +161,20 @@ struct State {
         double frac = 0.0;          /* the read position past ring[head] */
         float hist[2][2] = {};      /* the frame before head (the cubic's first point) */
         uint64_t consumed = 0;      /* frames played */
+        uint64_t fadeFrames = 0;    /* the BGM's fade-in (SndNativeBgmFrom), its frames; 0: none */
     } pcm;
+    /* PC: the BGM from a .wav or a 16-bit PCM .ads, through the PCM output
+     * (pcm_bgm_*): what the status needs of it */
+    struct PcmBgm {
+        bool on = false;            /* it plays (pcm is its) */
+        bool last = false;          /* the stream started last: the status is its */
+        bool loop = false;
+        bool allRead = false;       /* (no loop) all of it read: its length is the true one */
+        uint32_t rate = 0;
+        uint64_t frames = 0;        /* its length (the file's; the true one after its first pass) */
+        uint64_t consumed = 0;      /* frames played when it stopped */
+        uint64_t from = 0;          /* the frames before where it started (SndNativeBgmFrom) */
+    } pcmBgm;
 };
 
 State &st()
@@ -182,6 +198,18 @@ AdsStream &bgm()
         s.bgm = new AdsStream();
     return *s.bgm;
 }
+
+/* PC: the BGM through the PCM output ('PBGM' below) */
+void pcm_bgm_stop();
+bool pcm_bgm_fill();
+/* PC: the PCM output opened for `rate' / `channels' (snd_native_pcm_open,
+ * the BGM's); its ring of pcm_cap(rate) frames, zeroed, is allocated by the
+ * caller outside the sound lock (taken: the old one comes back). */
+size_t pcm_cap(int rate)
+{
+    return (size_t)(rate > 0 ? rate : 48000) * 2 + 4096;    /* about 2 s */
+}
+void pcm_open_locked(State &s, int rate, int channels, std::vector<float> &ring);
 
 /* pdispu2 0x001C30: a * b * c * d, each product >> 15, clamped to 16 bits. */
 int32_t vol_chain(int32_t a, int32_t b, int32_t c, int32_t d)
@@ -510,6 +538,7 @@ void trace_frame_locked()
 void snd_native_init(void)
 {
     bgm().close();
+    pcm_bgm_stop();                         /* PC */
     std::lock_guard<std::mutex> g(st().lock);
     State &s = st();
     Spu2 &p = spu();
@@ -574,6 +603,7 @@ void snd_native_init(void)
 void snd_native_shutdown(void)
 {
     bgm().close();
+    pcm_bgm_stop();                         /* PC */
     State &s = st();
     std::lock_guard<std::mutex> g(s.lock);
     delete s.bgm;
@@ -1076,6 +1106,242 @@ void snd_trace_line(const char *fmt, ...)
 /* 'PBGM'                                                                   */
 /* ------------------------------------------------------------------------ */
 
+/* ---- PC: the BGM through the PCM output ----
+ * (docs/sound.md 1.5) A .wav (integer PCM of 8 to 32 bits or float: what the
+ * launcher converts each .ads to, or a mod's), a 16-bit PCM .ads (two of the
+ * European disc's; pdistr sent those through core 1's sound input, not the
+ * voices) or a stream the caller decodes (an .mp3: snd_native_bgm_start_
+ * decoded) plays through the PCM output below (snd_native_pcm_*: resampled
+ * to 48 kHz, at the BGM voices' gain, after the output stage's: snd_native_
+ * render_music), as float frames, read about a second ahead by a feeder
+ * thread of its own - from the first: the caller (the game thread) reads
+ * the file's head alone, a decoder opens on the feeder thread too.  The
+ * 'PBGM' functions act on it as on the voices' stream; its status counts
+ * the frames played (exact, where the voices' clock moves by chunks), its
+ * length the true one once its first pass has been read. */
+namespace {
+
+struct PcmBgmFeed {
+    std::thread thread;
+    std::mutex lock;                /* quit, the wake-up */
+    std::condition_variable wake;
+    bool quit = false;
+    AdsReadFn read = nullptr;       /* a file's (.wav, .ads) */
+    void *user = nullptr;
+    BgmFileInfo info;
+    bool decoded = false;           /* else the file's */
+    SndNativeBgmDecoder dec = {};
+    bool opened = false;            /* the PCM output opened for it (a decoder's open: on the feeder) */
+    int outChannels = 2;            /* the frames pushed: 1 or 2 */
+    bool loop = false;
+    SndNativeBgmFrom from = {};     /* where it starts, its fade-in */
+    uint32_t pos = 0;               /* bytes of its samples read */
+    uint64_t passFrames = 0;        /* frames read in this pass */
+    bool lengthTaken = false;       /* its true length given to the status */
+    bool done = false;              /* all of it pushed (no loop): the end told */
+    AdpcmHistory hist[2];
+    std::vector<uint8_t> raw;
+    std::vector<int16_t> pcm16;     /* (an .ads's, decoded) */
+    std::vector<float> fl;          /* read, not taken yet */
+    size_t flPos = 0;
+};
+PcmBgmFeed g_pcmFeed;
+
+/* The next frames of the stream into f.fl: how many; 0 at its end, < 0 on
+ * an error. */
+int pcm_bgm_read(PcmBgmFeed &f)
+{
+    if (f.decoded) {
+        f.fl.resize((size_t)4096 * f.outChannels);
+        const int got = f.dec.read(f.dec.user, f.fl.data(), 4096);
+        f.fl.resize(got > 0 ? (size_t)got * f.outChannels : 0);
+        return got;
+    }
+    BgmFileInfo &in = f.info;
+    const bool wav = in.kind == BgmKind::wav;
+    const uint32_t unit = wav ? in.blockAlign : in.ads.interleave * in.channels;    /* a frame / a chunk */
+    uint32_t left = in.dataBytes - f.pos;
+    left -= left % unit;
+    if (left == 0)
+        return 0;
+    const uint32_t want = std::min(left, std::max(unit, 0x10000u / unit * unit));
+    f.raw.resize(want);
+    int got = f.read(f.user, in.dataOffset + f.pos, f.raw.data(), want);
+    if (got > 0)
+        got -= got % (int)unit;
+    if (got == 0)
+        in.dataBytes = f.pos;               /* (the file ends before its head says) */
+    if (got <= 0)
+        return got;
+    f.pos += (uint32_t)got;
+    f.fl.clear();
+    if (wav) {
+        wav_to_float(in, f.raw.data(), (uint32_t)got / unit, f.fl);
+    } else {
+        f.pcm16.clear();
+        ads_decode(in.ads, f.raw.data(), (uint32_t)got, f.hist, f.pcm16);
+        f.fl.resize(f.pcm16.size());
+        for (size_t i = 0; i < f.pcm16.size(); i++)
+            f.fl[i] = f.pcm16[i] * (1.0f / 32768.0f);
+    }
+    return (int)(f.fl.size() / f.outChannels);
+}
+
+/* Pushes until the output holds a second; false once all of it is in. */
+bool pcm_bgm_fill()
+{
+    PcmBgmFeed &f = g_pcmFeed;
+    const int ch = f.outChannels;
+    for (int guard = 0; guard < 64; guard++) {
+        if (f.flPos < f.fl.size()) {
+            const int frames = (int)((f.fl.size() - f.flPos) / ch);
+            const int took = snd_native_pcm_push_f32(f.fl.data() + f.flPos, frames);
+            f.flPos += (size_t)took * ch;
+            if (took < frames)
+                return true;                /* (the output's 2 s are full) */
+        }
+        f.fl.clear();
+        f.flPos = 0;
+        if (f.done)
+            return false;
+        if (snd_native_pcm_buffered() >= (int)f.info.rate)
+            return true;
+        const int got = pcm_bgm_read(f);
+        if (got > 0) {
+            f.passFrames += (uint64_t)got;
+            continue;
+        }
+        /* its end (or a read error): its true length, then from its start
+         * again without a break, or the end told */
+        if (!f.lengthTaken && f.passFrames > 0) {
+            State &s = st();
+            std::lock_guard<std::mutex> g(s.lock);
+            s.pcmBgm.frames = f.passFrames;
+            s.pcmBgm.allRead = !f.loop;
+            f.lengthTaken = true;
+        }
+        if (got == 0 && f.loop && f.passFrames > 0 &&
+            (f.decoded ? f.dec.rewind(f.dec.user) != 0 : true)) {
+            f.pos = 0;
+            f.passFrames = 0;
+            f.hist[0] = f.hist[1] = AdpcmHistory();
+            continue;
+        }
+        if (f.lengthTaken || f.passFrames == 0) {
+            State &s = st();
+            std::lock_guard<std::mutex> g(s.lock);
+            s.pcmBgm.allRead = true;
+        }
+        f.done = true;
+        snd_native_pcm_end();
+        return false;
+    }
+    return true;
+}
+
+/* The stream moved to its start (SndNativeBgmFrom's `at'), once its rate and
+ * length are known (a file's at its start, a decoder's once it opened): the
+ * frames before it, counted in its first pass (its true length) and by the
+ * status; 0 from its start (none asked, or no length or seek to go by). */
+uint64_t pcm_bgm_seek(PcmBgmFeed &f)
+{
+    const double at = f.from.at;
+    if (!(at > 0.0) || at >= 1.0 || f.info.frames == 0)
+        return 0;
+    if (f.decoded) {
+        const uint64_t frame = (uint64_t)(f.info.frames * at);
+        if (frame == 0 || f.dec.seek == nullptr || f.dec.seek(f.dec.user, frame) == 0)
+            return 0;
+        f.passFrames = frame;
+        return frame;
+    }
+    /* a file's: whole units of pcm_bgm_read (a .wav's frame, a PCM .ads's chunk) */
+    const BgmFileInfo &in = f.info;
+    const uint32_t unit = in.kind == BgmKind::wav ? in.blockAlign : in.ads.interleave * in.channels;
+    if (unit == 0 || in.dataBytes == 0)
+        return 0;
+    f.pos = (uint32_t)(in.dataBytes * at) / unit * unit;
+    f.passFrames = (uint64_t)in.frames * f.pos / in.dataBytes;
+    return f.passFrames;
+}
+
+/* Its fade-in in its frames (State::Pcm::fadeFrames). */
+uint64_t pcm_bgm_fade_frames(const PcmBgmFeed &f)
+{
+    return f.from.fadeIn > 0.0f ? (uint64_t)((double)f.from.fadeIn * f.info.rate) : 0;
+}
+
+/* A decoder with an open (SndNativeBgmDecoder::open) opened, moved to its
+ * start, the PCM output opened for it, its length to the status: true when
+ * it plays (a file's, opened by pcm_bgm_go: at once). */
+bool pcm_bgm_open(PcmBgmFeed &f)
+{
+    if (f.opened)
+        return true;
+    int rate = 0, channels = 0;
+    uint64_t frames = 0;
+    if (f.dec.open(f.dec.user, &rate, &channels, &frames) == 0 || rate <= 0 || channels < 1 || channels > 2)
+        return false;
+    f.info.rate = (uint32_t)rate;
+    f.info.channels = (uint32_t)channels;
+    f.info.frames = (uint32_t)std::min<uint64_t>(frames, 0xFFFFFFFFu);
+    f.outChannels = channels;
+    const uint64_t from = pcm_bgm_seek(f);
+    std::vector<float> ring(pcm_cap(rate) * 2, 0.0f);
+    State &s = st();
+    std::lock_guard<std::mutex> g(s.lock);
+    const bool paused = s.pcm.paused;       /* (paused before it opened) */
+    pcm_open_locked(s, rate, channels, ring);
+    s.pcm.started = true;
+    s.pcm.paused = paused;
+    s.pcm.fadeFrames = pcm_bgm_fade_frames(f);
+    s.pcmBgm.rate = f.info.rate;
+    s.pcmBgm.frames = f.info.frames;
+    s.pcmBgm.from = from;
+    f.opened = true;
+    return true;
+}
+
+void pcm_bgm_thread()
+{
+    PcmBgmFeed &f = g_pcmFeed;
+    if (!pcm_bgm_open(f))
+        return;                             /* (silent; the status at 0) */
+    std::unique_lock<std::mutex> lk(f.lock);
+    while (!f.quit) {
+        lk.unlock();
+        const bool more = pcm_bgm_fill();
+        lk.lock();
+        if (more)
+            f.wake.wait_for(lk, std::chrono::milliseconds(10), [&f] { return f.quit; });
+        else
+            f.wake.wait(lk, [&f] { return f.quit; });
+    }
+}
+
+/* The feeder ended, the output emptied (the status keeps its clock). */
+void pcm_bgm_stop()
+{
+    PcmBgmFeed &f = g_pcmFeed;
+    if (f.thread.joinable()) {
+        {
+            std::lock_guard<std::mutex> g(f.lock);
+            f.quit = true;
+        }
+        f.wake.notify_all();
+        f.thread.join();
+    }
+    State &s = st();
+    std::lock_guard<std::mutex> g(s.lock);
+    if (s.pcmBgm.on) {
+        s.pcmBgm.consumed = s.pcm.consumed;
+        s.pcmBgm.on = false;
+        s.pcm = State::Pcm();
+    }
+}
+
+} /* namespace */
+
 /* pdistr 0x00049C: stops a stream that plays (voices, then the file). */
 static void bgm_stop_all()
 {
@@ -1091,14 +1357,116 @@ static void bgm_stop_all()
         s.bgmPushPending = false;
     }
     bgm().close();
+    pcm_bgm_stop();                         /* PC */
+}
+
+/* PC: the feeder's stream set up (info: its rate, channels, length; none
+ * yet for a decoder that opens on the feeder thread), the PCM output opened
+ * for it (or at the decoder's open), the feeder started: it reads the first
+ * second (the output silent until then; the caller - the game thread - not
+ * held up by it).  What played was stopped (bgm_stop_all).  PC: from
+ * `from' (NULL: its start). */
+static void pcm_bgm_go(PcmBgmFeed &f, int loop, const SndNativeBgmFrom *from)
+{
+    f.quit = false;
+    f.loop = loop != 0;
+    f.from = from != nullptr ? *from : SndNativeBgmFrom();
+    f.opened = !(f.decoded && f.dec.open != nullptr);
+    f.pos = 0;
+    f.passFrames = 0;
+    f.lengthTaken = false;
+    f.done = false;
+    f.hist[0] = f.hist[1] = AdpcmHistory();
+    f.fl.clear();
+    f.flPos = 0;
+    const uint64_t start = f.opened ? pcm_bgm_seek(f) : 0;  /* (a decoder that opens: there) */
+    std::vector<float> ring(f.opened ? pcm_cap((int)f.info.rate) * 2 : 0, 0.0f);
+    State &s = st();
+    {
+        std::lock_guard<std::mutex> g(s.lock);
+        s.pcm = State::Pcm();               /* (closed until the decoder opens) */
+        if (f.opened) {
+            pcm_open_locked(s, (int)f.info.rate, f.outChannels, ring);
+            s.pcm.started = true;
+            s.pcm.fadeFrames = pcm_bgm_fade_frames(f);
+        }
+        s.pcmBgm = State::PcmBgm();
+        s.pcmBgm.on = s.pcmBgm.last = true;
+        s.pcmBgm.loop = f.loop;
+        s.pcmBgm.rate = f.info.rate;
+        s.pcmBgm.frames = f.info.frames;
+        s.pcmBgm.from = start;
+    }
+    if (s.bgmThreaded) {
+        f.thread = std::thread(pcm_bgm_thread);
+        return;
+    }
+    if (pcm_bgm_open(f))                    /* (offline: no feeder thread) */
+        pcm_bgm_fill();
+}
+
+/* PC: a .wav or a 16-bit PCM .ads started through the PCM output (true);
+ * false for anything else (the voices' .ads, an .mp3: the caller decodes
+ * it, or not a music file).  The file's head alone is read here. */
+static bool pcm_bgm_start(SndNativeReadFn read, void *user, int loop, const SndNativeBgmFrom *from)
+{
+    BgmFileInfo info;
+    if (!bgm_probe(read, user, 0xFFFFFFFFu, &info, true) || info.kind == BgmKind::mp3 ||
+        (info.kind == BgmKind::ads && info.ads.type != ADS_TYPE_PCM) || info.frames == 0)
+        return false;
+    PcmBgmFeed &f = g_pcmFeed;
+    f.read = read;
+    f.user = user;
+    f.info = info;
+    f.decoded = false;
+    f.outChannels = info.channels == 1 ? 1 : 2;
+    pcm_bgm_go(f, loop, from);
+    return true;
+}
+
+int snd_native_bgm_start_decoded(const SndNativeBgmDecoder *dec, int loop)
+{
+    return snd_native_bgm_start_decoded_from(dec, loop, nullptr);
+}
+
+int snd_native_bgm_start_decoded_from(const SndNativeBgmDecoder *dec, int loop, const SndNativeBgmFrom *from)
+{
+    bgm_stop_all();
+    if (dec == nullptr || dec->read == nullptr ||
+        (dec->open == nullptr && (dec->rate <= 0 || dec->channels < 1 || dec->channels > 2)))
+        return -1;
+    PcmBgmFeed &f = g_pcmFeed;
+    f.read = nullptr;
+    f.user = nullptr;
+    f.info = BgmFileInfo();
+    f.decoded = true;
+    f.dec = *dec;
+    if (dec->open == nullptr) {
+        f.info.rate = (uint32_t)dec->rate;
+        f.info.channels = (uint32_t)dec->channels;
+        f.info.frames = (uint32_t)std::min<uint64_t>(dec->frames, 0xFFFFFFFFu);
+        f.outChannels = dec->channels;
+    }
+    pcm_bgm_go(f, loop, from);
+    return 0;
 }
 
 /* 'PBGM' function 1 (pdistr 0x000A70 -> 0x0004E8 -> the reader 0x000100
- * and pdispu2's stream thread 0x000498). */
+ * and pdispu2's stream thread 0x000498).  PC: a .wav or a 16-bit PCM .ads
+ * through the PCM output (pcm_bgm_start). */
 int snd_native_bgm_start(SndNativeReadFn read, void *user, int loop)
+{
+    return snd_native_bgm_start_from(read, user, loop, nullptr);
+}
+
+/* PC: from `from' (the PCM output's streams; the voices' .ads from its
+ * start). */
+int snd_native_bgm_start_from(SndNativeReadFn read, void *user, int loop, const SndNativeBgmFrom *from)
 {
     State &s = st();
     bgm_stop_all();
+    if (pcm_bgm_start(read, user, loop, from))
+        return 0;
     if (!bgm().open(read, user, loop != 0, s.bgmThreaded))
         return -1;
     bgm().bind_voice(BGM_CORE, BGM_VOICE_L, 0);
@@ -1108,6 +1476,7 @@ int snd_native_bgm_start(SndNativeReadFn read, void *user, int loop)
     bgm_voices_start_locked();
     s.bgmPlaying = true;
     s.bgmPaused = false;
+    s.pcmBgm.last = false;          /* PC: the status is the voices' clock */
     return 0;
 }
 
@@ -1136,6 +1505,11 @@ void snd_native_bgm_pause(void)
 {
     State &s = st();
     std::lock_guard<std::mutex> g(s.lock);
+    if (s.pcmBgm.on) {
+        s.pcm.paused = true;                /* PC: the PCM stream holds */
+        s.bgmPaused = true;
+        return;
+    }
     if (!s.bgmPlaying || s.bgmPaused)
         return;
     bgm().set_paused(true);
@@ -1151,6 +1525,11 @@ void snd_native_bgm_resume(void)
     std::lock_guard<std::mutex> g(s.lock);
     if (!s.bgmPaused)
         return;
+    if (s.pcmBgm.on) {
+        s.pcm.paused = false;               /* PC: the PCM stream goes on */
+        s.bgmPaused = false;
+        return;
+    }
     bgm().set_paused(false);
     bgm_voices_start_locked();
     s.bgmPaused = false;
@@ -1167,6 +1546,7 @@ void snd_native_bgm_open_push(void)
     bgm().bind_voice(BGM_CORE, BGM_VOICE_R, 1);
     std::lock_guard<std::mutex> g(s.lock);
     s.bgmPushPending = true;
+    s.pcmBgm.last = false;                  /* PC: the status is the voices' clock */
 }
 
 /* Starts the voices of a pushed stream once enough is buffered. */
@@ -1221,18 +1601,26 @@ static float fixed_gain(uint16_t reg)
     return (reg & 0x8000) ? 1.0f : (float)(int16_t)(uint16_t)(reg << 1) / 32768.0f;
 }
 
-void snd_native_pcm_open(int rate, int channels)
+namespace {
+void pcm_open_locked(State &s, int rate, int channels, std::vector<float> &ring)
 {
-    bgm_stop_all();                         /* (the movie's sound takes the BGM's place) */
-    State &s = st();
-    std::lock_guard<std::mutex> g(s.lock);
     State::Pcm &m = s.pcm;
     m = State::Pcm();
     m.rate = rate > 0 ? rate : 48000;
     m.channels = channels >= 2 ? 2 : 1;
-    m.cap = (size_t)m.rate * 2 + 4096;      /* about 2 s */
-    m.ring.assign(m.cap * 2, 0.0f);
+    m.cap = pcm_cap(rate);
+    m.ring.swap(ring);
     m.open = true;
+}
+} /* namespace */
+
+void snd_native_pcm_open(int rate, int channels)
+{
+    bgm_stop_all();                         /* (the movie's sound takes the BGM's place) */
+    std::vector<float> ring(pcm_cap(rate) * 2, 0.0f);
+    State &s = st();
+    std::lock_guard<std::mutex> g(s.lock);
+    pcm_open_locked(s, rate, channels, ring);
 }
 
 int snd_native_pcm_push(const int16_t *pcm, int frames)
@@ -1248,6 +1636,27 @@ int snd_native_pcm_push(const int16_t *pcm, int frames)
     for (int i = 0; i < n; i++) {
         const float l = pcm[i * m.channels] * (1.0f / 32768.0f);
         const float r = m.channels == 2 ? pcm[i * 2 + 1] * (1.0f / 32768.0f) : l;
+        m.ring[at * 2] = l;
+        m.ring[at * 2 + 1] = r;
+        at = at + 1 == m.cap ? 0 : at + 1;
+    }
+    m.count += (size_t)n;
+    return n;
+}
+
+int snd_native_pcm_push_f32(const float *pcm, int frames)
+{
+    State &s = st();
+    std::lock_guard<std::mutex> g(s.lock);
+    State::Pcm &m = s.pcm;
+    if (!m.open || frames <= 0)
+        return 0;
+    const size_t room = m.cap - m.count;
+    const int n = (int)std::min<size_t>(room, (size_t)frames);
+    size_t at = (m.head + m.count) % m.cap;
+    for (int i = 0; i < n; i++) {
+        const float l = pcm[i * m.channels];
+        const float r = m.channels == 2 ? pcm[i * 2 + 1] : l;
         m.ring[at * 2] = l;
         m.ring[at * 2 + 1] = r;
         at = at + 1 == m.cap ? 0 : at + 1;
@@ -1306,7 +1715,8 @@ int64_t snd_native_pcm_played_us(void)
 /* The PCM into out (added), resampled to 48 kHz (4-point Catmull-Rom), at
  * the BGM voices' gain: the BGM volume's chain (the voices' VOLL / VOLR)
  * and core 1's master volume (BGM_CORE).  Starved (fewer than 3 frames
- * before its end): silence until more comes. */
+ * before its end): silence until more comes.  PC: a BGM's fade-in
+ * (fadeFrames) from 0 at its first frame, in a straight line. */
 static void pcm_mix_locked(float *out, int frames)
 {
     State &s = st();
@@ -1326,11 +1736,12 @@ static void pcm_mix_locked(float *out, int frames)
         if (m.count == 0 || (m.count < 3 && !m.ended))
             break;
         const float t = (float)m.frac;
+        const float fade = m.consumed < m.fadeFrames ? (float)((m.consumed + m.frac) / (double)m.fadeFrames) : 1.0f;
         for (int c = 0; c < 2; c++) {
             const float p0 = m.hist[0][c], p1 = at(0, c), p2 = at(1, c), p3 = at(2, c);
             const float v = p1 + 0.5f * t * (p2 - p0 + t * (2.0f * p0 - 5.0f * p1 + 4.0f * p2 - p3 +
                                                              t * (3.0f * (p1 - p2) + p3 - p0)));
-            out[2 * i + c] += v * gain[c];
+            out[2 * i + c] += v * gain[c] * fade;
         }
         m.frac += step;
         while (m.frac >= 1.0 && m.count > 0) {
@@ -1388,6 +1799,37 @@ void snd_native_schedule_info(SndNativeScheduleInfo *out)
 void snd_native_bgm_get_status(SndNativeBgmStatus *out)
 {
     std::memset(out, 0, sizeof(*out));
+    /* PC: a PCM stream's (pcm_bgm_*): the frames played (from the song's
+     * start: those before where it started too), wrapped at its length when
+     * it loops (id the wraps), else held there (ended) */
+    State &s = st();
+    State::PcmBgm p;
+    uint64_t consumed;
+    {
+        std::lock_guard<std::mutex> g(s.lock);
+        p = s.pcmBgm;
+        consumed = (p.on ? s.pcm.consumed : p.consumed) + p.from;
+    }
+    if (p.last) {
+        if (p.on && !s.bgmThreaded)
+            pcm_bgm_fill();                 /* (offline: no feeder thread) */
+        if (p.frames == 0 || p.rate == 0)
+            return;
+        uint64_t pos = consumed, loops = 0;
+        if (p.loop) {
+            loops = consumed / p.frames;
+            pos = consumed % p.frames;
+        } else if (consumed >= p.frames) {
+            pos = p.frames;
+            /* (ended only once all was read: the file's length may have been
+             * short of the true one) */
+            out->ended = p.allRead ? 1 : 0;
+        }
+        out->time = (int64_t)(pos * 1000000u / p.rate);
+        out->pos = (int32_t)pos;
+        out->id = (int32_t)loops;
+        return;
+    }
     AdsClock c = bgm().clock();
     out->time = c.timeUs;
     out->pos = (int32_t)c.pos;
@@ -1410,6 +1852,7 @@ void snd_native_mix(int16_t *out, int frames)
             const int n = frames < 256 ? frames : 256;
             float f[2 * 256];
             snd_native_render(f, n, s.clock != nullptr ? s.clock() : 0.0);
+            snd_native_render_music(f, n);
             for (int i = 0; i < 2 * n; i++) {
                 const float v = f[i] * 32768.0f;
                 out[i] = (int16_t)(v < -32768.0f ? -32768 : (v > 32767.0f ? 32767 : (int)v));
@@ -1528,8 +1971,17 @@ void snd_native_render(float *out, int frames, double now)
             }
         }
     }
-    pcm_mix_locked(out, frames);            /* PC: an MP4 movie's sound */
+    if (!s.pcmBgm.on)
+        pcm_mix_locked(out, frames);        /* PC: a movie's PCM sound (the music files: below) */
     s.frame += (uint64_t)frames;
+}
+
+void snd_native_render_music(float *out, int frames)
+{
+    State &s = st();
+    std::lock_guard<std::mutex> g(s.lock);
+    if (s.pcmBgm.on && frames > 0)
+        pcm_mix_locked(out, frames);
 }
 
 /* ------------------------------------------------------------------------ */

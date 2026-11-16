@@ -216,7 +216,54 @@ public:
     void          *pcWheelFile;             /* the wheel file loadWheel read (NULL: the car file's) */
     u32            pcWheelSize;
     void          *pcTireWork;              /* RACE_TIRE_WORK_SIZE bytes (T180) */
-    /*             vptr                        0x6E0 (GT3 0x6BC) */
+    /* ---- PC (2026-11-11, no original): the cockpit camera's menu model
+     * (PC 2026-11-15: per car model, [CockpitMenuModels], the calibrator's;
+     * game/app/pc_headcam.h): the car's
+     * menu/cars/ file (the showroom's body: the race body's frame, ~40 %
+     * more triangles, no driver), read by pcLoadMenu for the cars the views
+     * follow while the setting is on (RacePS2Base::virtual_3) and kept until
+     * release().  drawBody draws its body instead of the race body while
+     * pcMenuDraw (the cockpit view's own car, RacePS2Base::drawCars): the
+     * CarModel's state - colour, lamps, dirt, switches - stays the car's. */
+    CarModelFile  *pcMenuFile;
+    int            pcMenuColors;            /* its body's colour count (CarModel::setModel's) */
+    u8             pcMenuState;             /* 0 not read yet, 1 read, 2 none (missing, no memory) */
+    u8             pcMenuDraw;
+    /* Reads the menu model of car `code' (blocking, once). */
+    void pcLoadMenu(u64 code);
+    /* ---- PC (2026-11-12, no original): the menu wheel ([Graphics]
+     * MenuWheels, game/app/pc_menu_wheels.h): the showroom's wheel file of
+     * the car's wheel - an aftermarket wheel's "menu/wheel/<name>" (loadWheel
+     * keeps the name), else the wheel part of the car's menu file - in a
+     * buffer of its own, relocated, read by pcLoadMenuWheel (blocking, once:
+     * RaceEntryCar::setupTires while the setting is on, RacePS2Base::
+     * virtual_3 when it is turned on in a race), kept until release().
+     * drawTires gives it to the tyres while the wheel is slow
+     * (pcMenuWheelFast). */
+    void          *pcMenuWheel;             /* a WheelFile2; NULL: none */
+    u32            pcMenuWheelSize;
+    u8             pcMenuWheelState;        /* 0 not read yet, 1 read, 2 none (missing, no memory) */
+    u8             pcMenuWheelFast[4];      /* per wheel: its race wheel has taken over (pc_menu_wheel_fast) */
+    char           pcWheelName[0x40];       /* loadWheel's name, "" for the car's own wheel */
+    void pcLoadMenuWheel(u64 code);
+    /* ---- PC (2026-11-13, no original): the menu tyre ([Graphics] MenuTires,
+     * game/app/pc_menu_tires.h): the menu file of the car's tyre,
+     * "menu/tire/n<k>" (k: loadTire's number, else the car file's default),
+     * shared with the other cars on that tyre (pc_menu_tire_acquire), taken
+     * by pcLoadMenuTire (a blocking read the first time; once a car:
+     * RaceEntryCar::setupTires while the setting is on, RacePS2Base::
+     * virtual_3 when it is turned on in a race); pcBuildMenuTires builds the
+     * four tyres' menu packets with it (RaceTireModel::pcBuildMenu) into
+     * pcMenuTireWork - at the end of setupTires, or after a read in a race.
+     * Kept until release(). */
+    void          *pcMenuTire;              /* a TireFile2 (shared: pc_menu_tire_release); NULL: none */
+    u32            pcMenuTireSize;
+    u8             pcMenuTireState;         /* 0 not read yet, 1 read, 2 none (missing, no memory) */
+    int            pcTireNumber;            /* loadTire's tyre file number (-1: not asked: the default) */
+    void          *pcMenuTireWork;          /* PC_MENU_TIRE_WORK_SIZE bytes (T180) */
+    void pcLoadMenuTire();
+    void pcBuildMenuTires();
+    /*             vptr                        (after the PC members) */
 };
 EGCS_SIZE(RaceCarModel, 0x6E4);
 

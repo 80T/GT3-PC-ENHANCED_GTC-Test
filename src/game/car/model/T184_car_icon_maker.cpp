@@ -46,7 +46,7 @@ enum {
 #define WRITE_ALL   0xFFFFFFFFu
 
 /* Callers: the race modes' constructors (array construction of the 7
- * icons). */
+ * icons; PC: PC_RACE_CARS_MAX of them). */
 // FUNC 0x001ADA68 CarIcon::CarIcon
 CarIcon::CarIcon()
 {
@@ -150,7 +150,14 @@ void CarIconMaker::drawIcon(int car, GSBuffer *out)
     entry->info.getLength();                            /* result unused */
     f32 carHeight = (f32)entry->info.getHeight() * mm;  /* mm -> m */
     f32 tyre = state->params.gear.tyreRadius[0];
+#if ENH_PHYSICS_REAR_RIDE_HEIGHT
+    /* PC (2026-11-12): pitched for the rear axle's own height
+     * (ShowRoomCar::pcRestLift; turned below, after the icon's view) */
+    f32 pitch;
+    f32 lift = spec.pcRestLift(tyre, &pitch);
+#else
     f32 lift = tyre - spec.wheelHeight(0, 0.0f, 0.0f);
+#endif
 
     /* the reflection: a cleared 128 x 128 buffer */
     GSBuffer env(SCE_GS_PSMCT32, ICON_ENV_SIZE, ICON_ENV_SIZE);    /* sp+0x1370 */
@@ -192,6 +199,9 @@ void CarIconMaker::drawIcon(int car, GSBuffer *out)
     gfx_set_fog_params(0.0f, 1.0f);
     entry->setModelLod(0);                              /* a fixed LOD (u061 CarDrawParam mode) */
     /* implicit: getCarModel, F_00179460 (setModelLod's inline body: the call to F_00179460 stays) */
+#if ENH_PHYSICS_REAR_RIDE_HEIGHT
+    vu0_rotate_x(pitch);                                /* PC (2026-11-12): in the car's frame, after its lights */
+#endif
     model->drawBody(0.0f, 0);                           /* in the current matrix */
     model->drawMenuTires(&spec);
 
@@ -296,10 +306,16 @@ void CarIconMaker::setLights()
 // FUNC 0x001AE3F8 car_icons_make
 /* Makes the icons of the race's cars (as many as there are; the callers
  * have 7).  Callers: the race modes' virtual_43.  The maker's implicit
- * destructor, GameObject::~GameObject(&maker, 2), runs at the end. */
+ * destructor, GameObject::~GameObject(&maker, 2), runs at the end.
+ * PC (ROADMAP 35): icons is an array of PC_RACE_CARS_MAX (the race modes'
+ * icons[PC_RACE_CARS_MAX]); at most that many are made, whatever the
+ * race's count (retail wrote one icon per car, past the 7 with more). */
 void car_icons_make(CarIcon *icons, RaceOrganization *org)
 {
-    CarIconMaker maker(org->entries->count, icons, org);    /* sp+0x00 */
+    int count = org->entries->count;
+    if (count > PC_RACE_CARS_MAX)           /* PC: the array's size */
+        count = PC_RACE_CARS_MAX;
+    CarIconMaker maker(count, icons, org);  /* sp+0x00 */
     maker.run(); /* implicit: ~GameObject (the maker's implicit destructor) */
 }
 

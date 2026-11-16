@@ -59,6 +59,7 @@
 #include "engine/pdistd/T534_sprintf.h"              /* sprintf */
 #include "engine/pgl/G001_flare.h"                /* tex1_relocate, Tex1Image */
 #include "libc.h"                           /* memalign */
+#include "game/menu/race_menu/pc_race_list.h"           /* PC: pc_race_list_row (the list of every car) */
 #include "game/menu/race_menu/shortmenu_internal.h"                           /* g_003514F0, the qm_* functions */
 
 using namespace gt2k_menu;
@@ -268,7 +269,9 @@ Transitive *qm_rank_name(void *ctx, PageLayout *layout, Object *parent, MenuLayo
 /* "qm_list_car_name1".."6" (p8 = 0..5): the car name of result line p8
  * (formatted on the stack), "---" for an empty line (never highlighted).
  * An if / else with one return (an early return makes jump2 merge the two
- * returns, which retail does not). */
+ * returns, which retail does not).  PC (ROADMAP 35): the row also goes to
+ * the pre-race page's list of every car (pc_race_list.h; nothing unless the
+ * race has more than 6 cars). */
 // FUNC 0x0012D040 qm_list_car_name
 Transitive *qm_list_car_name(void *ctx, PageLayout *layout, Object *parent, MenuLayoutItem *item,
                              int p8, int pC, int p10, int p14)
@@ -287,6 +290,7 @@ Transitive *qm_list_car_name(void *ctx, PageLayout *layout, Object *parent, Menu
         if (line->highlight != 0)
             text->textColor = SHORT_MENU_HIGHLIGHT;
     }
+    pc_race_list_row(layout, parent, item, PC_RACE_LIST_NAME, p8);    /* PC: the list of every car */
     return text;
 }
 
@@ -304,7 +308,8 @@ Transitive *qm_mt_1000_time_rank(void *ctx, PageLayout *layout, Object *parent,
     return text;
 }
 
-/* "qm_list_time1".."6" (p8 = 0..5): the time of result line p8. */
+/* "qm_list_time1".."6" (p8 = 0..5): the time of result line p8.  (PC: and
+ * the list of every car, as qm_list_car_name.) */
 // FUNC 0x0012D240 qm_list_time
 Transitive *qm_list_time(void *ctx, PageLayout *layout, Object *parent, MenuLayoutItem *item,
                          int p8, int pC, int p10, int p14)
@@ -317,11 +322,13 @@ Transitive *qm_list_time(void *ctx, PageLayout *layout, Object *parent, MenuLayo
     text->setText(text->buf);
     if (line->highlight != 0)
         text->textColor = SHORT_MENU_HIGHLIGHT;
+    pc_race_list_row(layout, parent, item, PC_RACE_LIST_TIME, p8);    /* PC: the list of every car */
     return text;
 }
 
 /* "qm_pt1".."6" (p8 = 0..5): the points of result line p8, "%d pt" or (2
- * and more) "%d pts". */
+ * and more) "%d pts".  (PC: and the list of every car, as
+ * qm_list_car_name.) */
 // FUNC 0x0012D328 qm_pt
 Transitive *qm_pt(void *ctx, PageLayout *layout, Object *parent, MenuLayoutItem *item,
                   int p8, int pC, int p10, int p14)
@@ -337,6 +344,7 @@ Transitive *qm_pt(void *ctx, PageLayout *layout, Object *parent, MenuLayoutItem 
     text->setText(text->buf);
     if (line->highlight != 0)
         text->textColor = SHORT_MENU_HIGHLIGHT;
+    pc_race_list_row(layout, parent, item, PC_RACE_LIST_POINTS, p8);  /* PC: the list of every car */
     return text;
 }
 

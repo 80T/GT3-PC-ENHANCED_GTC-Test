@@ -452,13 +452,17 @@ ResultBoard::~ResultBoard()
 /* Lays the board out for `rows' rows in `mode', opening at t: the title at
  * t, row i at t + 1 + 0.12 i (each under the previous bar, in
  * "color_others"), the term bar after the last row, the end 1 s after it.
- * Callers: ResultArcade::start, ResultChampionship::update. */
+ * Callers: ResultArcade::start, ResultChampionship::update.  PC (ROADMAP
+ * 35): a race of more than 6 cars shows its top 6 (PC_RESULT_BOARD_SHOWN;
+ * retail's races had 6 at most, the bars are 7). */
 // FUNC 0x001B1DF0 ResultBoard::setup
 void ResultBoard::setup(int rows, int mode, f32 t)
 {
     ResultBar *above;
     f32 at;
 
+    if (rows > PC_RESULT_BOARD_SHOWN)       /* PC: the top 6 */
+        rows = PC_RESULT_BOARD_SHOWN;
     time = 0.0f;
     title.setStartTime(t);
     count = rows;
@@ -550,10 +554,21 @@ void ResultBoard::close(f32 t)
     }
 }
 
+/* PC (ROADMAP 35): row `row' is one of the rows shown (setup's; the rows of
+ * the places past the top 6 of a bigger race are not written).  The row
+ * setters below test it; a race of 6 cars writes rows 0..5 of 6, as
+ * before. */
+static inline int result_row_shown(const ResultBoard *board, int row)
+{
+    return row >= 0 && row < board->count && row < RESULT_BOARD_ROWS;
+}
+
 /* The car name of a row ("name suffix"). */
 // FUNC 0x001B2170 ResultBoard::setName
 void ResultBoard::setName(int row, const char *name, const char *suffix)
 {
+    if (!result_row_shown(this, row))       /* PC: the top 6 */
+        return;
     bars[row].setName(name, suffix);
 }
 
@@ -563,6 +578,8 @@ void ResultBoard::setName(int row, const char *name, const char *suffix)
 // FUNC 0x001B21A0 ResultBoard::setTime
 void ResultBoard::setTime(int row, int time, int laps)
 {
+    if (!result_row_shown(this, row))       /* PC: the top 6 */
+        return;
     if (mode == RESULT_BOARD_TIMES) {
         int winner = row == 0;
         if (winner) {
@@ -582,6 +599,8 @@ void ResultBoard::setTime(int row, int time, int laps)
 // FUNC 0x001B2230 ResultBoard::setLaps
 void ResultBoard::setLaps(int row, int laps)
 {
+    if (!result_row_shown(this, row))       /* PC: the top 6 */
+        return;
     if (mode == RESULT_BOARD_TIMES) {
         if (row == 0)
             bestLaps = laps;
@@ -593,6 +612,8 @@ void ResultBoard::setLaps(int row, int laps)
 // FUNC 0x001B2278 ResultBoard::setSpeed
 void ResultBoard::setSpeed(int row, f32 speed)
 {
+    if (!result_row_shown(this, row))       /* PC: the top 6 */
+        return;
     if (mode == RESULT_BOARD_TIMES)
         bars[row].setSpeed(speed);
 }
@@ -602,24 +623,33 @@ void ResultBoard::setSpeed(int row, f32 speed)
 // FUNC 0x001B22B0 ResultBoard::setPoints
 void ResultBoard::setPoints(int row, int points)
 {
+    if (!result_row_shown(this, row))       /* PC: the top 6 */
+        return;
     if ((u32)(mode - RESULT_BOARD_POINTS) < 2)
         bars[row].setPoints(points, mode == RESULT_BOARD_POINTS);
 }
 
-/* The icon of row `row' shows car `car''s icon (when there are icons). */
+/* The icon of row `row' shows car `car''s icon (when there are icons).
+ * (PC: displays is the race's CarIcon[PC_RACE_CARS_MAX]; a car past it
+ * shows none.) */
 // FUNC 0x001B2300 ResultBoard::setCar
 void ResultBoard::setCar(int row, int car)
 {
+    if (!result_row_shown(this, row) || car < 0 || car >= PC_RACE_CARS_MAX)    /* PC: the top 6 */
+        return;
     if (displays != NULL)
         bars[row].setCarDisplay(&displays[car]);
 }
 
 /* Row `row' (>= 0) in "color_mine", the one highlighted before it back in
- * "color_others". */
+ * "color_others".  (PC: only a row shown: a player past the top 6 has no
+ * highlighted row.) */
 // FUNC 0x001B2348 ResultBoard::highlight
 void ResultBoard::highlight(int row)
 {
     int old = highlighted;
+    if (row >= count || row >= RESULT_BOARD_ROWS)  /* PC: the top 6 */
+        return;
     if (row != old && row >= 0) {
         if (old >= 0)
             bars[old].setTextColor(&colors[1]);
@@ -631,10 +661,11 @@ void ResultBoard::highlight(int row)
 /* The enhanced engine (new, Lupo 2 L2 0x001B83A0; menus_b.md 14 a): row
  * `row' reads "Disqualified".  Caller: ResultArcade::update (the cars of
  * RACE_EVENT_CAR_DISQUALIFIED, placed from the last row up).  A row outside
- * the board is ignored. */
+ * the board is ignored (PC: outside the rows shown: in a race of more than
+ * 6 cars the last places are past the top 6). */
 void ResultBoard::setDisqualified(int row)
 {
-    if (row >= 0 && row < RESULT_BOARD_ROWS)
+    if (result_row_shown(this, row))
         bars[row].setDisqualified();
 }
 
@@ -646,6 +677,8 @@ void ResultBoard::setDisqualified(int row)
  * setRowResult. */
 void ResultBoard::setLapsGap(int row, int time, int laps)
 {
+    if (!result_row_shown(this, row))       /* PC: the top 6 */
+        return;
     if (mode == RESULT_BOARD_TIMES) {
         if (row == 0) {
             bestTime = time;

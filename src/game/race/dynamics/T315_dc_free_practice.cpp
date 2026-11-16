@@ -44,6 +44,13 @@ void DynamicsConductorFreePractice::getEachEntrantInfo_(int car, int *tyreFlag, 
 //   -(n x 200 + 300), 120 km/h.  The code sets no result: $v0 is left 6 or
 //   the start argument (initialize ignores it); returned here, so that the
 //   function does not fall off its end.
+//   PC: races of up to 32 cars (game/race/race_cars.h).  The start point
+//   is clamped to the lap (racingLinePoint: lap length - 20 m), so the cars
+//   whose 200 m steps run past it all stood at that one point.  When the
+//   last car's -(n x 200 + 300) does not fit, cars 6.. share what is left
+//   after car 5's 1300 m up to the clamp, evenly (the last one a step short
+//   of it); cars 1..5, and every race whose cars fit (all races of 6 cars),
+//   keep retail's points.
 int DynamicsConductorFreePractice::getSpecialStart(int car, int *startType, int *startArg, int *speedKmh)
 {
     if (car == 0) {
@@ -52,10 +59,22 @@ int DynamicsConductorFreePractice::getSpecialStart(int car, int *startType, int 
         *speedKmh = 0;
         return 6;
     } else {
+        int dist = car * 200 + 300;
+
+        /* PC: spread past car 5 when they do not fit (above) */
+        if (car >= 6) {
+            f32 room = getLapLength() - 20.0f;  /* racingLinePoint's clamp */
+
+            if (room < (f32)((carCount - 1) * 200 + 300)) {
+                f32 from = (room < 1300.0f) ? room : 1300.0f;   /* car 5's point, clamped as retail */
+
+                dist = (int)(from + (room - from) * (f32)(car - 5) / (f32)(carCount - 5));
+            }
+        }
         *startType = 5;
-        *startArg = -(car * 200 + 300);
+        *startArg = -dist;
         *speedKmh = 120;
-        return -(car * 200 + 300);
+        return -dist;
     }
 }
 
@@ -165,7 +184,8 @@ void DynamicsConductorFreePractice::virtual_1()
 {
     int i;
 
-    for (i = 7; i >= 0; i--)
+    /* PC: PC_RACE_CARS_MAX - 1 (was 7), the whole of order[] (game/race/race_cars.h) */
+    for (i = PC_RACE_CARS_MAX - 1; i >= 0; i--)
         order[i] = -1;
     for (i = 0; i < carCount; i++) {
         int pos = org->entries->cars[i]->order;

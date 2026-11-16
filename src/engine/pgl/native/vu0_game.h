@@ -154,17 +154,30 @@ inline void transposeVf20ToVf24()
  *   vf23.xyz = -t R^T by vmulax / vmadday / vmaddz.xyz); vf5 = vf5 through
  *   vf20..vf22 (vmaddz.xyzw: the camera's z axis in model space); vf7.xyz =
  *   vf6 x vf5 (vopmula / vopmsub; vf7.w kept).  Returns vf7, which the
- *   caller stores whole (its w is whatever vf7 held). */
+ *   caller stores whole (its w is whatever vf7 held).
+ *   PC: under the course scale (pgl::g_worldScale: the modelview is the
+ *   scale, then the view) the view's own rows (the modelview's divided by
+ *   the scale) are inverted, and the axis found in the world divided by the
+ *   scale: drawn through it, the quad faces the camera again. */
 inline Vec4 billboardAxis()
 {
     pgl::Vu0 &vu = pgl::g_vu0;
+    const Vec4 ws = pgl::g_worldScale;
     Vec4 vf5 = vu.vf[5];
     Vec4 vf6 = {vf5.y, vf5.z, vf5.w, vf5.x};            /* vmr32.xyzw vf6, vf5 */
+    if (ws.w != 0.0f)
+        for (int r = 0; r < 3; r++)
+            vu.vf[20 + r] = pgl::vu::scale(vu.vf[20 + r], 1.0f / ws[r]);
     pgl::invertRigid(&vu.vf[20]);
     vf5 = pgl::vu::xform3(&vu.vf[20], vf5);             /* vmulax / vmadday / vmaddz.xyzw */
     vu.vf[5] = vf5;
     vu.vf[6] = vf6;
     Vec4 c = pgl::vu::cross(vf6, vf5);                  /* vopmula.xyz ACC, vf6, vf5; vopmsub.xyz vf7, vf5, vf6 */
+    if (ws.w != 0.0f) {
+        c.x /= ws.x;
+        c.y /= ws.y;
+        c.z /= ws.z;
+    }
     vu.vf[7].x = c.x;
     vu.vf[7].y = c.y;
     vu.vf[7].z = c.z;

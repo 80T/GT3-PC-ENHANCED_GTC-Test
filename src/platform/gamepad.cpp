@@ -3,13 +3,15 @@
  *
  * SDL is started and polled on one thread of its own (SDL's device
  * notifications belong to the thread that starts it): every kPollMs it
- * handles the plug / unplug events, reads each open pad and wheel into the
- * shared state, drives the motors and watches the Guide buttons.  The game's
+ * handles the plug / unplug events, reads each open pad, wheel and named
+ * device into the shared state, drives the motors and watches the Guide
+ * buttons (PC: and the hotkeys' devices: hotkeys).  The game's
  * threads only read the state and set the motors, under a mutex or atomics. */
 #include "platform/gamepad.h"
 #include "platform/log.h"
 #include "platform/settings_menu.h"
 #include "platform/system_menu.h"
+#include "platform/window.h"
 
 #include <SDL3/SDL.h>
 #include <windows.h>
@@ -91,10 +93,24 @@ struct WheelSlot {
 };
 WheelSlot g_wheelSlots[kWheels];
 
+/* The SDL thread's view of a device bindings name (input_map::device_name):
+ * its joystick, and its gamepad when SDL maps it as one. */
+constexpr int kDevices = input_map::kMaxDevices;
+struct DeviceSlot {
+    SDL_Joystick *joy = nullptr;
+    SDL_Gamepad *pad = nullptr;
+    SDL_JoystickID id = 0;
+};
+DeviceSlot g_devSlots[kDevices];
+int g_devCount;                             /* the ids opened, 1 .. g_devCount (set before the thread starts) */
+
 /* Shared with the game's threads. */
 std::mutex g_mutex;
 bool g_present[kPorts];
 State g_state[kPorts];
+/* PC (2026-11-07): each port's controller's button names (button_names) */
+const ButtonNames kDefaultNames = {"CROSS", "CIRCLE", "SQUARE", "TRIANGLE", "GUIDE"};
+ButtonNames g_names[kPorts] = {kDefaultNames, kDefaultNames};
 input_map::PadSource g_raw[kPorts];
 /* SDL's buttons seen down since the last take_pressed_raw (a tap between
  * two of the game's reads still counts). */
@@ -102,9 +118,31 @@ uint32_t g_pressed[kPorts];
 std::atomic<int> g_small[kPorts], g_large[kPorts];
 bool g_wheelPresent[kWheels];
 Joystick g_wheel[kWheels];
+bool g_devPresent[kDevices], g_devGamepad[kDevices];
+input_map::PadSource g_devPad[kDevices];
+Joystick g_devJoy[kDevices];
+/* their buttons seen down since the last take_pressed_devices */
+uint32_t g_devPressedPad[kDevices];
+uint8_t g_devPressedJoy[kDevices][128];
 
 std::thread g_thread;
 std::atomic<bool> g_quit{false};
+
+/* PC: the SDL thread's view of the hotkeys' devices (hotkeys): each one's
+ * binding down at the last look; the first look made. */
+bool g_hotDown[input_map::kHotkeyCount];
+bool g_hotLooked;
+
+/* SDL's buttons and axes of a gamepad as they are. */
+void poll_raw(SDL_Gamepad *pad, input_map::PadSource *raw)
+{
+    raw->buttons = 0;
+    for (int b = 0; b < input_map::kPadButtons; b++)
+        if (SDL_GetGamepadButton(pad, (SDL_GamepadButton)b))
+            raw->buttons |= 1u << b;
+    for (int a = 0; a < input_map::kPadAxes; a++)
+        raw->axes[a] = SDL_GetGamepadAxis(pad, (SDL_GamepadAxis)a);
+}
 
 void poll(SDL_Gamepad *pad, State *st, input_map::PadSource *raw)
 {
@@ -124,12 +162,52 @@ void poll(SDL_Gamepad *pad, State *st, input_map::PadSource *raw)
     }
     for (int i = 0; i < 4; i++)
         st->sticks[i] = (uint8_t)((SDL_GetGamepadAxis(pad, kSticks[i]) + 32768) >> 8);
-    raw->buttons = 0;
-    for (int b = 0; b < input_map::kPadButtons; b++)
-        if (SDL_GetGamepadButton(pad, (SDL_GamepadButton)b))
-            raw->buttons |= 1u << b;
-    for (int a = 0; a < input_map::kPadAxes; a++)
-        raw->axes[a] = SDL_GetGamepadAxis(pad, (SDL_GamepadAxis)a);
+    poll_raw(pad, raw);
+}
+
+/* PC (2026-11-07): a controller's button names (gamepad.h button_names):
+ * SDL's labels of its face buttons, the Guide button by its type. */
+ButtonNames names_of(SDL_Gamepad *pad)
+{
+    auto label = [pad](SDL_GamepadButton b, const char *own) -> const char * {
+        switch (SDL_GetGamepadButtonLabel(pad, b)) {
+        case SDL_GAMEPAD_BUTTON_LABEL_A: return "A";
+        case SDL_GAMEPAD_BUTTON_LABEL_B: return "B";
+        case SDL_GAMEPAD_BUTTON_LABEL_X: return "X";
+        case SDL_GAMEPAD_BUTTON_LABEL_Y: return "Y";
+        case SDL_GAMEPAD_BUTTON_LABEL_CROSS: return "CROSS";
+        case SDL_GAMEPAD_BUTTON_LABEL_CIRCLE: return "CIRCLE";
+        case SDL_GAMEPAD_BUTTON_LABEL_SQUARE: return "SQUARE";
+        case SDL_GAMEPAD_BUTTON_LABEL_TRIANGLE: return "TRIANGLE";
+        default: return own;
+        }
+    };
+    ButtonNames n = kDefaultNames;
+    n.south = label(SDL_GAMEPAD_BUTTON_SOUTH, "CROSS");
+    n.east = label(SDL_GAMEPAD_BUTTON_EAST, "CIRCLE");
+    n.west = label(SDL_GAMEPAD_BUTTON_WEST, "SQUARE");
+    n.north = label(SDL_GAMEPAD_BUTTON_NORTH, "TRIANGLE");
+    switch (SDL_GetGamepadType(pad)) {
+    case SDL_GAMEPAD_TYPE_PS3:
+    case SDL_GAMEPAD_TYPE_PS4:
+    case SDL_GAMEPAD_TYPE_PS5:
+        n.guide = "PS";
+        break;
+    case SDL_GAMEPAD_TYPE_XBOX360:
+    case SDL_GAMEPAD_TYPE_XBOXONE:
+        n.guide = "XBOX";
+        break;
+    case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_PRO:
+    case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_LEFT:
+    case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_RIGHT:
+    case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_PAIR:
+        n.guide = "HOME";
+        break;
+    default:
+        n.guide = "GUIDE";
+        break;
+    }
+    return n;
 }
 
 void poll_wheel(SDL_Joystick *joy, Joystick *st)
@@ -173,6 +251,89 @@ void guide(Slot &s, ULONGLONG now)
     }
 }
 
+/* PC: the hotkeys' devices (input_map.h [Hotkeys], after `;'): a binding
+ * newly down (an axis past half) is a press of its hotkey, which the window
+ * thread acts on (window::press_hotkey).  A gamepad's button or axis is read
+ * on both ports' controllers, a joystick's on the device it names, else on
+ * both wheels.  One held at the first look waits for its release. */
+void hotkeys()
+{
+    using namespace input_map;
+    bool any = false;
+    for (int h = 0; h < kHotkeyCount; h++)
+        any = any || hotkey_device(h).source != Source::none;
+    if (!any)
+        return;
+    bool padOn[kPorts], wheelOn[kWheels];
+    PadSource pads[kPorts];
+    Joystick wheels[kWheels], devJoy[kDevices];
+    bool devOn[kDevices], devPadOn[kDevices];
+    PadSource devPad[kDevices];
+    {
+        std::lock_guard<std::mutex> lock(g_mutex);
+        for (int p = 0; p < kPorts; p++) {
+            padOn[p] = g_present[p];
+            pads[p] = g_raw[p];
+        }
+        for (int w = 0; w < kWheels; w++) {
+            wheelOn[w] = g_wheelPresent[w];
+            if (wheelOn[w])
+                wheels[w] = g_wheel[w];
+        }
+        for (int d = 0; d < g_devCount; d++) {
+            devOn[d] = g_devPresent[d];
+            devPadOn[d] = g_devPresent[d] && g_devGamepad[d];
+            if (devOn[d]) {
+                devJoy[d] = g_devJoy[d];
+                devPad[d] = g_devPad[d];
+            }
+        }
+    }
+    JoySource wheelSrc[kWheels], devJoySrc[kDevices];
+    DeviceSource devSrc[kDevices] = {};
+    for (int w = 0; w < kWheels; w++)
+        if (wheelOn[w])
+            wheelSrc[w] = {wheels[w].buttonCount, wheels[w].axisCount, wheels[w].hatCount, wheels[w].buttons,
+                           wheels[w].axes, wheels[w].hats};
+    for (int d = 0; d < g_devCount; d++) {
+        if (!devOn[d])
+            continue;
+        const Joystick &j = devJoy[d];
+        devJoySrc[d] = {j.buttonCount, j.axisCount, j.hatCount, j.buttons, j.axes, j.hats};
+        devSrc[d].joy = &devJoySrc[d];
+        devSrc[d].pad = devPadOn[d] ? &devPad[d] : nullptr;
+    }
+    for (int h = 0; h < kHotkeyCount; h++) {
+        const Binding &b = hotkey_device(h);
+        if (b.source == Source::none)
+            continue;
+        float v = 0.0f;
+        if (b.device != 0) {
+            const Sources s = {nullptr, nullptr, nullptr, 0, devSrc, g_devCount};
+            v = value(b, s);
+        } else if (b.source == Source::pad_button || b.source == Source::pad_axis) {
+            for (int p = 0; p < kPorts; p++)
+                if (padOn[p]) {
+                    const Sources s = {&pads[p], nullptr, nullptr, 0, nullptr, 0};
+                    const float x = value(b, s);
+                    v = x > v ? x : v;
+                }
+        } else {
+            for (int w = 0; w < kWheels; w++)
+                if (wheelOn[w]) {
+                    const Sources s = {nullptr, &wheelSrc[w], nullptr, 0, nullptr, 0};
+                    const float x = value(b, s);
+                    v = x > v ? x : v;
+                }
+        }
+        const bool down = v >= 0.5f;
+        if (down && !g_hotDown[h] && g_hotLooked)
+            window::press_hotkey(h);
+        g_hotDown[h] = down;
+    }
+    g_hotLooked = true;
+}
+
 void rumble(int port, ULONGLONG now)
 {
     Slot &s = g_slots[port];
@@ -187,10 +348,20 @@ void rumble(int port, ULONGLONG now)
     s.sentAt = now;
 }
 
+/* A wheel's binding names the joystick (`@<name>'): a device of that wheel
+ * (its pedals...), never an automatic wheel itself. */
+bool named_by_wheel(const char *name)
+{
+    for (int w = 0; w < kWheels; w++)
+        if (input_map::names_device(input_map::profile(input_map::kWheel1 + w), name))
+            return true;
+    return false;
+}
+
 /* The wheel `id' would be: 0 / 1 for Wheel 1 / 2 by its name ([WheelN]
- * Device), else the first free auto one when SDL types it a wheel; -1 none
- * (a pad, or no wheel slot wants it).  free: only the slots without a
- * joystick count. */
+ * Device), else the first free auto one when SDL types it a wheel (and no
+ * wheel's binding names it); -1 none (a pad, or no wheel slot wants it).
+ * free: only the slots without a joystick count. */
 int wheel_for(SDL_JoystickID id, bool free)
 {
     const char *name = SDL_GetJoystickNameForID(id);
@@ -200,7 +371,7 @@ int wheel_for(SDL_JoystickID id, bool free)
             (!free || g_wheelSlots[w].joy == nullptr))
             return w;
     }
-    if (SDL_GetJoystickTypeForID(id) != SDL_JOYSTICK_TYPE_WHEEL)
+    if (SDL_GetJoystickTypeForID(id) != SDL_JOYSTICK_TYPE_WHEEL || named_by_wheel(name))
         return -1;
     for (int w = 0; w < kWheels; w++)
         if (input_map::profile(input_map::kWheel1 + w).device[0] == '\0' && (!free || g_wheelSlots[w].joy == nullptr))
@@ -259,6 +430,70 @@ void unplug_wheel(SDL_JoystickID id)
     SDL_free(ids);
 }
 
+/* A joystick a binding names: opened as that device, the first of its name
+ * (besides being a pad or a wheel). */
+void plug_device(SDL_JoystickID id)
+{
+    const char *name = SDL_GetJoystickNameForID(id);
+    if (name == nullptr)
+        return;
+    for (int d = 0; d < g_devCount; d++) {
+        DeviceSlot &s = g_devSlots[d];
+        if (s.joy != nullptr || _stricmp(input_map::device_name(d + 1), name) != 0)
+            continue;                       /* (taken: by this one, or another of its name) */
+        SDL_Joystick *joy = SDL_OpenJoystick(id);
+        if (joy == nullptr) {
+            pclog::write("pad: device %d (%s) could not be opened (%s)", d + 1, name, SDL_GetError());
+            return;
+        }
+        s.joy = joy;
+        s.id = id;
+        s.pad = SDL_IsGamepad(id) ? SDL_OpenGamepad(id) : nullptr;
+        Joystick st;
+        input_map::PadSource raw = {};
+        poll_wheel(joy, &st);
+        if (s.pad != nullptr)
+            poll_raw(s.pad, &raw);
+        {
+            std::lock_guard<std::mutex> lock(g_mutex);
+            g_devJoy[d] = st;
+            g_devPad[d] = raw;
+            g_devGamepad[d] = s.pad != nullptr;
+            g_devPressedPad[d] = 0;
+            memset(g_devPressedJoy[d], 0, sizeof(g_devPressedJoy[d]));
+            g_devPresent[d] = true;
+        }
+        pclog::write("pad: device %d: %s (%d axes, %d buttons, %d hats%s)", d + 1, name, st.axisCount, st.buttonCount,
+                     st.hatCount, s.pad != nullptr ? "; a gamepad" : "");
+        return;
+    }
+}
+
+void unplug_device(SDL_JoystickID id)
+{
+    for (int d = 0; d < g_devCount; d++) {
+        DeviceSlot &s = g_devSlots[d];
+        if (s.joy == nullptr || s.id != id)
+            continue;
+        {
+            std::lock_guard<std::mutex> lock(g_mutex);
+            g_devPresent[d] = false;
+        }
+        if (s.pad != nullptr)
+            SDL_CloseGamepad(s.pad);
+        SDL_CloseJoystick(s.joy);
+        s = DeviceSlot();
+        pclog::write("pad: device %d: %s disconnected", d + 1, input_map::device_name(d + 1));
+        /* another of its name takes its place */
+        int n = 0;
+        SDL_JoystickID *ids = SDL_GetJoysticks(&n);
+        for (int i = 0; ids != nullptr && i < n; i++)
+            if (ids[i] != id)
+                plug_device(ids[i]);
+        SDL_free(ids);
+    }
+}
+
 void plug(SDL_JoystickID id)
 {
     if (wheel_for(id, false) >= 0)
@@ -286,13 +521,16 @@ void plug(SDL_JoystickID id)
     s.guide = SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_GUIDE);
     s.guideHeld = true;                     /* (held while plugged in: not a tap) */
     SDL_SetGamepadPlayerIndex(pad, port);   /* the DualShock 4's light bar colour of player 1 / 2 */
+    const ButtonNames names = names_of(pad);    /* PC (2026-11-07) */
     {
         std::lock_guard<std::mutex> lock(g_mutex);
         poll(pad, &g_state[port], &g_raw[port]);
+        g_names[port] = names;
         g_present[port] = true;
     }
     const char *name = SDL_GetGamepadName(pad);
-    pclog::write("pad: port %d: %s", port + 1, name ? name : "a controller");
+    pclog::write("pad: port %d: %s (its buttons %s, %s, %s, %s, %s)", port + 1, name ? name : "a controller",
+                 names.south, names.east, names.west, names.north, names.guide);
 }
 
 void unplug(SDL_JoystickID id)
@@ -340,10 +578,13 @@ void thread_main(std::promise<bool> *started)
                 plug(e.gdevice.which);
             else if (e.type == SDL_EVENT_GAMEPAD_REMOVED)
                 unplug(e.gdevice.which);
-            else if (e.type == SDL_EVENT_JOYSTICK_ADDED)
+            else if (e.type == SDL_EVENT_JOYSTICK_ADDED) {
                 plug_wheel(e.jdevice.which);
-            else if (e.type == SDL_EVENT_JOYSTICK_REMOVED)
+                plug_device(e.jdevice.which);
+            } else if (e.type == SDL_EVENT_JOYSTICK_REMOVED) {
                 unplug_wheel(e.jdevice.which);
+                unplug_device(e.jdevice.which);
+            }
         }
         ULONGLONG now = GetTickCount64();
         for (int p = 0; p < kPorts; p++) {
@@ -369,6 +610,23 @@ void thread_main(std::promise<bool> *started)
             std::lock_guard<std::mutex> lock(g_mutex);
             g_wheel[w] = st;
         }
+        for (int d = 0; d < g_devCount; d++) {
+            const DeviceSlot &s = g_devSlots[d];
+            if (s.joy == nullptr)
+                continue;
+            Joystick st;
+            input_map::PadSource raw = {};
+            poll_wheel(s.joy, &st);
+            if (s.pad != nullptr)
+                poll_raw(s.pad, &raw);
+            std::lock_guard<std::mutex> lock(g_mutex);
+            g_devJoy[d] = st;
+            g_devPad[d] = raw;
+            g_devPressedPad[d] |= raw.buttons;
+            for (int i = 0; i < st.buttonCount; i++)
+                g_devPressedJoy[d][i] |= st.buttons[i];
+        }
+        hotkeys();                          /* PC */
         Sleep(kPollMs);
     }
 
@@ -382,6 +640,13 @@ void thread_main(std::promise<bool> *started)
         if (g_wheelSlots[w].joy != nullptr) {
             SDL_CloseJoystick(g_wheelSlots[w].joy);
             g_wheelSlots[w] = WheelSlot();
+        }
+    for (int d = 0; d < g_devCount; d++)
+        if (g_devSlots[d].joy != nullptr) {
+            if (g_devSlots[d].pad != nullptr)
+                SDL_CloseGamepad(g_devSlots[d].pad);
+            SDL_CloseJoystick(g_devSlots[d].joy);
+            g_devSlots[d] = DeviceSlot();
         }
     SDL_Quit();
 }
@@ -404,6 +669,11 @@ bool init()
                      SDL_MINOR_VERSION);
         return false;
     }
+    /* the devices the bindings name (input_map::init has read them) */
+    g_devCount = input_map::device_count() < kDevices ? input_map::device_count() : kDevices;
+    for (int d = 0; d < input_map::device_count(); d++)
+        pclog::write("pad: device %d named by the bindings: %s%s", d + 1, input_map::device_name(d + 1),
+                     d < kDevices ? "" : " (too many: not read)");
     std::promise<bool> started;
     std::future<bool> ok = started.get_future();
     g_quit = false;
@@ -465,6 +735,16 @@ void set_motors(int port, int small, int large)
     g_large[port] = large < 0 ? 0 : large > 255 ? 255 : large;
 }
 
+/* PC (2026-11-07) */
+ButtonNames button_names()
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    for (int p = 0; p < kPorts; p++)
+        if (g_present[p])
+            return g_names[p];
+    return kDefaultNames;
+}
+
 bool read_wheel(int wheel, Joystick *out)
 {
     if (wheel < 0 || wheel >= kWheels)
@@ -474,6 +754,53 @@ bool read_wheel(int wheel, Joystick *out)
         return false;
     *out = g_wheel[wheel];
     return true;
+}
+
+void read_devices(Devices *out)
+{
+    out->count = g_devCount;
+    {
+        std::lock_guard<std::mutex> lock(g_mutex);
+        for (int d = 0; d < out->count; d++) {
+            out->present[d] = g_devPresent[d];
+            out->gamepad[d] = g_devPresent[d] && g_devGamepad[d];
+            if (out->present[d]) {
+                out->joy[d] = g_devJoy[d];
+                out->pad[d] = g_devPad[d];
+            }
+        }
+    }
+    for (int d = 0; d < out->count; d++) {
+        out->src[d] = {};
+        if (!out->present[d])
+            continue;
+        const Joystick &j = out->joy[d];
+        out->joySrc[d] = {j.buttonCount, j.axisCount, j.hatCount, j.buttons, j.axes, j.hats};
+        out->src[d].pad = out->gamepad[d] ? &out->pad[d] : nullptr;
+        out->src[d].joy = &out->joySrc[d];
+    }
+}
+
+bool device_present(int id)
+{
+    if (id < 1 || id > g_devCount)
+        return false;
+    std::lock_guard<std::mutex> lock(g_mutex);
+    return g_devPresent[id - 1];
+}
+
+void take_pressed_devices(DevicePresses *out)
+{
+    memset(out, 0, sizeof(*out));
+    std::lock_guard<std::mutex> lock(g_mutex);
+    for (int d = 0; d < g_devCount; d++) {
+        if (g_devPresent[d]) {
+            out->pad[d] = g_devPressedPad[d];
+            memcpy(out->joy[d], g_devPressedJoy[d], sizeof(out->joy[d]));
+        }
+        g_devPressedPad[d] = 0;
+        memset(g_devPressedJoy[d], 0, sizeof(g_devPressedJoy[d]));
+    }
 }
 
 } // namespace gamepad

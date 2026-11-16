@@ -15,12 +15,16 @@
 #include "game/race/dynamics/T305_dynamics_conductor.h"
 #include "game/enhanced.h"                  /* ENH_PHYSICS_TIMED_END_AT_LEADER */
 #include "game/race/modes/race_pod_rules.h"  /* pod_rules_lap_check (the enhanced engine's Pod race) */
+#include "game/app/pc_course_pick.h"        /* PC (2026-11-07): the course mode forcer (pc_race_mode) */
 // DATA_START 0x0033CCC0
 
 // FUNC 0x001EF8B8 DynamicsConductor::virtual_29
-/* The race's lap count. */
+/* The race's lap count.  PC (2026-11-07): none in a line mode of the course
+ * mode forcer (game/app/pc_course_pick.h), as the machine test's. */
 int DynamicsConductor::virtual_29()
 {
+    if (pc_race_mode_lines(org) > 0)
+        return 0;
     return rules.laps;
 }
 
@@ -151,9 +155,36 @@ void DynamicsConductor::virtual_17(int car, int lap, u32 raw, u32 ms, u32 split,
 }
 
 // FUNC 0x001EFCC8 DynamicsConductor::virtual_18
-/* The slot 30 line: 0, the logger section is not closed there. */
+/* The slot 30 line: 0, the logger section is not closed there.  PC
+ * (2026-11-07): under the course mode forcer (game/app/pc_course_pick.h) the
+ * line - the course's own finish line, or the mode's - ends the car's race
+ * as a lap end does at the lap count (virtual_17): its time posted, the
+ * goal event, car 0's finish timer; 1 (the logger section closes).  Not in
+ * the background race.  The car's lap goes up and its lap start time
+ * becomes the crossing, as at a lap end (countLap, virtual_17): the running
+ * order (car_compare, T305) ranks by laps first and, on the same lap, a
+ * finished car behind one still running, so a finisher kept on its lap was
+ * put last (user: "the winner is given last"); with the lap it is a lap
+ * ahead, as a normal finisher is, and the finishers are ordered among
+ * themselves by their crossing times.  The lap display shows the lap
+ * finished (car_lap_display: lap - 1 once finished). */
 int DynamicsConductor::virtual_18(int car, int lap, u32 raw, u32 ms, u32 split)
 {
+    if (pc_race_mode(org) != 0) {
+        RaceCarState *c = getCar(car);
+        DynCarState *st = &c->st;
+
+        if (org->backgroundMode != 0)
+            return 0;
+        dc_post_lap_time(this, car, lap, ms, split, st->fault);
+        org->eventQueue.post(RACE_EVENT_GOAL, car, 2);
+        car_finish(c, CAR_FINISH_RACE_END);
+        if (car == 0)
+            setFinishTimer(3);
+        st->lap = st->lap + 1;
+        st->lapStartTime = ms;
+        return 1;
+    }
     return 0;
 }
 

@@ -34,6 +34,7 @@
 #define U049_H
 
 #include "types.h"
+#include "game/race/race_cars.h"            /* PC: PC_RACE_CARS_MAX (REPLAY_DATA_LOAD_SIZE) */
 
 /* ------------------------------------------------------------------------ */
 /* Named constants                                                          */
@@ -94,8 +95,11 @@ enum { LICENSE_SKIP_BUTTON = 0x40 };
 /* RaceMachineTest::kind: MACHINE_TEST_* (T415). */
 
 /* The data of a replay save that ReplayData / TrackData load (copied to
- * dest, whatever the header's data size). */
-enum { REPLAY_DATA_LOAD_SIZE = 0x41940 };
+ * dest, whatever the header's data size).  PC: the most they copy - the
+ * header's data size, which is all there is (the file's buffer is the
+ * file's size) - with room for the slots of a race of more than 8 cars
+ * (game/app/pc_race_cars.h PC_REPLAY_DATA_SIZE; retail 0x41940). */
+enum { REPLAY_DATA_LOAD_SIZE = 0x41940 + (PC_RACE_CARS_MAX - 8) * 0x280 };
 /* GameThumbnail::type (T108). */
 enum { MC_THUMBNAIL_REPLAY = 2, MC_THUMBNAIL_BESTLAP = 3 };
 

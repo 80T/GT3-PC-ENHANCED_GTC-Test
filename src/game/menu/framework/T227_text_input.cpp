@@ -46,6 +46,13 @@ int run_text_input(PageManager *pm, const char *page, const char *initial, char 
         /* through the pointer: retail calls getButtonsOn through the vtable */
         if (list != 0 && (pm->control->getControl1()->getButtonsOn() & CONTROL_START) != 0) {
             list->setCursor(TEXT_INPUT_END_BUTTON);
+            /* PC: retail loops straight back with no wait: the vblank preempts
+             * it and the render thread's pad update ends the press.  Here no
+             * interrupt preempts a game thread that makes no kernel call
+             * (platform/scheduler.h), so the press never ended and the game
+             * froze (user report 2026-11-01).  The frame the other branch
+             * waits for; not preempt_point(), a no-op with interrupts off. */
+            gfx_vsync(1);
         } else {
             if (abortFn != 0 && abortFn(abortArg) != 0)
                 pm->exitRequest = 1;        /* doExit(), expanded */

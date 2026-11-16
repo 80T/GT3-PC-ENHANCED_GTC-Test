@@ -39,6 +39,12 @@
 #include "engine/io/T504_file_queue.h"           /* file_req_alloc, FileDoneFn */
 #include "engine/pdistd/T534_sprintf.h"              /* sprintf */
 #include "game/sound/car_sound_internal.h"                           /* sound_voice_priority, spu_volume_clamp, SPU_VOLUME_* */
+#include "game/app/pc_volume.h"                   /* PC: pc_race_se_volume */
+#include "game/race/race_cars.h"                  /* PC: PC_RACE_CARS_MAX (car_sound_budget) */
+#include "game/camera/T383_camera_manager.h"      /* PC: CameraManager (car_sound_budget: the views, the eye) */
+#include "game/race/core/T125_race_organization.h"    /* PC: RaceOrganization::entries (car_sound_budget) */
+#include "game/car/physics/T302_car_state.h"      /* PC: car_view_x / y / z (car_sound_budget) */
+#include "engine/sound/spu_memory.h"              /* PC: snd_trace_level / snd_trace_line */
 
 /* The enhanced engine (Lupo 2's dispatcher L2 0x001A5318, its jump table
  * L2 0x00342DD0): the effect each emotion of the Pod plays (index the
@@ -277,10 +283,16 @@ void CarSoundPan::reset()
 //   (replay == 0) / replays is on, else 0 (RaceBase::virtual_29,
 //   RacePS2Base::virtual_8).  One conditional expression: retail jumps from
 //   each option's test straight to the 1.0 / 0.0 arms.
+//   PC: and the player's volume of them (pc_race_se_volume) into
+//   g_pcRaceSeLevel, read each frame (RaceBase::virtual_29): a change is
+//   heard at once.  (PC 2026-11-11: the switch is 1 / 0 again, the level
+//   applied after the volumes' clamp, pc_volume.h; it scaled them ahead of
+//   it, and the clashes stayed at full volume.)
 void car_sound_update_se_switch(int replay)
 {
     g_003521E0 = (replay ? getGameStatus()->getGameOptions()->replaySe
                          : getGameStatus()->getGameOptions()->raceSe) ? 1.0f : 0.0f;
+    g_pcRaceSeLevel = pc_race_se_volume(replay);
 }
 
 // FUNC 0x001A66F0 CarSound::CarSound
@@ -320,11 +332,18 @@ CarSound::~CarSound()
 
 // FUNC 0x001A6A30 CarSound::reserveSpu
 //   spuBase = the SPU allocation pointer; reserves 0x25800 bytes after it.
+//   PC (ROADMAP 35): only while the slot ends below the core 0 reverb
+//   (SOUND_SPU_MUSIC_END): the 8 slots from CAR_SOUND_SPU_START.  A car past
+//   them (the 9th of a race of up to 32) keeps the pointer where it is (no
+//   slot: car_sound_place_banks puts its banks in the cars' window), so the
+//   pointer no longer walks over the reverb, gt3sys and the windows above
+//   2 MB.  The first 8 cars reserve as retail.
 void CarSound::reserveSpu()
 {
     int addr = g_00352B8C;
     spuBase = addr;
-    sound_set_spu_addr(addr + CAR_SOUND_SPU_SIZE);
+    if (addr + CAR_SOUND_SPU_SIZE <= SOUND_SPU_MUSIC_END)   /* PC: a slot that fits */
+        sound_set_spu_addr(addr + CAR_SOUND_SPU_SIZE);
 }
 
 /* PC: not the game's.  An engine voice whose bank's header buffer moved
@@ -353,7 +372,12 @@ static void car_sound_voice_detach(GtSoundVoice *v)
  * (SOUND_SPU_MUSIC_END: 8 cars), else to an area of the cars' window above
  * 2 MB, the car's own (logged).  Bank 1's address is set here (bank 0's
  * onTransfer sets the same once it is in), so the order the file queue
- * loads them in does not matter.  Returns bit i: queue bank i. */
+ * loads them in does not matter.  Returns bit i: queue bank i.
+ * PC (ROADMAP 35): with the window full, no bank goes over another area
+ * (retail's place, the fallback before, ran into the next car's slot, or
+ * for the 9th car on into the reverb, gt3sys and the windows): the banks
+ * that fit the car's PS2 slot go there, in order; a bank that does not
+ * fit, and both of a car with no slot (reserveSpu), are silent (logged). */
 static int car_sound_place_banks(CarSound *cs)
 {
     const char *path[2] = { cs->path0, cs->path1 };
@@ -396,8 +420,32 @@ static int car_sound_place_banks(CarSound *cs)
             room = need;
             cs->spuBase = high;
         } else {
-            printf("snd: %s + %s: %d bytes of samples, the cars' window is full: at SPU 0x%05X (over what "
-                   "follows)\n", cs->path0, cs->path1, need, base);
+            /* PC (ROADMAP 35): the slot's room only (0: no slot), the banks
+             * that do not fit it silent, as a missing file's */
+            int slot = (base + CAR_SOUND_SPU_SIZE <= SOUND_SPU_MUSIC_END) ? CAR_SOUND_SPU_SIZE : 0;
+            int used = 0;
+
+            printf("snd: %s + %s: %d bytes of samples, the cars' window is full: %s\n", cs->path0, cs->path1,
+                   need, slot != 0 ? "what fits the car's PS2 slot" : "the car has no PS2 slot (the 9th car on)");
+            for (i = 0; i < 2; i++) {
+                EngineSound *bank = &cs->engines[i].bank;
+
+                if (!(queue & (1 << i)))
+                    continue;
+                if (used + sz[i].samples <= slot) {
+                    used += sz[i].samples;
+                    continue;
+                }
+                printf("snd: %s: no room for its %d bytes of samples: that engine sound is silent\n", path[i],
+                       sz[i].samples);
+                car_sound_voice_detach(&cs->engines[i].voice);
+                sz[i].header = sz[i].samples = 0;
+                memset(bank->header, 0, sizeof(EngnBank));  /* no set: engine_setup gives no segments */
+                bank->headerSize = 0;
+                bank->spuSize = 0;
+                queue &= ~(1 << i);
+            }
+            room = slot;
         }
     }
     cs->engines[0].bank.spuAddr = base;
@@ -473,6 +521,7 @@ void CarSound::start()
 //   0x001A48F4), when the caller hands its part of the frame (pod).
 void CarSound::update(const CarSoundFrame *f, const CarSoundPodVoice *pod)
 {
+    PcSeLevelScope pcLevel(g_pcRaceSeLevel);  /* PC: the player's level, after the clamps (pc_volume.h) */
     for (int i = 0; i < 3; i++)
         updateEngine(i, f);
     for (int i = 0; i < 32; i++)
@@ -511,7 +560,7 @@ void CarSound::update(const CarSoundFrame *f, const CarSoundPodVoice *pod)
 void CarSound::playOneShot(int id, f32 vol, f32 atten, f32 l, f32 r)
 {
     f32 v = vol * atten * (g_003521E0 * g_003521E4);
-    if (v == 0.0f)
+    if (v == 0.0f || pc_se_silent())        /* PC: or the player's level 0 (pc_volume.h) */
         return;
     SoundProgram *prog = se_program(id, 0);
     int prio = sound_voice_priority(v);
@@ -528,8 +577,11 @@ void CarSound::playOneShot(int id, f32 vol, f32 atten, f32 l, f32 r)
         u32           w[5];
     } u;
     s16 *volume = u.p.vol.lr;
-    volume[0] = spu_volume_clamp((spu_volume_clamp((int)(v * l * (f32)SPU_VOLUME_UNITY)) * prog->volume) >> 14);
-    volume[1] = spu_volume_clamp((spu_volume_clamp((int)(v * r * (f32)SPU_VOLUME_UNITY)) * prog->volume) >> 14);
+    /* PC: the player's level after the clamps (pc_volume.h): v is the
+     * clash's level x 32 / distance, far beyond the SPU's full scale from the
+     * car's own view, so a level applied ahead of the clamp was not heard */
+    volume[0] = pc_se_out(spu_volume_clamp((spu_volume_clamp((int)(v * l * (f32)SPU_VOLUME_UNITY)) * prog->volume) >> 14));
+    volume[1] = pc_se_out(spu_volume_clamp((spu_volume_clamp((int)(v * r * (f32)SPU_VOLUME_UNITY)) * prog->volume) >> 14));
     u.p.pitch = snd_note_to_pitch(prog->note << 8, prog->basePitch);
     u.p.unk_10 = prog->unk_0A;
     u.p.adsr = prog->adsr;
@@ -591,8 +643,9 @@ void CarSound::updateEngine(int i, const CarSoundFrame *f)
      * sink below the next computation).  The original's GtSoundVoice most
      * likely held them as a SndVolPair; the canonical header keeps two s16
      * for u123's engine code. */
-    ((SndWordView *)&voice->volL)->lr[0] = spu_volume_clamp((int)(gain[0] * volume * (f32)SPU_VOLUME_UNITY));
-    ((SndWordView *)&voice->volL)->lr[1] = spu_volume_clamp((int)(gain[1] * volume * (f32)SPU_VOLUME_UNITY));
+    /* PC: the player's level after the clamp (pc_volume.h) */
+    ((SndWordView *)&voice->volL)->lr[0] = pc_se_out(spu_volume_clamp((int)(gain[0] * volume * (f32)SPU_VOLUME_UNITY)));
+    ((SndWordView *)&voice->volL)->lr[1] = pc_se_out(spu_volume_clamp((int)(gain[1] * volume * (f32)SPU_VOLUME_UNITY)));
     int t = (int)(src->pitch * 4096.0f);
     int pitch;
     if (t < 0)
@@ -684,6 +737,7 @@ void CarSound::updatePodVoice(const CarSoundFrame *f, const CarSoundPodVoice *po
 //   g_003521E8 (the background mode) is set.
 void race_se_play(int se)
 {
+    PcSeLevelScope pcLevel(g_pcRaceSeLevel);  /* PC: the player's level, after the clamp (pc_volume.h) */
     if (g_003521E8 == 0)
         se_play(se, 0x40, -1, g_003521E0 * g_003521E4);
 }
@@ -692,5 +746,128 @@ void race_se_play(int se)
 void EngineSound::setLink(GTSOUNDINSTRUMENT *next)
 {
     link = next;
+}
+
+/* ------------------------------------------------------------------------ */
+/* PC (ROADMAP 35, not the game's): the car sound budget                     */
+/* ------------------------------------------------------------------------ */
+
+/* GT3's races hold 6 cars.  Each keeps three engine voices of one or two
+ * layers, its slots (the whines, the cabin, seven per wheel) and the Pod's
+ * voice: a race of up to PC_RACE_CARS_MAX cars asks for more voices than the
+ * mixer's 126 (engine/sound/native), and snd_voice_alloc steals by priority
+ * every frame - the engines of the cars would take each other's voices.  So
+ * in a race of more than CAR_SOUND_BUDGET cars only that many sound:
+ *   - the car each view follows (CameraManager::views[v].targetInfo.index[0],
+ *     v < viewCount: the camera's target) and the player's, car 0;
+ *   - then the cars nearest the listener: the current view's eye
+ *     (CameraManager::getPosition*, the debug camera's under it), measured to
+ *     each car's position as updateSound places it (car_view_*, t 0); a car
+ *     sounding now counts 0.8 x its distance (CAR_SOUND_KEEP_SQ, a
+ *     hysteresis: two cars at about the same distance do not swap every
+ *     frame, which would restart their engines); equal ones by number.
+ * The set is chosen once a frame, at car 0's call (RacePS2Base::virtual_29
+ * updates the cars' sounds in order, car 0 first).  A car out of it is
+ * stopped (CarSound::stop: its engine voices keyed off and released, its
+ * slots and the Pod's voice faded out) and its frame is not built, so it
+ * takes no voice; one back in is started again (CarSound::start: the engine
+ * voices set up, they key on in the frame's update).  With CAR_SOUND_BUDGET
+ * cars or fewer nothing is done: as retail. */
+enum { CAR_SOUND_BUDGET = 8 };
+#define CAR_SOUND_KEEP_SQ   0.64f           /* a sounding car's squared distance x 0.8^2 */
+#define CAR_SOUND_FAR       3.0e38f         /* a car without a state: last */
+
+static u32 s_carSoundSet;                   /* bit n: car n sounds this frame */
+static const void *s_carSoundLogged;        /* the entries the budget was logged for */
+
+static_assert(PC_RACE_CARS_MAX <= 32, "PC: the budget's set is a 32-bit mask");
+
+/* The set of the cars that sound this frame (bit n: car n). */
+static u32 car_sound_pick(RaceEntryBase *entries, CameraManager *cm)
+{
+    f32 dist[PC_RACE_CARS_MAX];
+    int count = entries->count;
+    f32 ex = cm->getPositionX();
+    f32 ey = cm->getPositionY();
+    f32 ez = cm->getPositionZ();
+    u32 set = 0;
+    int left = CAR_SOUND_BUDGET;
+    int i;
+
+    if (count > PC_RACE_CARS_MAX)
+        count = PC_RACE_CARS_MAX;
+    /* the cars the views follow, then the player's */
+    for (i = 0; i < cm->viewCount && i < 4; i++) {
+        int c = cm->views[i].targetInfo.index[0];
+        if (c >= 0 && c < count && (set & (1u << c)) == 0) {
+            set |= 1u << c;
+            left--;
+        }
+    }
+    if ((set & 1u) == 0) {
+        set |= 1u;
+        left--;
+    }
+    /* the others by their distance to the listener */
+    for (i = 0; i < count; i++) {
+        RaceEntryCar *car = entries->cars[i];
+        RaceCarState *st = car != NULL ? car->state : NULL;
+        f32 d = CAR_SOUND_FAR;
+
+        if (st != NULL) {
+            f32 dx = car_view_x(st, 0.0f) - ex;
+            f32 dy = car_view_y(st, 0.0f) - ey;
+            f32 dz = car_view_z(st, 0.0f) - ez;
+            d = dx * dx + dy * dy + dz * dz;
+            if (car->sound.playing != 0)
+                d = d * CAR_SOUND_KEEP_SQ;
+        }
+        dist[i] = d;
+    }
+    while (left > 0) {
+        int best = -1;
+        for (i = 0; i < count; i++) {
+            if ((set & (1u << i)) == 0 && (best < 0 || dist[i] < dist[best]))
+                best = i;
+        }
+        if (best < 0)
+            break;
+        set |= 1u << best;
+        left--;
+    }
+    return set;
+}
+
+/* From RaceEntryCar::updateSound (T121), before the car's frame is built: 1
+ * when the car sounds this frame (started again if the budget had stopped
+ * it), 0 when it is silent (stopped; the caller builds no frame). */
+int car_sound_budget(RaceEntryCar *car, CameraManager *cm)
+{
+    RaceOrganization *org = cm->views[0].targetInfo.org;
+    RaceEntryBase *entries = org != NULL ? org->entries : NULL;
+    int n = car->number;
+
+    if (entries == NULL || entries->count <= CAR_SOUND_BUDGET)
+        return 1;                           /* up to 8 cars: as retail */
+    if (n < 0 || n >= PC_RACE_CARS_MAX)
+        return 1;
+    if (n == 0) {
+        s_carSoundSet = car_sound_pick(entries, cm);
+        if (s_carSoundLogged != entries) {
+            s_carSoundLogged = entries;
+            printf("snd: %d cars: the car sound budget - %d of them sound (the followed and the player's, then "
+                   "the nearest)\n", entries->count, CAR_SOUND_BUDGET);
+        }
+    }
+    if (s_carSoundSet & (1u << n)) {
+        if (car->sound.playing == 0 && snd_trace_level() >= 2)
+            snd_trace_line("EE car %d: in the car sound budget again (started)", n);
+        car->sound.start();                 /* (nothing when it plays) */
+        return 1;
+    }
+    if (car->sound.playing != 0 && snd_trace_level() >= 2)
+        snd_trace_line("EE car %d: out of the car sound budget (stopped)", n);
+    car->sound.stop();                      /* (nothing when it is stopped) */
+    return 0;
 }
 

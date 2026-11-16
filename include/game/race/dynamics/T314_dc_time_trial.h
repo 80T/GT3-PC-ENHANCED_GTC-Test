@@ -59,8 +59,9 @@ public:
     virtual int  isPitEnabled();            /* [38] +0x13C 0x001F1F58 */
     virtual void issueCrashEvent(RaceCarState *car, int kind, int arg, f32 force); /* [40] +0x14C 0x001F1F60 F_001DA130 */
 };
-/* The enhanced engine: DynamicsConductor's (GT3 0xE3AC). */
-EGCS_SIZE(DynamicsConductorTimeTrial, 0xE58C);
+/* The enhanced engine: DynamicsConductor's (GT3 0xE3AC; PC: 0x3B14C, the
+ * conductor's per-car arrays PC_RACE_CARS_MAX long, game/race/race_cars.h). */
+EGCS_SIZE(DynamicsConductorTimeTrial, 0x3B14C);
 
 
 #endif /* GAME_T314_DC_TIME_TRIAL_H */

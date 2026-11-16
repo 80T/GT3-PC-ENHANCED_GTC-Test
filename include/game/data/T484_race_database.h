@@ -143,6 +143,12 @@ enum {
     NEED_DRIVETRAIN_RR  = 5
 };
 
+/* PC (ROADMAP 35): the last place a race's results know (0-based, the 6th):
+ * in a race of more than 6 cars (up to PC_RACE_CARS_MAX) the 7th .. last
+ * score as the 6th (prize money, championship points, the event's best
+ * place).  A 6-car race is as before. */
+enum { PC_RESULT_LAST_PLACE = 5 };
+
 /* vtable 0x003423D8 (1 slot).  typeinfo __tf12RaceDataBase 0x00238FB8.  Base
  * CarDataBase at +0x00 (its vptr +0x0C is the object's).  Size 0x28 (built
  * on the stack by some 40 callers). */
@@ -165,12 +171,14 @@ public:
     const char *getRegulatedCarName(int i);     /* 0x00238700 name (first part); NULL if any car */
     void getRegulatedCarFullName(char *buf, int i); /* 0x002387D0 "%s %s"; "" if any car */
     u64  getRegulatedCar(int i);                /* 0x002388D8 0 if any car */
-    int  getPrize(int rank);                    /* 0x00238950 prize[rank] * 100 (x100 again in region 0) */
+    int  getPrize(int rank);                    /* 0x00238950 prize[rank] * 100 (x100 again in region 0;
+                                                   PC: rank past the 6th as the 6th) */
     u8   getCourseKind(u64 course);             /* 0x002389A0 CourseRecord.kind (2 = dirt) */
     const char *F_002389C8(u64 course);         /* 0x002389C8 CourseRecord.name0A */
     const char *getCourseName(u64 course);      /* 0x00238A00 CourseRecord.name0C, NULL if unknown */
     const char *F_00238A48(u64 code);           /* 0x00238A48 table 0x22 record `code`'s name0E */
-    s8   getChampionshipPoint(int rank);        /* 0x00238A80 {10, 6, 4, 3, 2, 1, 0, 0} (this unused) */
+    s8   getChampionshipPoint(int rank);        /* 0x00238A80 {10, 6, 4, 3, 2, 1, 0, 0} (this unused;
+                                                   PC: rank past the 6th as the 6th) */
     const char *F_00238A90();                   /* 0x00238A90 F_00238A48(code) */
     const char *F_00238AB0();                   /* 0x00238AB0 getCourseName(course) */
     const char *F_00238AD0();                   /* 0x00238AD0 F_002389C8(course) */

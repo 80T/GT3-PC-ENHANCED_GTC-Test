@@ -78,7 +78,9 @@ enum {
 
 #define TARGET_SCORE_MAX    1200.0f         /* a score is kept in 0..1200; a forced target has 1200 */
 #define TARGET_PLACE_LAST   5               /* g_002DF108 has six places: 6th and below share the last */
-#define TARGET_CARS         7               /* TargetChooser::car[] */
+/* TargetChooser::car[].  PC (ROADMAP 35): PC_RACE_CARS_MAX (game/race/
+ * race_cars.h, through T393_target_chooser.h), was 7. */
+#define TARGET_CARS         PC_RACE_CARS_MAX
 
 /* ======================================================================== */
 /* MenuCarCamera (T411)                                                      */

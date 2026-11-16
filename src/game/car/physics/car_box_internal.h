@@ -2,7 +2,7 @@
  * 0x001FBCE8..0x001FED38, second pass.
  *
  * Translation units (link order):
- *   T375  the car collision boxes (CarBox, 0x4F0 bytes; T373 / T374 in
+ *   T375  the car collision boxes (CarBox, 0x4F0 bytes, PC 0x4B0; T373 / T374 in
  *         u087): car against car.  A swept test of the other box's corners
  *         against this box's edges (the earliest hit of the frame), its
  *         impulse response (restitution 0.5), the overlap push-outs, and the

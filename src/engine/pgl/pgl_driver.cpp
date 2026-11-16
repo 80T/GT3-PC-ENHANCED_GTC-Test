@@ -92,6 +92,31 @@ void pgl_vu1_state(GsContext *ctx, PglrVu1 *out)
     memcpy(out->limits, &ctx->limits, 16);
     memcpy(out->vBB0, &ctx->vBB0, 16);
     out->prog = ctx->vu1Prog;
+    /* PC: the projection's clip z = A w + B (docs/renderer.md 4,
+     * "Precision"): the renderer takes the depth from w with them when the
+     * combined matrix agrees (pgl_exec.cpp vu1_depth) */
+    pgl::Vec4 p[4];
+    pgl::vu0GetModeMatrix(VU0, ctx->matrixMode, pgl::MTX_PROJECTION, p);
+    double ww = 0.0, zw = 0.0, zz = 0.0;
+    for (int r = 0; r < 3; r++) {
+        ww += (double)p[r].w * p[r].w;
+        zw += (double)p[r].z * p[r].w;
+        zz += (double)p[r].z * p[r].z;
+    }
+    out->projZ[0] = out->projZ[1] = out->projZ[2] = 0.0f;
+    if (ww > 1e-20) {
+        const double a = zw / ww;
+        double res = 0.0;
+        for (int r = 0; r < 3; r++) {
+            const double d = p[r].z - a * p[r].w;
+            res += d * d;
+        }
+        if (res <= 1e-10 * zz) {
+            out->projZ[0] = (float)a;
+            out->projZ[1] = (float)((double)p[3].z - a * p[3].w);
+            out->projZ[2] = 1.0f;
+        }
+    }
 }
 
 /* ======================================================================== */
@@ -1528,6 +1553,12 @@ void gfx_post_antialias(u32 fbWordAddr, int w, int h)
     pglr_post_aa(fbWordAddr >> 6, w, h);
 }
 
+/* PC (2026-11-14, G001_flare.h): a buffer's detail (pglr_target_detail). */
+void gfx_pc_target_detail(u32 fbWordAddr, int w, int h, f32 dx, f32 dy)
+{
+    pglr_target_detail(fbWordAddr >> 6, w, h, dx, dy);
+}
+
 void gfx_present_again(void)
 {
     pglr_present_again();
@@ -1650,6 +1681,17 @@ void gfx_set_scissor(int x, int y, int w, int h)
     sc->SCAY0 = y;
     sc->SCAX1 = x + w - 1;
     sc->SCAY1 = y + h - 1;
+    ctx->dirty |= GS_DIRTY_BOTH(GS_REG_SCISSOR);
+}
+
+/* PC: the scissor narrowed to its part below `top' of its height (0 .. 1;
+ * PGL_ATTR_SCISSOR's push and pop round it). */
+void gfx_scissor_below(f32 top)
+{
+    GsContext *ctx = GS_SPR_CTX;
+    GsScissor *sc = (GsScissor *)&ctx->reg[GS_REG_SCISSOR];
+
+    sc->SCAY0 += (int)((f32)(sc->SCAY1 - sc->SCAY0 + 1) * top);
     ctx->dirty |= GS_DIRTY_BOTH(GS_REG_SCISSOR);
 }
 
@@ -2222,7 +2264,9 @@ void gfx_set_clut_mode(int mode)
 
 // FUNC 0x0025A038 pgl_color
 /* color = rgba; colorTex = each colour byte x 129 >> 8, alpha kept; with
- * colorMaterial gs_set_material_param(faces, kind, the alpha byte only). */
+ * colorMaterial gs_set_material_param(faces, kind, the alpha byte only).
+ * PC: of colorTex only the alpha reaches a draw now (pgl_state_prim.h
+ * fullColor, docs/renderer.md "Full colours"). */
 void pgl_color(u32 rgba)
 {
     GsContext *ctx = GS_SPR_CTX;
@@ -2437,14 +2481,18 @@ void dma_start_source_chain(int ch, const void *tadr)
 void gs_select_vu1_prog(GsContext *ctx)
 {
     u32 prog = ctx->vu1ProgAlt ? VU1_PROG_BASE_33E : VU1_PROG_BASE;
+    /* PC: under a mirrored world scale (the course scale with an odd number
+     * of negative axes, pgl_set_world_scale) every triangle's screen winding
+     * is turned: the front face taken as the other one */
+    const int ccw = (ctx->frontFace == PGL_FRONT_CCW) != (pgl_world_scale_mirrored() != 0);
 
     if (ctx->cullEnable != 0) {
         switch (ctx->cullFace) {
         case PGL_CULL_FRONT:
-            prog += (ctx->frontFace == PGL_FRONT_CCW) ? VU1_PROG_CULL_CCW : VU1_PROG_CULL_CW;
+            prog += ccw ? VU1_PROG_CULL_CCW : VU1_PROG_CULL_CW;
             break;
         case PGL_CULL_BACK:
-            prog += (ctx->frontFace == PGL_FRONT_CCW) ? VU1_PROG_CULL_CW : VU1_PROG_CULL_CCW;
+            prog += ccw ? VU1_PROG_CULL_CW : VU1_PROG_CULL_CCW;
             break;
         case PGL_CULL_FRONT_AND_BACK:
             prog = 0;

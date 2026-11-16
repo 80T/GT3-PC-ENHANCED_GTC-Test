@@ -150,8 +150,16 @@ EGCS_SIZE(FlareType, 0x38);
  * each on the PS2: what passed it was not drawn).  255 + 255 queries and
  * the sun's still fit the 64 x 8 occlusion result strip (512 a frame,
  * FlareClass::begin).  FlareClass is a runtime class (RacePS2Base +0x9830):
- * its size follows. */
-enum { FLARE_LIST_MAX = 255 };
+ * its size follows.
+ * PC (ROADMAP 35): 1023 each - the lamps of a race of up to 32 cars - and the
+ * result strip FLARE_RESULT_ROWS rows of 64 (the PS2's 8): 1023 + 1023
+ * queries and the sun's fit its 2048 texels.  G001 (flare_init's occH,
+ * flare_readback, the result discs) and the renderer's native query take
+ * the strip's height as given. */
+enum {
+    FLARE_LIST_MAX    = 1023,
+    FLARE_RESULT_ROWS = 32                  /* PC: the occlusion result strip's rows (64 texels each; was 8) */
+};
 
 /* Declared before the class, for GCC 14 only: egcs declares a polymorphic
  * class's __tf<mangled> itself (C++ linkage) when the class is complete and
@@ -171,7 +179,8 @@ enum { FLARE_LIST_MAX = 255 };
  *             and every occluded draw counts one; flush keeps it in queryCount.
  *   flareBin  the glow model of the lamps and sources (relocated by
  *             vif_model_relocate); NULL: flare_sun_model_b.
- *   results    the read-back occlusion results (64 x 8 RGBA32, 0x800 bytes).
+ *   results    the read-back occlusion results (64 x 8 RGBA32, 0x800 bytes;
+ *             PC: 64 x FLARE_RESULT_ROWS, 0x2000 bytes).
  *   sunType   the sun glare's model: 0 flare_sun_model_a (textured with
  *             glareImg, made resident first), 1 flare_rays_model, 2
  *             flare_disc_model. */
@@ -247,10 +256,14 @@ public:
     VifModel        *flareBin;                  /* 0x080 race/flare.bin, the glow model (NULL: flare_sun_model_b) */
     Tex1Image       *modelTex2;                 /* 0x084 FlareWork tex[1], the models' texture 2 (? never set; u055 modelTex2) */
     Tex1Image       *reflImg;                   /* 0x088 race/reflection.img */
-    GSBuffer         occBuf;                    /* 0x08C 64 x 8: the occlusion result strip (flare_init occVram; u055 occBuf) */
+    GSBuffer         occBuf;                    /* 0x08C 64 x 8: the occlusion result strip (flare_init occVram; u055 occBuf;
+                                                   PC: 64 x FLARE_RESULT_ROWS) */
     GSBuffer         workBuf;                   /* 0x0C4 64 x 64: the reduction work buffer (workVram; u055 workBuf) */
     u32             *results;                   /* 0x0FC the read-back results, 64-byte aligned in resultsBuf (u055 results) */
-    u8               resultsBuf[0x900];         /* 0x100 */
+    /* PC: the strip's 64 x FLARE_RESULT_ROWS words and the 0x100 of
+     * alignment room retail had (0x900 = 0x800 + 0x100); the members after
+     * it sit 0x1800 later than shown */
+    u8               resultsBuf[0x40 * 4 * FLARE_RESULT_ROWS + 0x100];   /* 0x100 */
     int              queryCount;                /* 0xA00 the queries of the frame (queries), kept by flush (u055 queryCount) */
     Vec3             sunPos;                    /* 0xA04 the sun's direction (setSun) */
     f32              sun[4];                    /* 0xA10 the sun glare's scale, r, g, b (flare_draw_sun) */
@@ -258,9 +271,9 @@ public:
     int              sunType;                   /* 0xA24 the sun glare's model (see above) */
     int              noOcclusion;               /* 0xA28 */
     int              nLights;                   /* 0xA2C */
-    FlareLightEntry  lights[FLARE_LIST_MAX];    /* 0xA30 (PC: was [100]) */
+    FlareLightEntry  lights[FLARE_LIST_MAX];    /* 0xA30 (PC: was [100]; 1023, ROADMAP 35) */
     int              nSources;                  /* 0x1840 */
-    FlareSourceEntry sources[FLARE_LIST_MAX];   /* 0x1844 (PC: was [100]) */
+    FlareSourceEntry sources[FLARE_LIST_MAX];   /* 0x1844 (PC: was [100]; 1023, ROADMAP 35) */
     f32              unk21A4;                   /* 0x21A4 proj.m[1][1] */
     Matrix44         proj;                      /* 0x21A8 the projection matrix of the frame */
     FlareLightParams params;                    /* 0x21E8 */

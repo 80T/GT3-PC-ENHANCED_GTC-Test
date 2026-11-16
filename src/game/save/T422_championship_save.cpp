@@ -3,6 +3,8 @@
  * and the 8 entrants' cars and points. */
 #include "game/save/prize_records_internal.h"
 #include "game/save/T422_championship_save.h"
+#include "game/save/pc_save_ext.h"              /* PC: the entrants past 8 (PC_EXT_CHAMPIONSHIP) */
+#include "game/race/race_cars.h"                /* PC: PC_RACE_CARS_MAX */
 
 /* The bytes of the object that are saved as they are (active .. sessions);
  * the entries follow, each the car's save block and the points. */
@@ -43,6 +45,7 @@ void ChampionshipSave::clear()
     sessions = 0;
     for (int i = 7; i >= 0; i--)
         entries[i].points = 0;
+    pcSetEntrants(8);                           /* PC: none past the 8 */
 }
 
 // FUNC 0x00216058 ChampionshipSave::setPage
@@ -136,9 +139,12 @@ int ChampionshipSave::getSize()
 }
 
 // FUNC 0x00216168 ChampionshipSave::load
+//   PC (ROADMAP 35): the entrants past the 8 emptied first: a save's
+//   section of them (an 8.0 stream's, GameStatus::load) comes after.
 const u8 *ChampionshipSave::load(const u8 *src, int arg)
 {
     /* implicit: memcpy (load_bytes) */
+    pcSetEntrants(8);                           /* PC: none past the 8 until the stream's section */
     src = load_bytes((void *)this, src, CHAMPIONSHIP_SAVE_HEAD);
     for (int i = 0; i < 8; i++) {
         /* the points' address taken before the call: retail keeps it in its
@@ -161,4 +167,79 @@ u8 *ChampionshipSave::save(u8 *dst)
         dst = save_bytes(dst, points, sizeof(int));
     }
     return dst;
+}
+
+/* ------------------------------------------------------------------------ */
+/* PC (ROADMAP 35, no original): the entrants past entries[8]               */
+/* ------------------------------------------------------------------------ */
+
+/* The entrants the save extension can hold. */
+#define CHAMPIONSHIP_EXTRA_MAX (PC_RACE_CARS_MAX - 8)
+
+void ChampionshipSave::pcSetEntrants(int count)
+{
+    int extra = count - 8;
+
+    if (extra < 0)
+        extra = 0;
+    if (extra > CHAMPIONSHIP_EXTRA_MAX)
+        extra = CHAMPIONSHIP_EXTRA_MAX;
+    pc_ext_resize(this, PC_EXT_CHAMPIONSHIP, (u32)extra * PC_REC_CHAMPIONSHIP);
+}
+
+int ChampionshipSave::pcGetEntrants()
+{
+    return 8 + (int)(pc_ext_size(this, PC_EXT_CHAMPIONSHIP) / PC_REC_CHAMPIONSHIP);
+}
+
+void ChampionshipSave::pcSetEntrant(int i, CarEquipments *car, int points)
+{
+    if (i < 8 || i >= pcGetEntrants())
+        return;
+    u8 *rec = pc_ext_get(this, PC_EXT_CHAMPIONSHIP, 0, NULL) + (u32)(i - 8) * PC_REC_CHAMPIONSHIP;
+    u8 *at = car->serialize(rec);               /* the save block, as save() writes an entry */
+    memcpy(at, &points, sizeof(int));
+}
+
+int ChampionshipSave::pcGetEntrant(int i, CarEquipments *car)
+{
+    int points;
+
+    if (i < 8 || i >= pcGetEntrants())
+        return 0;
+    const u8 *rec = pc_ext_get(this, PC_EXT_CHAMPIONSHIP, 0, NULL) + (u32)(i - 8) * PC_REC_CHAMPIONSHIP;
+    const u8 *at = car->deserialize(rec);       /* as load() reads an entry */
+    memcpy(&points, at, sizeof(int));
+    return points;
+}
+
+void ChampionshipSave::pcSaveSection(PcSaveWriter *w)
+{
+    u32 bytes = pc_ext_size(this, PC_EXT_CHAMPIONSHIP);
+    u32 count = bytes / PC_REC_CHAMPIONSHIP;
+
+    if (count == 0)
+        return;
+    pc_put_u32(w, PC_EXT_CHAMPIONSHIP);         /* the section: tag, bytes */
+    pc_put_u32(w, 4 + count * PC_REC_CHAMPIONSHIP);
+    pc_put_u32(w, count);
+    pc_put(w, pc_ext_get(this, PC_EXT_CHAMPIONSHIP, 0, NULL), count * PC_REC_CHAMPIONSHIP);
+}
+
+void ChampionshipSave::pcLoadSection(const u8 *src, u32 bytes)
+{
+    u32 count;
+
+    pcSetEntrants(8);
+    if (bytes < 4)
+        return;
+    memcpy(&count, src, 4);
+    if (count > CHAMPIONSHIP_EXTRA_MAX || bytes - 4 < count * PC_REC_CHAMPIONSHIP) {
+        printf("PC: ChampionshipSave: a section of %u entrants past 8 in %u bytes: not loaded\n",
+               count, bytes);
+        return;
+    }
+    pcSetEntrants(8 + (int)count);
+    if (count != 0)
+        memcpy(pc_ext_get(this, PC_EXT_CHAMPIONSHIP, 0, NULL), src + 4, count * PC_REC_CHAMPIONSHIP);
 }

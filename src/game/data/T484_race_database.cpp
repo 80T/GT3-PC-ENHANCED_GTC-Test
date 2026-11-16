@@ -235,12 +235,18 @@ u64 RaceDataBase::getRegulatedCar(int i)
 }
 
 /* The prize money of position `rank': prize[rank] * 100, again x 100 in
- * region 0. */
+ * region 0.  PC (ROADMAP 35): prize[6]: in a race of more than 6 cars the
+ * 7th and lower get the 6th's (PC_RESULT_LAST_PLACE; retail read past the
+ * table with a rank of 6 or more). */
 // FUNC 0x00238950 RaceDataBase::getPrize
 int RaceDataBase::getPrize(int rank)
 {
     int money;
 
+    if (rank > PC_RESULT_LAST_PLACE)        /* PC: the 6th's */
+        rank = PC_RESULT_LAST_PLACE;
+    if (rank < 0)
+        rank = 0;
     money = event->prize[rank] * 100;
     if (isJapan() != 0)
         money *= 100;
@@ -289,10 +295,16 @@ const char *RaceDataBase::F_00238A48(u64 code)
 /* The championship points of position `rank' (signed bytes {10, 6, 4, 3, 2,
  * 1, 0, 0}; `this' unused).  Callers: ResultChampionship::update,
  * ResultChampionship::sortStandings, RaceChampionshipInformation::addPoints,
- * RaceChampionshipInformation::addEnemyPoints. */
+ * RaceChampionshipInformation::addEnemyPoints.  PC (ROADMAP 35): in a race
+ * of more than 6 cars the 7th and lower score the 6th's point
+ * (PC_RESULT_LAST_PLACE; the table's 7th / 8th, 0, were never reached). */
 // FUNC 0x00238A80 RaceDataBase::getChampionshipPoint
 s8 RaceDataBase::getChampionshipPoint(int rank)
 {
+    if (rank > PC_RESULT_LAST_PLACE)        /* PC: the 6th's */
+        rank = PC_RESULT_LAST_PLACE;
+    if (rank < 0)
+        rank = 0;
     return g_00352D78[rank];
 }
 
