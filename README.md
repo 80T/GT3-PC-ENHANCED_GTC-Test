@@ -50,6 +50,7 @@ configure the settings, and play.
 <p align="center">
   <img src="https://github.com/Silentwarior112/GT3-PC-ENHANCED/blob/main/ss6.PNG">
 </p>
+
 ```
 The launcher's background is `launcher_bg.png`.
 Both the launcher and the main executable use `gt3pc.ico` for their program icon.
@@ -190,6 +191,10 @@ text\
   realtime.sqlite3
 ```
 - External Texture replacement system (Default hotkey is F10)
+<p align="center">
+  <img src="https://github.com/Silentwarior112/GT3-PC-ENHANCED/blob/main/ss8.PNG">
+</p>
+
 ```
 > Toggle Replacements on/off in the popup window or the hotkey
 > Toggle Texture Dumping with 2 modes: Select and All. Select allows finding one texture on-screen and dumping only that one.
@@ -220,6 +225,10 @@ Online functionality will not be added to this project.
 If you want to make an online version of this, see the plugin system below
 ```
 - Game Engine Plugins
+<p align="center">
+  <img src="https://github.com/Silentwarior112/GT3-PC-ENHANCED/blob/main/ss7.PNG">
+</p>
+
 ```
 GT3 PC Enhanced supports overrides of the launcher and game executable with its engine plugin system.
 A custom launcher and executable can be created and integrated into the base launcher as a selectable game engine
@@ -245,7 +254,7 @@ Inside the plugin's folder is `engine.txt`, this allows you to set the mod's tit
 - Movie aspect ratio control
 
 ### Graphics
-- Resolution: 10% - 400% Supersampling
+- Resolution: 10% - 400% Supersampling * The current window size
 - Anti-Aliasing: FXAA, MSAA, AGSS
 - Anisotropic Filtering: Up to 16x
 - Detail: Can force the game to always use the best LOD
