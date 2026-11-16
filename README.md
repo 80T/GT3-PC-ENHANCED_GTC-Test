@@ -287,7 +287,7 @@ Inside the plugin's folder is `engine.txt`, this allows you to set the mod's tit
 ### Game Settings
 - Language
 - Units
-- Starting Credits: Default, 15,000 or 18,000
+- Starting Credits: Default, 15,000, 18,000, custom
 - HUD Settings:
   - HUD layout settings
   - HUD element color customizer
