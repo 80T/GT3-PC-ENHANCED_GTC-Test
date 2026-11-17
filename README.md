@@ -20,29 +20,29 @@ configure the settings, and play.
   <img src="https://github.com/Silentwarior112/GT3-PC-ENHANCED/blob/main/ss1.PNG">
 </p>
 
-<p align="center">
-  <img src="https://github.com/Silentwarior112/GT3-PC-ENHANCED/blob/main/ss2.PNG">
-</p>
 
-<p align="center">
-  <img src="https://github.com/Silentwarior112/GT3-PC-ENHANCED/blob/main/ss3.PNG">
-</p>
 
-<p align="center">
-  <img src="https://github.com/Silentwarior112/GT3-PC-ENHANCED/blob/main/ss4.PNG">
-</p>
 
-<p align="center">
-  <img src="https://github.com/Silentwarior112/GT3-PC-ENHANCED/blob/main/ss5.PNG">
-</p>
+
+
+
+
 
 ### Graphics quality
 - All original graphics, reproduced more accurately and with better clarity than emulation.
 - Fully dynamic aspect ratio control: HUD and Field of view re-calibrate automatically.
+<p align="center">
+  <img src="https://github.com/Silentwarior112/GT3-PC-ENHANCED/blob/main/ss3.PNG">
+</p>
+
 
 ### Performance quality
 - Optimized for PC, with some multi-threading implemented to produce very high and consistent frame rates.
 - True High Frame Rate support
+
+<p align="center">
+  <img src="https://github.com/Silentwarior112/GT3-PC-ENHANCED/blob/main/ss2.PNG">
+</p>
 
 ### Launcher
 - The launcher is a lightweight 640x360 window that holds the settings and access to managers
@@ -56,6 +56,37 @@ The launcher's background is `launcher_bg.png`.
 Both the launcher and the main executable use `gt3pc.ico` for their program icon.
 The background and icon are embedded into the programs when built. Changing them requires
 compiling the source again (run build.cmd)
+```
+
+### Languages
+- The launcher and the in-game settings overlay menu are localized for multiple languages,
+  and the game's language depends on the regional variant:
+```
+- The launcher and overlay menu support 9 languages, English is the base language, and all other
+  languages were translated via an automated process from English, so the quality may not be perfect for
+  other languages:
+  - English
+  - Français
+  - Deutsch
+  - Italiano
+  - Español
+  - 日本語
+  - Русский
+  - Português
+  - Polski
+
+- Editing the codebase has been made safe in this regard too: Any new strings added will be checked by
+  `build.cmd` and `Build Mod Plugin.cmd` and prompt you in the command line interface to translate them
+  to the other languages with a streamlined process: You can manually input the translations as it asks
+  you, or you can export the untranslated strings to a file (good for automated processes), or you can
+  skip translating them and continue to build the executable.
+
+- The game's own language support is largely confined by its regional variant. Each variant has unfinished
+  or missing assets for languages it never officially supported, so using an unexpected language will run
+  into any gaps in the localization assets. Additionally, for languages that were never supported by the original game,
+  you would have to update the executable and also create all of the localization assets for it, which
+  is relatively involved to do, including separate menu graphics and scripting with the translated strings.
+
 ```
 
 ### Game Engine
@@ -83,6 +114,10 @@ The significant features used are:
 - H-shifter support
 ```
 - Options menu via the Hotkey (Default is F2 or the controller's Home Button)
+<p align="center">
+  <img src="https://github.com/Silentwarior112/GT3-PC-ENHANCED/blob/main/ss5.PNG">
+</p>
+
 ```
   + Display
   + Graphics
@@ -93,6 +128,8 @@ The significant features used are:
   + Challenge Modes
   + Controls: Deadzones, toggle between using the wheel or gamepad if both are connected
   + Debug: Developer cheats
+  Interface Language Selector (Options menu & the Launcher)
+  Take Screenshot
 ```
 - Escape menu via the Hotkey (Default is Esc or holding the controller's Home Button for a few seconds)
 ```
@@ -101,6 +138,10 @@ The significant features used are:
   - Exit
 ```
 - Debug Camera and Look-around support with the Right Stick during racing and menus
+<p align="center">
+  <img src="https://github.com/Silentwarior112/GT3-PC-ENHANCED/blob/main/ss4.PNG">
+</p>
+
 ```
 Controls:
 - Enter Debug Camera (Default is F7)
@@ -202,7 +243,8 @@ text\
 > Compression: Turn on to save disk space
 > Refresh Button / Texture selector in the popup window
 
-- Dumped textures go into the tex_replacements folder
+- Dumped textures go into the tex_replacements folder, under either dumps, or dumps_selected.
+- When dumping textures in All mode, they only dump upon being loaded into memory.
 - To use replacements, add a texture replacement folder in the textures manager in the launcher.
 
 - Textures are hashed by content only, so no ghost / duplicate dumps can occur.
@@ -232,7 +274,7 @@ If you want to make an online version of this, see the plugin system below
 ```
 GT3 PC Enhanced supports overrides of the launcher and game executable with its engine plugin system.
 A custom launcher and executable can be created and integrated into the base launcher as a selectable game engine
-with it's own data folder separate from the base Gran Turismo 3: A-Spec engine this project provides.
+in it's own folder separate from the base Gran Turismo 3: A-Spec engine this project provides.
 
 This allows easy support for mods that make engine changes without over-complicating the installation process.
 Because custom engines fully override the default launcher and executable, mods can have fully custom launchers
@@ -242,6 +284,8 @@ different engines. Only the game data (mod folders) are separately configured pe
 To make a custom build of this project as a plugin, simply run `Build Mod Plugin.cmd`, then find the output in `build/plugins`.
 Inside the plugin's folder is `engine.txt`, this allows you to set the mod's title.
 ```
+
+# Settings
 
 ### Display
 - Windowed, Borderless, and Exclusive Fullscreen support
