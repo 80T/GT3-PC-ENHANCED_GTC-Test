@@ -157,6 +157,7 @@ add_library(gt3_platform STATIC
     platform/frame_monitor.cpp
     platform/frame_step.cpp
     platform/overlay.cpp
+    platform/overlay_font.cpp
     platform/osd.cpp
     platform/hotkey_hint.cpp
     platform/song_osd.cpp
@@ -176,6 +177,9 @@ add_library(gt3_platform STATIC
     platform/play_time.cpp
     platform/png_image.cpp
     platform/screenshot.cpp
+    # PC (2026-11-16): the interface's languages (the catalogues: resources of
+    # each executable, cmake/languages.cmake)
+    platform/ui_text.cpp
 )
 target_include_directories(gt3_platform PUBLIC ${GT3PC_ROOT}/include ${GT3PC_ROOT}/src)
 target_link_libraries(gt3_platform PUBLIC winmm d3d11 dxgi d3dcompiler dbghelp windowscodecs)
@@ -246,6 +250,9 @@ add_executable(gt3pc WIN32
 target_include_directories(gt3pc PRIVATE ${GT3PC_ROOT}/include ${GT3PC_ROOT}/src ${CMAKE_CURRENT_SOURCE_DIR}/main)
 target_link_libraries(gt3pc PRIVATE gt3_platform gt3_media gt3_render)
 target_link_options(gt3pc PRIVATE /LARGEADDRESSAWARE)
+# PC (2026-11-16): the interface's languages, lang/*.po (platform/ui_text.h)
+include(${GT3PC_ROOT}/cmake/languages.cmake)
+gt3pc_languages(gt3pc)
 add_custom_command(TARGET gt3pc POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${GT3PC_SDL3_DLL} $<TARGET_FILE_DIR:gt3pc>)
 add_subdirectory(launcher)

@@ -4,6 +4,7 @@
 #include "util.h"
 
 #include "platform/param_db.h"
+#include "platform/ui_text.h"  /* PC (2026-11-16): the interface's languages */
 
 #include <windows.h>
 
@@ -108,7 +109,7 @@ bool finish(const std::wstring &part, const std::wstring &done, Check check, std
     std::string error;
     if (!read_all(part, &bytes, why) || !check(bytes, &error)) {
         if (why->empty())
-            *why = L"the check of the database failed (" + util::widen(error) + L"); the files are kept";
+            *why = trf(L"the check of the database failed (%s); the files are kept", util::widen(error).c_str());
         DeleteFileW(part.c_str());
         return false;
     }
@@ -174,7 +175,7 @@ bool convert_region(const std::wstring &dir, const std::wstring &region, std::ws
                        L".id_db_idx" + region + L".db", L".id_db_str" + region + L".db"}, &left);
     *note = notes_text(notes);
     if (!left.empty())
-        *note += L" (not deleted: " + left + L")";
+        *note += L" " + trf(L"(not deleted: %s)", left.c_str());
     return true;
 }
 
@@ -214,7 +215,7 @@ bool convert_common(const std::wstring &dir, std::vector<std::pair<uint64_t, std
     delete_files(dir, {kCommonFiles[0], kCommonFiles[1], kCommonFiles[2], kCommonFiles[3]}, &left);
     *note = notes_text(notes);
     if (!left.empty())
-        *note += L" (not deleted: " + left + L")";
+        *note += L" " + trf(L"(not deleted: %s)", left.c_str());
     return true;
 }
 
@@ -261,7 +262,7 @@ bool convert_texts(const std::wstring &data, std::wstring *note, std::wstring *w
     delete_files(dir, {L"realtime.dat"}, &left);
     note->clear();
     if (!left.empty())
-        *note = L" (not deleted: " + left + L")";
+        *note = L" " + trf(L"(not deleted: %s)", left.c_str());
     return true;
 }
 
@@ -342,21 +343,21 @@ bool convert(const std::wstring &data, std::wstring *message, std::vector<std::w
         int named = 0;
         std::wstring why;
         if (name_common(dir, &named, &why))
-            updated.push_back(L"database\\common: " + std::to_wstring(named) + L" race display rows named");
+            updated.push_back(trf(L"database\\common: %d race display rows named", named));
         else
-            problems.push_back(L"database\\common, naming its race display rows: " + why);
+            problems.push_back(trf(L"database\\common, naming its race display rows: %s", why.c_str()));
     }
     message->clear();
     if (!done.empty()) {
         std::wstring list;
         for (const std::wstring &d : done)
             list += (list.empty() ? L"" : L", ") + d;
-        *message = L"Databases written (<name>.sqlite3), the files they were made of deleted: " + list + L".";
+        *message = trf(L"Databases written (<name>.sqlite3), the files they were made of deleted: %s.", list.c_str());
     }
     for (const std::wstring &u : updated)
-        *message += (message->empty() ? L"" : L" ") + std::wstring(L"Updated: ") + u + L".";
+        *message += (message->empty() ? L"" : L" ") + trf(L"Updated: %s.", u.c_str());
     for (const std::wstring &p : problems)
-        *message += (message->empty() ? L"" : L" ") + std::wstring(L"Not converted: ") + p + L".";
+        *message += (message->empty() ? L"" : L" ") + trf(L"Not converted: %s.", p.c_str());
     if (doneOut != nullptr)
         *doneOut = done;
     if (problemsOut != nullptr)

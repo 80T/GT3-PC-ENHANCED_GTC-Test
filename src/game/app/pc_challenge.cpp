@@ -7,6 +7,7 @@
 #include "game/data/T516_country.h"              /* g_00352FD8, COUNTRY_JP */
 #include "platform/challenge_osd.h"
 #include "platform/settings.h"
+#include "platform/ui_text.h"                   /* PC (2026-11-16): the interface's languages */
 
 #include <stdio.h>
 #include <string.h>
@@ -239,51 +240,54 @@ void pc_challenge_refresh(const gt2k_game::GameStatus *gs)
 {
     if (!is_game(gs))
         return;
+    /* PC (2026-11-16): the texts in the interface's language (platform/ui_text.h),
+     * each a whole sentence (the plurals, MAX and MIN their own); the panel
+     * keeps them until the next refresh (a language changed in the F2 menu:
+     * from then) */
     const int day = gs->getDay();
-    char title[48];
-    snprintf(title, sizeof(title), "CHALLENGE MODES - DAY %d", day);
-    challenge_osd::set_title(title);
+    challenge_osd::set_title(trf("CHALLENGE MODES - DAY %d", day).c_str());
 
     /* money decay: the next day's take, the pause's days left */
     {
-        char line[2][64], amount[32];
+        std::string line[2];
+        char amount[32];
         const int through = pc_challenge_paused_through(gs);
         const int left = through > day ? through - day : 0;
         if (left > 0) {
-            snprintf(line[0], sizeof(line[0]), "NEXT DAY: PAUSED");
-            snprintf(line[1], sizeof(line[1]), "LICENSE PAUSE: %d DAY%s LEFT", left, left == 1 ? "" : "S");
+            line[0] = tr("NEXT DAY: PAUSED");
+            line[1] = left == 1 ? trf("LICENSE PAUSE: %d DAY LEFT", left) : trf("LICENSE PAUSE: %d DAYS LEFT", left);
         } else {
             const s64 next = pc_challenge_money_decay(day + 1);
             with_commas(amount, sizeof(amount), next * pc_challenge_money_scale());
-            snprintf(line[0], sizeof(line[0]), "NEXT DAY: -%s %s%s", amount,
-                     pc_challenge_money_scale() == 100 ? "YEN" : "CR.", next >= kMoneyCap ? " (MAX)" : "");
-            line[1][0] = '\0';
+            const char *unit = pc_challenge_money_scale() == 100 ? tr("YEN") : tr("CR.");
+            line[0] = next >= kMoneyCap ? trf("NEXT DAY: -%s %s (MAX)", amount, unit) : trf("NEXT DAY: -%s %s", amount, unit);
         }
-        const char *lines[challenge_osd::kStatusLines] = {line[0], line[1]};
+        const char *lines[challenge_osd::kStatusLines] = {line[0].c_str(), line[1].c_str()};
         challenge_osd::set_status((int)settings::Challenge::moneyDecay, lines);
     }
     /* car decay: today's power, the next day's */
     {
-        char line[2][64], now[16], next[16];
+        std::string line[2];
+        char now[16], next[16];
         hundredths_text(now, sizeof(now), pc_challenge_power(day));
         hundredths_text(next, sizeof(next), pc_challenge_power(day + 1));
         if (g_scene.load() == PC_SCENE_GT_LICENSE)
-            snprintf(line[0], sizeof(line[0]), "LICENSE TEST: NO DECAY");   /* PC (2026-11-15) */
+            line[0] = tr("LICENSE TEST: NO DECAY");   /* PC (2026-11-15) */
         else
-            snprintf(line[0], sizeof(line[0]), "POWER: %s%s", now, pc_challenge_power(day) == kPowerMin ? " (MIN)" : "");
-        snprintf(line[1], sizeof(line[1]), "NEXT DAY: %s", next);
-        const char *lines[challenge_osd::kStatusLines] = {line[0], line[1]};
+            line[0] = pc_challenge_power(day) == kPowerMin ? trf("POWER: %s (MIN)", now) : trf("POWER: %s", now);
+        line[1] = trf("NEXT DAY: %s", next);
+        const char *lines[challenge_osd::kStatusLines] = {line[0].c_str(), line[1].c_str()};
         challenge_osd::set_status((int)settings::Challenge::carDecay, lines);
     }
     /* course shrinkage: today's size, the next day's */
     {
-        char line[2][64], now[16], next[16];
+        std::string line[2];
+        char now[16], next[16];
         tenths_text(now, sizeof(now), pc_challenge_course(day));
         tenths_text(next, sizeof(next), pc_challenge_course(day + 1));
-        snprintf(line[0], sizeof(line[0]), "COURSE SIZE: %s%s", now,
-                 pc_challenge_course(day) == kCourseMin ? " (MIN)" : "");
-        snprintf(line[1], sizeof(line[1]), "NEXT DAY: %s", next);
-        const char *lines[challenge_osd::kStatusLines] = {line[0], line[1]};
+        line[0] = pc_challenge_course(day) == kCourseMin ? trf("COURSE SIZE: %s (MIN)", now) : trf("COURSE SIZE: %s", now);
+        line[1] = trf("NEXT DAY: %s", next);
+        const char *lines[challenge_osd::kStatusLines] = {line[0].c_str(), line[1].c_str()};
         challenge_osd::set_status((int)settings::Challenge::courseShrinkage, lines);
     }
 }

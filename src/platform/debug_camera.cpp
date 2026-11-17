@@ -6,6 +6,7 @@
 #include "platform/settings.h"
 #include "platform/settings_menu.h"
 #include "platform/system_menu.h"
+#include "platform/ui_text.h"                  /* PC (2026-11-16): the interface's languages */
 #include "platform/window.h"
 
 #include <atomic>
@@ -70,7 +71,7 @@ void key()
     g_locked = false;
     g_active = on;
     pclog::write("debug camera: %s", on ? "on" : "off");
-    settings_menu::notice(on ? "DEBUG CAMERA ENABLED" : "DEBUG CAMERA DISABLED", 2.0);
+    settings_menu::notice(on ? tr("DEBUG CAMERA ENABLED") : tr("DEBUG CAMERA DISABLED"), 2.0);
 }
 
 bool active()
@@ -142,25 +143,26 @@ void read(Controls *out)
         const bool locked = !g_locked.load();
         g_locked = locked;
         pclog::write("debug camera: %s", locked ? "locked (the players drive)" : "unlocked");
-        settings_menu::notice(locked ? "DEBUG CAMERA LOCKED" : "DEBUG CAMERA UNLOCKED", 2.0);
+        settings_menu::notice(locked ? tr("DEBUG CAMERA LOCKED") : tr("DEBUG CAMERA UNLOCKED"), 2.0);
     }
     g_lockHeld = lockHeld;
     if (g_locked.load())
         return;
-    /* the toggles: a press each way, kept in the settings */
+    /* the toggles: a press each way, kept in the settings (the texts
+     * translated when said: PC 2026-11-16) */
     auto toggle = [&](int c, bool *held, bool (*now)(), void (*set)(bool), const char *textOn, const char *textOff) {
         const bool down = get(c, nullptr) >= 0.5f;
         if (down && !*held) {
             const bool on = !now();
             set(on);
-            settings_menu::notice(on ? textOn : textOff, 2.0);
+            settings_menu::notice(tr(on ? textOn : textOff), 2.0);
         }
         *held = down;
     };
     toggle(DEBUG_Y_LOOK, &g_yLookHeld, settings::debug_camera_y_look, settings::set_debug_camera_y_look,
-           "DEBUG CAMERA Y-AXIS LOOK ON", "DEBUG CAMERA Y-AXIS LOOK OFF");
+           N_("DEBUG CAMERA Y-AXIS LOOK ON"), N_("DEBUG CAMERA Y-AXIS LOOK OFF"));
     toggle(DEBUG_GROUND, &g_groundHeld, settings::debug_camera_ground, settings::set_debug_camera_ground,
-           "DEBUG CAMERA GROUND COLLISION ON", "DEBUG CAMERA GROUND COLLISION OFF");
+           N_("DEBUG CAMERA GROUND COLLISION ON"), N_("DEBUG CAMERA GROUND COLLISION OFF"));
     int lookR = 0, lookL = 0, lookU = 0, lookD = 0;
     out->lookRight = get(DEBUG_LOOK_RIGHT, nullptr, &lookR) - get(DEBUG_LOOK_LEFT, nullptr, &lookL);
     out->lookUp = get(DEBUG_LOOK_UP, nullptr, &lookU) - get(DEBUG_LOOK_DOWN, nullptr, &lookD);

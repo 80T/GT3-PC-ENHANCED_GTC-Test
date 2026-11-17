@@ -7,6 +7,7 @@
 #include "save_manager.h"
 
 #include "platform/save_folders.h"
+#include "platform/ui_text.h"  /* PC (2026-11-16): the interface's languages */
 #include "ps2_icon.h"
 #include "save_card.h"
 #include "util.h"
@@ -21,7 +22,7 @@ namespace save_manager {
 namespace {
 
 constexpr const wchar_t *kClass = L"GT3LauncherSaveManager";
-constexpr const wchar_t *kTitle = L"Saves";
+constexpr const wchar_t *kTitle = N_(L"Saves");     /* (shown as tr(kTitle)) */
 
 /* Layout, in 96-DPI units. */
 constexpr int kW = 960, kH = 660, kM = 12, kGap = 8, kBtnH = 28, kHintH = 36, kPathH = 18;
@@ -244,7 +245,7 @@ void show_details()
         int kb = 0;
         for (int i : sel)
             kb += g.card.saves[(size_t)i].kb;
-        t = std::to_wstring(sel.size()) + L" saves selected, " + save_card::number(kb) + L" KB.";
+        t = trf(L"%d saves selected, %s KB.", (int)sel.size(), save_card::number(kb).c_str());
     }
     SetWindowTextW(g.details, t.c_str());
     buttons();
@@ -253,19 +254,22 @@ void show_details()
 std::wstring stats_text()
 {
     if (g.current.empty())
-        return g.list.empty() ? L"No save folders yet. New makes one: a blank memory card." : L"";
+        return g.list.empty() ? tr(L"No save folders yet. New makes one: a blank memory card.") : L"";
     if (!g.card.there)
-        return g.current + L" is not there any more.";
+        return trf(L"%s is not there any more.", g.current.c_str());
     const size_t n = g.card.saves.size();
-    std::wstring t = g.current + L": " + (n == 0 ? std::wstring(L"no saves") : save_card::number((long long)n) +
-                                                                             (n == 1 ? L" save" : L" saves")) +
-                     L", " + save_card::number(g.card.usedKB) + L" KB used of " +
-                     save_card::number(save_card::kCardKB) + L" KB (" + save_card::number(g.card.freeKB()) +
-                     L" KB free)";
+    /* (the count as a phrase of its own: "no saves", "1 save", "12 saves") */
+    const std::wstring count = n == 0   ? std::wstring(tr(L"no saves"))
+                               : n == 1 ? std::wstring(tr(L"1 save"))
+                                        : trf(L"%s saves", save_card::number((long long)n).c_str());
+    const std::wstring usedKB = save_card::number(g.card.usedKB), cardKB = save_card::number(save_card::kCardKB),
+                       freeKB = save_card::number(g.card.freeKB());
     const int s = slot_of(g.current);
-    if (s >= 0)
-        t += L", in memory card slot " + std::to_wstring(s + 1);
-    t += L".";
+    std::wstring t =
+        s >= 0 ? trf(L"%s: %s, %s KB used of %s KB (%s KB free), in memory card slot %d.", g.current.c_str(),
+                     count.c_str(), usedKB.c_str(), cardKB.c_str(), freeKB.c_str(), s + 1)
+               : trf(L"%s: %s, %s KB used of %s KB (%s KB free).", g.current.c_str(), count.c_str(), usedKB.c_str(),
+                     cardKB.c_str(), freeKB.c_str());
     if (n > 0) {
         std::wstring kinds;
         for (save_card::Kind k : {save_card::Kind::game, save_card::Kind::replay, save_card::Kind::bestLap,
@@ -281,7 +285,10 @@ std::wstring stats_text()
             if (v.kind == save_card::Kind::game) {
                 const std::wstring progress = save_card::game_summary(v);
                 if (!progress.empty())
-                    t += L"\r\nGame data" + (v.region.empty() ? L"" : L" (" + v.region + L")") + L": " + progress;
+                    t += L"\r\n" +
+                         (v.region.empty() ? std::wstring(tr(L"Game data"))
+                                           : trf(L"Game data (%s)", tr(v.region.c_str()))) +
+                         L": " + progress;
             }
     }
     return t;
@@ -298,12 +305,12 @@ void content_columns()
     const struct {
         const wchar_t *name;
         int width, fmt;
-    } cols[] = {{L"Save", title, LVCFMT_LEFT}, {L"Kind", kind, LVCFMT_LEFT}, {L"Size", size, LVCFMT_RIGHT},
-                {L"Saved", date, LVCFMT_LEFT}};
+    } cols[] = {{N_(L"Save"), title, LVCFMT_LEFT}, {N_(L"Kind"), kind, LVCFMT_LEFT}, {N_(L"Size"), size, LVCFMT_RIGHT},
+                {N_(L"Saved"), date, LVCFMT_LEFT}};
     for (int i = 0; i < 4; i++) {
         LVCOLUMNW col = {};
         col.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_FMT;
-        col.pszText = const_cast<wchar_t *>(cols[i].name);
+        col.pszText = const_cast<wchar_t *>(tr(cols[i].name));
         col.cx = cols[i].width;
         col.fmt = cols[i].fmt;
         if (SendMessageW(g.contents, LVM_SETCOLUMNWIDTH, (WPARAM)i, (LPARAM)col.cx) == FALSE)
@@ -340,8 +347,9 @@ void show_card()
         it.pszText = const_cast<wchar_t *>(title.c_str());
         SendMessageW(g.contents, LVM_INSERTITEMW, 0, (LPARAM)&it);
         set_cell(g.contents, (int)i, 1,
-                 save_card::kind_name(s.kind) + (s.region.empty() ? L"" : L" (" + s.region + L")"));
-        set_cell(g.contents, (int)i, 2, save_card::number(s.kb) + L" KB");
+                 save_card::kind_name(s.kind) +
+                     (s.region.empty() ? L"" : L" (" + std::wstring(tr(s.region.c_str())) + L")"));
+        set_cell(g.contents, (int)i, 2, trf(L"%s KB", save_card::number(s.kb).c_str()));
         set_cell(g.contents, (int)i, 3, save_card::date_text(s.saved));
         if (std::any_of(keep.begin(), keep.end(), [&s](const std::wstring &k) { return same(k, s.dir); })) {
             LVITEMW st = {};
@@ -366,7 +374,7 @@ void fill_slots()
     for (int s = 0; s < save_folders::kSlots; s++) {
         HWND c = g.slot[s];
         SendMessageW(c, CB_RESETCONTENT, 0, 0);
-        SendMessageW(c, CB_ADDSTRING, 0, (LPARAM)L"(No card)");
+        SendMessageW(c, CB_ADDSTRING, 0, (LPARAM)tr(L"(No card)"));
         const std::wstring cur = save_folders::slot(g.ini, s), other = save_folders::slot(g.ini, 1 - s);
         int sel = 0;
         for (const Folder &f : g.list) {
@@ -377,7 +385,7 @@ void fill_slots()
                 sel = i;
         }
         if (!cur.empty() && sel == 0)       /* its folder is gone (or not usable): said so */
-            sel = (int)SendMessageW(c, CB_ADDSTRING, 0, (LPARAM)(cur + L" (not found)").c_str());
+            sel = (int)SendMessageW(c, CB_ADDSTRING, 0, (LPARAM)trf(L"%s (not found)", cur.c_str()).c_str());
         SendMessageW(c, CB_SETCURSEL, (WPARAM)sel, 0);
     }
     g.filling = false;
@@ -392,12 +400,12 @@ void folder_columns()
     const struct {
         const wchar_t *name;
         int width, fmt;
-    } cols[] = {{L"Folder", name, LVCFMT_LEFT}, {L"Slot", slot, LVCFMT_CENTER}, {L"Saves", saves, LVCFMT_RIGHT},
-                {L"Used", used, LVCFMT_RIGHT}};
+    } cols[] = {{N_(L"Folder"), name, LVCFMT_LEFT}, {N_(L"Slot"), slot, LVCFMT_CENTER},
+                {N_(L"Saves"), saves, LVCFMT_RIGHT}, {N_(L"Used"), used, LVCFMT_RIGHT}};
     for (int i = 0; i < 4; i++) {
         LVCOLUMNW col = {};
         col.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_FMT;
-        col.pszText = const_cast<wchar_t *>(cols[i].name);
+        col.pszText = const_cast<wchar_t *>(tr(cols[i].name));
         col.cx = cols[i].width;
         col.fmt = cols[i].fmt;
         if (SendMessageW(g.folders, LVM_SETCOLUMNWIDTH, (WPARAM)i, (LPARAM)col.cx) == FALSE)
@@ -451,7 +459,7 @@ void refresh(std::wstring keep = std::wstring())
         const int s = slot_of(f.name);
         set_cell(g.folders, (int)i, 1, s >= 0 ? std::to_wstring(s + 1) : std::wstring());
         set_cell(g.folders, (int)i, 2, save_card::number(f.saves));
-        set_cell(g.folders, (int)i, 3, save_card::number(f.kb) + L" KB");
+        set_cell(g.folders, (int)i, 3, trf(L"%s KB", save_card::number(f.kb).c_str()));
         if (!keep.empty() && same(f.name, keep))
             sel = (int)i;
     }
@@ -465,8 +473,9 @@ void refresh(std::wstring keep = std::wstring())
 std::wstring summary_line()
 {
     const size_t n = g.list.size();
-    return n == 0 ? L"No save folders yet: New makes one."
-                  : save_card::number((long long)n) + (n == 1 ? L" save folder in " : L" save folders in ") + g.dir;
+    return n == 0   ? std::wstring(tr(L"No save folders yet: New makes one."))
+           : n == 1 ? trf(L"1 save folder in %s", g.dir.c_str())
+                    : trf(L"%s save folders in %s", save_card::number((long long)n).c_str(), g.dir.c_str());
 }
 
 void slot_changed(int s)
@@ -479,12 +488,16 @@ void slot_changed(int s)
         SendMessageW(g.slot[s], CB_GETLBTEXT, (WPARAM)i, (LPARAM)text);
     std::wstring name = text;
     const std::wstring cur = save_folders::slot(g.ini, s);
-    if (!cur.empty() && name == cur + L" (not found)")
+    if (!cur.empty() && name == trf(L"%s (not found)", cur.c_str()))
         return;                             /* (the gone folder picked again: no change) */
     save_folders::set_slot(g.ini, s, name);
     refresh();
-    set_status(L"Memory card slot " + std::to_wstring(s + 1) + L": " + (name.empty() ? L"no card" : name) +
-               L". The game takes it when it starts (in the game: F2 > MEMORY CARDS).");
+    set_status(name.empty() ? trf(L"Memory card slot %d: no card. The game takes it when it starts (in the game: "
+                                  L"F2 > MEMORY CARDS).",
+                                  s + 1)
+                            : trf(L"Memory card slot %d: %s. The game takes it when it starts (in the game: "
+                                  L"F2 > MEMORY CARDS).",
+                                  s + 1, name.c_str()));
     notify();
 }
 
@@ -509,11 +522,12 @@ void new_folder()
             break;
     }
     if (!util::make_folders(folder_path(name))) {
-        set_status(L"Could not make " + folder_path(name) + L": " + util::system_error_text(GetLastError()) + L".");
+        set_status(trf(L"Could not make %s: %s.", folder_path(name).c_str(),
+                       util::system_error_text(GetLastError()).c_str()));
         return;
     }
     refresh(name);
-    set_status(L"Made " + name + L", a blank memory card. Type its name, or Enter to keep this one.");
+    set_status(trf(L"Made %s, a blank memory card. Type its name, or Enter to keep this one.", name.c_str()));
     notify();
     begin_rename();
 }
@@ -528,21 +542,22 @@ bool end_rename(int row, const wchar_t *text)
     if (to == from)
         return false;
     if (const wchar_t *problem = save_folders::name_problem(to)) {
-        MessageBoxW(g.wnd, (to + L"\n\n" + problem).c_str(), kTitle, MB_OK | MB_ICONWARNING);
+        /* (save_folders' text: translated here, also when it is marked N_ there) */
+        MessageBoxW(g.wnd, (to + L"\n\n" + tr(problem)).c_str(), tr(kTitle), MB_OK | MB_ICONWARNING);
         return false;
     }
     for (const Folder &f : g.list)
         if (same(f.name, to) && !same(f.name, from)) {
-            MessageBoxW(g.wnd, (L"There is a save folder named " + f.name + L" already.").c_str(), kTitle,
+            MessageBoxW(g.wnd, trf(L"There is a save folder named %s already.", f.name.c_str()).c_str(), tr(kTitle),
                         MB_OK | MB_ICONWARNING);
             return false;
         }
     if (!MoveFileW(folder_path(from).c_str(), folder_path(to).c_str())) {
         MessageBoxW(g.wnd,
-                    (L"Could not rename " + from + L":\n" + util::system_error_text(GetLastError()) +
-                     L".\n\nIs the game using it?")
+                    trf(L"Could not rename %s:\n%s.\n\nIs the game using it?", from.c_str(),
+                        util::system_error_text(GetLastError()).c_str())
                         .c_str(),
-                    kTitle, MB_OK | MB_ICONWARNING);
+                    tr(kTitle), MB_OK | MB_ICONWARNING);
         return false;
     }
     for (int s = 0; s < save_folders::kSlots; s++)
@@ -551,7 +566,7 @@ bool end_rename(int row, const wchar_t *text)
     /* (refreshed after the list has taken the edit) */
     PostMessageW(g.wnd, WM_APP_RENAMED, 0, 0);
     g.current = to;
-    set_status(L"Renamed " + from + L" to " + to + L".");
+    set_status(trf(L"Renamed %s to %s.", from.c_str(), to.c_str()));
     return true;
 }
 
@@ -564,15 +579,22 @@ void clear_folder()
     const Folder fo = g.list[(size_t)f];
     if (fo.saves == 0)
         return;
-    const std::wstring q = L"Delete every save in " + fo.name + L"?\n\n" + save_card::number(fo.saves) +
-                           (fo.saves == 1 ? L" save, " : L" saves, ") + save_card::number(fo.kb) +
-                           L" KB. The folder stays, empty: a blank memory card.\n\nThis cannot be undone.";
-    if (MessageBoxW(g.wnd, q.c_str(), kTitle, MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) != IDYES)
+    const std::wstring kb = save_card::number(fo.kb);
+    const std::wstring q =
+        (fo.saves == 1 ? trf(L"Delete every save in %s?\n\n1 save, %s KB. The folder stays, empty: a blank memory "
+                             L"card.",
+                             fo.name.c_str(), kb.c_str())
+                       : trf(L"Delete every save in %s?\n\n%s saves, %s KB. The folder stays, empty: a blank memory "
+                             L"card.",
+                             fo.name.c_str(), save_card::number(fo.saves).c_str(), kb.c_str())) +
+        L"\n\n" + tr(L"This cannot be undone.");
+    if (MessageBoxW(g.wnd, q.c_str(), tr(kTitle), MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) != IDYES)
         return;
     std::wstring error;
     const bool ok = save_card::remove_tree(folder_path(fo.name), false, &error);
     refresh(fo.name);
-    set_status(ok ? L"Cleared " + fo.name + L"." : L"Not all of " + fo.name + L" could be deleted: " + error);
+    set_status(ok ? trf(L"Cleared %s.", fo.name.c_str())
+                  : trf(L"Not all of %s could be deleted: %s", fo.name.c_str(), error.c_str()));
     notify();
 }
 
@@ -584,14 +606,15 @@ void delete_folder()
         return;
     const Folder fo = g.list[(size_t)f];
     const int s = slot_of(fo.name);
-    std::wstring q = L"Delete the save folder " + fo.name + L" and everything in it?\n\n";
-    q += fo.saves == 0 ? std::wstring(L"It has no saves.")
-                       : save_card::number(fo.saves) + (fo.saves == 1 ? L" save, " : L" saves, ") +
-                             save_card::number(fo.kb) + L" KB.";
+    std::wstring q = trf(L"Delete the save folder %s and everything in it?", fo.name.c_str()) + L"\n\n";
+    q += fo.saves == 0   ? std::wstring(tr(L"It has no saves."))
+         : fo.saves == 1 ? trf(L"1 save, %s KB.", save_card::number(fo.kb).c_str())
+                         : trf(L"%s saves, %s KB.", save_card::number(fo.saves).c_str(),
+                               save_card::number(fo.kb).c_str());
     if (s >= 0)
-        q += L"\nMemory card slot " + std::to_wstring(s + 1) + L" will have no card.";
-    q += L"\n\nThis cannot be undone.";
-    if (MessageBoxW(g.wnd, q.c_str(), kTitle, MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) != IDYES)
+        q += L"\n" + trf(L"Memory card slot %d will have no card.", s + 1);
+    q += std::wstring(L"\n\n") + tr(L"This cannot be undone.");
+    if (MessageBoxW(g.wnd, q.c_str(), tr(kTitle), MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) != IDYES)
         return;
     std::wstring error;
     const bool ok = save_card::remove_tree(folder_path(fo.name), true, &error);
@@ -601,7 +624,8 @@ void delete_folder()
                 save_folders::set_slot(g.ini, k, std::wstring());
     const int next = f + 1 < (int)g.list.size() ? f + 1 : f - 1;
     refresh(ok && next >= 0 && next < (int)g.list.size() ? g.list[(size_t)next].name : fo.name);
-    set_status(ok ? L"Deleted " + fo.name + L"." : L"Not all of " + fo.name + L" could be deleted: " + error);
+    set_status(ok ? trf(L"Deleted %s.", fo.name.c_str())
+                  : trf(L"Not all of %s could be deleted: %s", fo.name.c_str(), error.c_str()));
     notify();
 }
 
@@ -623,10 +647,10 @@ void copy_saves(const std::wstring &target)
         const bool there = GetFileAttributesW(to.c_str()) != INVALID_FILE_ATTRIBUTES;
         if (there) {
             const int a = MessageBoxW(g.wnd,
-                                      (target + L" has this save already:\n" + save_card::title(s) + L"\n(" + s.dir +
-                                       L")\n\nReplace it with this one?")
+                                      trf(L"%s has this save already:\n%s\n(%s)\n\nReplace it with this one?",
+                                          target.c_str(), save_card::title(s).c_str(), s.dir.c_str())
                                           .c_str(),
-                                      kTitle, MB_YESNOCANCEL | MB_ICONQUESTION | MB_DEFBUTTON2);
+                                      tr(kTitle), MB_YESNOCANCEL | MB_ICONQUESTION | MB_DEFBUTTON2);
             if (a == IDCANCEL)
                 break;
             if (a != IDYES) {
@@ -639,33 +663,34 @@ void copy_saves(const std::wstring &target)
         const int freeKB = save_card::kCardKB - save_card::used_kb(folder_path(target)) +
                            (there ? save_card::used_kb(to) : 0);
         if (s.kb + 2 > freeKB) {
-            problem = target + L" has not enough space for " + save_card::title(s) + L": it needs " +
-                      save_card::number(s.kb) + L" KB, " + save_card::number(std::max(0, freeKB)) + L" KB free.";
+            problem = trf(L"%s has not enough space for %s: it needs %s KB, %s KB free.", target.c_str(),
+                          save_card::title(s).c_str(), save_card::number(s.kb).c_str(),
+                          save_card::number(std::max(0, freeKB)).c_str());
             skipped++;
             continue;
         }
         std::wstring error;
         if (there && !save_card::remove_tree(to, true, &error)) {
-            problem = L"Could not replace " + s.dir + L" in " + target + L": " + error;
+            problem = trf(L"Could not replace %s in %s: %s", s.dir.c_str(), target.c_str(), error.c_str());
             skipped++;
             continue;
         }
         if (!save_card::copy_tree(from, to, &error)) {
             save_card::remove_tree(to, true, nullptr);      /* (no half save left) */
-            problem = L"Could not copy " + s.dir + L": " + error;
+            problem = trf(L"Could not copy %s: %s", s.dir.c_str(), error.c_str());
             skipped++;
             continue;
         }
         copied++;
     }
     refresh();
-    std::wstring t = L"Copied " + save_card::number(copied) + (copied == 1 ? L" save to " : L" saves to ") + target +
-                     L".";
+    std::wstring t = copied == 1 ? trf(L"Copied 1 save to %s.", target.c_str())
+                                 : trf(L"Copied %s saves to %s.", save_card::number(copied).c_str(), target.c_str());
     if (skipped > 0)
-        t += L" " + save_card::number(skipped) + L" not copied.";
+        t += L" " + trf(L"%s not copied.", save_card::number(skipped).c_str());
     if (!problem.empty()) {
         t += L" " + problem;
-        MessageBoxW(g.wnd, problem.c_str(), kTitle, MB_OK | MB_ICONWARNING);
+        MessageBoxW(g.wnd, problem.c_str(), tr(kTitle), MB_OK | MB_ICONWARNING);
     }
     set_status(t);
     notify();
@@ -681,14 +706,14 @@ void copy_menu()
     for (const Folder &f : g.list) {
         if (same(f.name, g.current))
             continue;
-        const std::wstring item = f.name + L"\t" + save_card::number(std::max(0, save_card::kCardKB - f.kb)) +
-                                  L" KB free";
+        const std::wstring item =
+            f.name + L"\t" + trf(L"%s KB free", save_card::number(std::max(0, save_card::kCardKB - f.kb)).c_str());
         AppendMenuW(menu, MF_STRING, IDC_COPY_TO0 + (UINT_PTR)g.copyTargets.size(), item.c_str());
         g.copyTargets.push_back(f.name);
     }
     if (g.copyTargets.empty()) {
         DestroyMenu(menu);
-        set_status(L"There is no other save folder to copy to: New makes one.");
+        set_status(tr(L"There is no other save folder to copy to: New makes one."));
         return;
     }
     RECT r;
@@ -712,18 +737,18 @@ void delete_saves()
     std::wstring q;
     if (saves.size() == 1) {
         const save_card::Save &s = saves[0];
-        q = L"Delete this save from " + source + L"?\n\n" + save_card::title(s) + L"\n" +
-            save_card::kind_name(s.kind) + L", " + save_card::number(s.kb) + L" KB, saved " +
-            save_card::date_text(s.saved);
+        q = trf(L"Delete this save from %s?", source.c_str()) + L"\n\n" + save_card::title(s) + L"\n" +
+            trf(L"%s, %s KB, saved %s", save_card::kind_name(s.kind).c_str(), save_card::number(s.kb).c_str(),
+                save_card::date_text(s.saved).c_str());
     } else {
         int kb = 0;
         for (const save_card::Save &s : saves)
             kb += s.kb;
-        q = L"Delete these " + std::to_wstring(saves.size()) + L" saves from " + source + L"?\n\n" +
-            save_card::number(kb) + L" KB.";
+        q = trf(L"Delete these %d saves from %s?\n\n%s KB.", (int)saves.size(), source.c_str(),
+                save_card::number(kb).c_str());
     }
-    q += L"\n\nThis cannot be undone.";
-    if (MessageBoxW(g.wnd, q.c_str(), kTitle, MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) != IDYES)
+    q += std::wstring(L"\n\n") + tr(L"This cannot be undone.");
+    if (MessageBoxW(g.wnd, q.c_str(), tr(kTitle), MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) != IDYES)
         return;
     int deleted = 0;
     std::wstring problem;
@@ -735,8 +760,9 @@ void delete_saves()
             problem = error;
     }
     refresh();
-    set_status(L"Deleted " + save_card::number(deleted) + (deleted == 1 ? L" save." : L" saves.") +
-               (problem.empty() ? L"" : L" Not deleted: " + problem));
+    set_status((deleted == 1 ? std::wstring(tr(L"Deleted 1 save."))
+                             : trf(L"Deleted %s saves.", save_card::number(deleted).c_str())) +
+               (problem.empty() ? std::wstring() : L" " + trf(L"Not deleted: %s", problem.c_str())));
     notify();
 }
 
@@ -756,29 +782,59 @@ void make_font()
     g.font = f;
 }
 
+/* PC (2026-11-16): a control's text's width / wrapped height in its font
+ * (the interface's languages run longer: layout sizes the slot labels, the
+ * buttons and the hint from them) */
+SIZE text_size(HWND c, int wrapWidth = 0)
+{
+    wchar_t t[1024] = L"";
+    GetWindowTextW(c, t, 1024);
+    HDC dc = GetDC(c);
+    HFONT f = (HFONT)SendMessageW(c, WM_GETFONT, 0, 0);
+    HGDIOBJ old = SelectObject(dc, f != nullptr ? (HGDIOBJ)f : GetStockObject(DEFAULT_GUI_FONT));
+    RECT r = {0, 0, wrapWidth, 0};
+    DrawTextW(dc, t, -1, &r, DT_CALCRECT | (wrapWidth > 0 ? DT_WORDBREAK : DT_SINGLELINE));
+    SelectObject(dc, old);
+    ReleaseDC(c, dc);
+    return {r.right, r.bottom};
+}
+
 void layout()
 {
     RECT rc;
     GetClientRect(g.wnd, &rc);
     const int W = rc.right, H = rc.bottom, m = px(kM), gap = px(kGap), bh = px(kBtnH);
     auto put = [](HWND c, int x, int y, int w, int h) { SetWindowPos(c, nullptr, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE); };
-    put(g.hint, m, m, W - 2 * m, px(kHintH));
-    put(g.path, m, m + px(kHintH), W - 2 * m, px(kPathH));
-    int y = m + px(kHintH) + px(kPathH) + gap, x = m;
+    /* (PC 2026-11-16: the hint as tall as its text needs, two lines at least) */
+    const int hintH = std::max(px(kHintH), (int)text_size(g.hint, W - 2 * m).cy + px(2));
+    put(g.hint, m, m, W - 2 * m, hintH);
+    put(g.path, m, m + hintH, W - 2 * m, px(kPathH));
+    int y = m + hintH + px(kPathH) + gap, x = m;
     for (int s = 0; s < save_folders::kSlots; s++) {
-        put(g.slotLabel[s], x, y + px(5), px(kSlotLabelW), px(kLabelH));
-        put(g.slot[s], x + px(kSlotLabelW), y, px(kSlotComboW), px(300));
-        x += px(kSlotLabelW) + px(kSlotComboW) + px(24);
+        /* (PC 2026-11-16: the label as wide as its text, kSlotLabelW at least) */
+        const int sw = std::max(px(kSlotLabelW), (int)text_size(g.slotLabel[s]).cx + px(8));
+        put(g.slotLabel[s], x, y + px(5), sw, px(kLabelH));
+        put(g.slot[s], x + sw, y, px(kSlotComboW), px(300));
+        x += sw + px(kSlotComboW) + px(24);
     }
     const int top = y + bh + px(12), bottom = H - m - bh, row = bottom - gap - bh;
     /* left: the folders */
     const int lw = px(kLeftW);
     put(g.foldersLabel, m, top, lw, px(kLabelH));
     put(g.folders, m, top + px(kLabelH) + px(2), lw, row - gap - (top + px(kLabelH) + px(2)));
-    const int bw = (lw - 3 * px(6)) / 4;
+    /* (PC 2026-11-16: the four buttons share the row by their texts' widths,
+     * the room left over alike; equal quarters before) */
+    HWND fb[4] = {g.newFolder, g.rename, g.clear, g.remove};
+    int need[4], sum = 0;
+    for (int i = 0; i < 4; i++) {
+        need[i] = (int)text_size(fb[i]).cx + px(14);
+        sum += need[i];
+    }
+    const int room = lw - 3 * px(6);
     int bx = m;
-    for (HWND b : {g.newFolder, g.rename, g.clear, g.remove}) {
-        put(b, bx, row, bw, bh);
+    for (int i = 0; i < 4; i++) {
+        const int bw = sum <= room ? need[i] + (room - sum) / 4 : need[i] * room / sum;
+        put(fb[i], bx, row, bw, bh);
         bx += bw + px(6);
     }
     /* right: the statistics, the saves, the details */
@@ -787,8 +843,10 @@ void layout()
     const int listTop = top + px(kStatsH) + px(4), detailsTop = row - gap - px(kDetailsH);
     put(g.contents, rx, listTop, rw, detailsTop - gap - listTop);
     put(g.details, rx, detailsTop, rw, px(kDetailsH));
-    put(g.copy, rx, row, px(120), bh);
-    put(g.removeSaves, rx + px(120) + px(6), row, px(120), bh);
+    const int cw = std::max(px(120), (int)text_size(g.copy).cx + px(16));
+    const int dw = std::max(px(120), (int)text_size(g.removeSaves).cx + px(16));
+    put(g.copy, rx, row, cw, bh);
+    put(g.removeSaves, rx + cw + px(6), row, dw, bh);
     /* the bottom */
     put(g.status, m, bottom + px(6), W - 2 * m - px(kCloseW) - gap, px(20));
     put(g.close, W - m - px(kCloseW), bottom, px(kCloseW), bh);
@@ -805,33 +863,34 @@ HWND make(const wchar_t *cls, const wchar_t *text, DWORD style, int id, DWORD ex
 void create_controls()
 {
     g.hint = make(WC_STATICW,
-                  L"Each save folder is one memory card (8 MB). The game's memory card slots take the folders picked "
-                  L"here when it starts; in the game, F2 > MEMORY CARDS swaps them.",
+                  tr(L"Each save folder is one memory card (8 MB). The game's memory card slots take the folders "
+                     L"picked here when it starts; in the game, F2 > MEMORY CARDS swaps them."),
                   SS_LEFT | SS_NOPREFIX, IDC_HINT);
-    g.path = make(WC_STATICW, (L"The folders: " + g.dir).c_str(), SS_LEFT | SS_NOPREFIX | SS_PATHELLIPSIS, IDC_PATH);
-    g.slotLabel[0] = make(WC_STATICW, L"Memory card slot &1:", SS_LEFT, IDC_SLOT_LABEL1);
+    g.path = make(WC_STATICW, trf(L"The folders: %s", g.dir.c_str()).c_str(), SS_LEFT | SS_NOPREFIX | SS_PATHELLIPSIS,
+                  IDC_PATH);
+    g.slotLabel[0] = make(WC_STATICW, tr(L"Memory card slot &1:"), SS_LEFT, IDC_SLOT_LABEL1);
     g.slot[0] = make(WC_COMBOBOXW, L"", WS_TABSTOP | WS_VSCROLL | CBS_DROPDOWNLIST, IDC_SLOT1);
-    g.slotLabel[1] = make(WC_STATICW, L"Memory card slot &2:", SS_LEFT, IDC_SLOT_LABEL2);
+    g.slotLabel[1] = make(WC_STATICW, tr(L"Memory card slot &2:"), SS_LEFT, IDC_SLOT_LABEL2);
     g.slot[1] = make(WC_COMBOBOXW, L"", WS_TABSTOP | WS_VSCROLL | CBS_DROPDOWNLIST, IDC_SLOT2);
-    g.foldersLabel = make(WC_STATICW, L"Save &folders", SS_LEFT, IDC_FOLDERS_LABEL);
+    g.foldersLabel = make(WC_STATICW, tr(L"Save &folders"), SS_LEFT, IDC_FOLDERS_LABEL);
     g.folders = make(WC_LISTVIEWW, L"",
                      WS_TABSTOP | LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | LVS_EDITLABELS,
                      IDC_FOLDERS, WS_EX_CLIENTEDGE);
     SendMessageW(g.folders, LVM_SETEXTENDEDLISTVIEWSTYLE, 0, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
-    g.newFolder = make(WC_BUTTONW, L"&New", WS_TABSTOP | BS_PUSHBUTTON, IDC_NEW);
-    g.rename = make(WC_BUTTONW, L"&Rename", WS_TABSTOP | BS_PUSHBUTTON, IDC_RENAME);
-    g.clear = make(WC_BUTTONW, L"C&lear...", WS_TABSTOP | BS_PUSHBUTTON, IDC_CLEAR);
-    g.remove = make(WC_BUTTONW, L"&Delete...", WS_TABSTOP | BS_PUSHBUTTON, IDC_DELETE);
+    g.newFolder = make(WC_BUTTONW, tr(L"&New"), WS_TABSTOP | BS_PUSHBUTTON, IDC_NEW);
+    g.rename = make(WC_BUTTONW, tr(L"&Rename"), WS_TABSTOP | BS_PUSHBUTTON, IDC_RENAME);
+    g.clear = make(WC_BUTTONW, tr(L"C&lear..."), WS_TABSTOP | BS_PUSHBUTTON, IDC_CLEAR);
+    g.remove = make(WC_BUTTONW, tr(L"&Delete..."), WS_TABSTOP | BS_PUSHBUTTON, IDC_DELETE);
     g.stats = make(WC_STATICW, L"", SS_LEFT | SS_NOPREFIX, IDC_STATS);
     g.contents = make(WC_LISTVIEWW, L"", WS_TABSTOP | LVS_REPORT | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER, IDC_CONTENTS,
                       WS_EX_CLIENTEDGE);
     SendMessageW(g.contents, LVM_SETEXTENDEDLISTVIEWSTYLE, 0, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
     g.details = make(WC_EDITW, L"", WS_TABSTOP | WS_VSCROLL | ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL, IDC_DETAILS,
                      WS_EX_CLIENTEDGE);
-    g.copy = make(WC_BUTTONW, L"&Copy to...", WS_TABSTOP | BS_PUSHBUTTON, IDC_COPY);
-    g.removeSaves = make(WC_BUTTONW, L"Delete sa&ves...", WS_TABSTOP | BS_PUSHBUTTON, IDC_DELETE_SAVES);
+    g.copy = make(WC_BUTTONW, tr(L"&Copy to..."), WS_TABSTOP | BS_PUSHBUTTON, IDC_COPY);
+    g.removeSaves = make(WC_BUTTONW, tr(L"Delete sa&ves..."), WS_TABSTOP | BS_PUSHBUTTON, IDC_DELETE_SAVES);
     g.status = make(WC_STATICW, L"", SS_LEFT | SS_NOPREFIX | SS_ENDELLIPSIS, IDC_STATUS);
-    g.close = make(WC_BUTTONW, L"Close", WS_TABSTOP | BS_PUSHBUTTON, IDCANCEL);
+    g.close = make(WC_BUTTONW, tr(L"Close"), WS_TABSTOP | BS_PUSHBUTTON, IDCANCEL);
 }
 
 LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
@@ -963,8 +1022,9 @@ std::wstring summary(const std::wstring &savesDir, const std::wstring &engineIni
         const std::wstring f = save_folders::slot(engineIni, s);
         const DWORD a = f.empty() ? INVALID_FILE_ATTRIBUTES : GetFileAttributesW((savesDir + f).c_str());
         const bool there = a != INVALID_FILE_ATTRIBUTES && (a & FILE_ATTRIBUTE_DIRECTORY);
-        t += (s > 0 ? L"\n" : L"") + std::wstring(L"Slot ") + std::to_wstring(s + 1) + L": " +
-             (f.empty() ? L"no card" : there ? f : f + L" (not found)");
+        t += (s > 0 ? L"\n" : L"") + (f.empty() ? trf(L"Slot %d: no card", s + 1)
+                                      : there   ? trf(L"Slot %d: %s", s + 1, f.c_str())
+                                                : trf(L"Slot %d: %s (not found)", s + 1, f.c_str()));
     }
     return t;
 }
@@ -1004,7 +1064,7 @@ void open(HWND owner, const std::wstring &savesDir, const std::wstring &engineIn
     RECT o = {};
     GetWindowRect(owner, &o);
     const int ww = r.right - r.left, wh = r.bottom - r.top;
-    const std::wstring title = std::wstring(kTitle) + L" - " + engine;
+    const std::wstring title = std::wstring(tr(kTitle)) + L" - " + engine;
     g.wnd = CreateWindowExW(ex, kClass, title.c_str(), style, o.left + ((o.right - o.left) - ww) / 2,
                             o.top + ((o.bottom - o.top) - wh) / 2, ww, wh, owner, nullptr, inst, nullptr);
     if (g.wnd == nullptr)

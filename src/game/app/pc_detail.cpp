@@ -6,6 +6,7 @@
 #include "engine/pgl/G001_flare.h"              /* pgl_get_matrix, vu0_scale */
 #include "platform/settings.h"
 #include "platform/settings_menu.h"             /* notice */
+#include "platform/ui_text.h"                   /* PC (2026-11-16): the interface's languages */
 
 #include <ctype.h>
 #include <math.h>
@@ -92,8 +93,8 @@ int pc_extra_cameras(void)
 
 void pc_camera_notice(const char *name)
 {
-    char text[32];
-    snprintf(text, sizeof(text), "CAMERA: %s", name);
+    char text[256];                         /* (PC 2026-11-16: 32 before - UTF-8 translations) */
+    snprintf(text, sizeof(text), tr("CAMERA: %s"), name);
     for (char *c = text; *c != '\0'; c++)
         *c = (char)toupper((unsigned char)*c);
     settings_menu::notice(text, 1.5);

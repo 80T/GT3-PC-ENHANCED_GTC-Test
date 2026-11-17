@@ -3,6 +3,7 @@
 
 #include "disc_files.h"                     /* PC (2026-11-15): a disc image's data folder */
 #include "util.h"
+#include "platform/ui_text.h"  /* PC (2026-11-16): the interface's languages */
 
 #include "engine/media/native/mp4_movie.h"   /* Mp4AudioReader: an .mp3's samples */
 #include "engine/sound/native/bgm_files.h"
@@ -263,8 +264,9 @@ install::Result convert(const std::wstring &data, install::Listener &listener, s
     std::vector<int16_t> pcm;
     for (const AdsFile &f : files) {
         if (listener.cancel_requested()) {
-            *message = L"The music conversion was stopped (" + std::to_wstring(converted) +
-                       L" files converted); it carries on with the rest the next time.";
+            *message = trf(L"The music conversion was stopped (%d files converted); it carries on with the rest the "
+                           L"next time.",
+                           converted);
             return install::Result::cancelled;
         }
         const std::wstring path = bgm + f.name;
@@ -273,7 +275,7 @@ install::Result convert(const std::wstring &data, install::Listener &listener, s
             problems.push_back(f.name + L": " + util::system_error_text(err));
         } else if (!ads_parse_header(src.data(), (uint32_t)std::min<size_t>(src.size(), 0xFFFFFFFFu), &h) ||
                    (h.type != ADS_TYPE_ADPCM && h.type != ADS_TYPE_PCM)) {
-            problems.push_back(f.name + L": not an .ads (left as it is)");
+            problems.push_back(trf(L"%s: not an .ads (left as it is)", f.name.c_str()));
         } else {
             const uint32_t body = (uint32_t)std::min<size_t>(h.bodySize, src.size() - ADS_HEAD_BYTES);
             pcm.clear();
@@ -289,12 +291,13 @@ install::Result convert(const std::wstring &data, install::Listener &listener, s
                          t != tags.end() ? t->second.second : std::string());
             const std::wstring wav = path.substr(0, path.size() - 4) + L".wav";
             if (!write_pieces(wav, {{head.data(), head.size()}, {pcm.data(), pcm.size() * 2}}, &err)) {
-                problems.push_back(f.name + L": writing its .wav failed: " + util::system_error_text(err));
+                problems.push_back(trf(L"%s: writing its .wav failed: %s", f.name.c_str(),
+                                       util::system_error_text(err).c_str()));
             } else {
                 converted++;
                 if (!DeleteFileW(path.c_str()))
-                    problems.push_back(f.name + L": converted, but it could not be deleted: " +
-                                       util::system_error_text(GetLastError()));
+                    problems.push_back(trf(L"%s: converted, but it could not be deleted: %s", f.name.c_str(),
+                                           util::system_error_text(GetLastError()).c_str()));
             }
         }
         done += f.size;
@@ -311,18 +314,18 @@ install::Result convert(const std::wstring &data, install::Listener &listener, s
         else
             problems.push_back(L"ads.txt: " + util::system_error_text(err));
     } else if (!haveList && !listError.empty()) {
-        problems.push_back(L"ads.inf: " + util::widen(listError) + L" (no ads.txt written)");
+        problems.push_back(trf(L"ads.inf: %s (no ads.txt written)", util::widen(listError).c_str()));
     }
 
-    *message = L"Music: " + std::to_wstring(converted) + L" files converted to WAV" +
-               (wroteList ? std::wstring(L", the list written as bgm\\ads.txt") : std::wstring()) + L".";
+    *message = wroteList ? trf(L"Music: %d files converted to WAV, the list written as bgm\\ads.txt.", converted)
+                         : trf(L"Music: %d files converted to WAV.", converted);
     if (problems.empty())
         return install::Result::ok;
-    *message += L" Not converted:";
+    *message += std::wstring(L" ") + tr(L"Not converted:");
     for (size_t i = 0; i < problems.size() && i < 8; i++)
         *message += L"\n  " + problems[i];
     if (problems.size() > 8)
-        *message += L"\n  (" + std::to_wstring(problems.size() - 8) + L" more)";
+        *message += L"\n  " + trf(L"(%d more)", (int)(problems.size() - 8));
     return install::Result::failed;
 }
 
@@ -366,7 +369,7 @@ bool write_list(const std::wstring &data, const std::string &text, std::wstring 
     util::make_folders(bgm_folder(data));
     if (write_pieces(bgm_folder(data) + L"ads.txt", {{text.data(), text.size()}}, &err))
         return true;
-    *message = L"bgm\\ads.txt could not be written: " + util::system_error_text(err) + L".";
+    *message = trf(L"bgm\\ads.txt could not be written: %s.", util::system_error_text(err).c_str());
     return false;
 }
 
@@ -434,8 +437,12 @@ int repair_markers(const std::wstring &data, std::wstring *message)
         return 0;
     if (!write_list(data, ads_list_text(list, prober(data)), message))
         return -1;
-    *message = L"the original songs' beat markers repaired (" + std::to_wstring(repaired) +
-               (repaired == 1 ? L" track" : L" tracks") + L": the conversion had misread them from ads.inf).";
+    *message = repaired == 1
+                   ? std::wstring(tr(L"the original songs' beat markers repaired (1 track: the conversion had misread "
+                                     L"them from ads.inf)."))
+                   : trf(L"the original songs' beat markers repaired (%d tracks: the conversion had misread them from "
+                         L"ads.inf).",
+                         repaired);
     return repaired;
 }
 
@@ -447,7 +454,7 @@ bool song_samples(const std::wstring &data, const std::string &file, std::vector
     Where where;
     mono->clear();
     if (!probe_file(data, file, &info, &found, &where)) {
-        *why = shown_file(file) + L": missing, or not a music file the game plays";
+        *why = trf(L"%s: missing, or not a music file the game plays", shown_file(file).c_str());
         return false;
     }
     const std::wstring &path = where.path;
@@ -456,7 +463,7 @@ bool song_samples(const std::wstring &data, const std::string &file, std::vector
         DiscRead r = {where.disc.get(), where.file};
         std::vector<uint8_t> raw(info.kind == BgmKind::wav ? 0 : info.dataBytes);
         if (info.kind == BgmKind::mp3) {
-            *why = shown_file(found) + L": an .mp3 in a disc image is not read";
+            *why = trf(L"%s: an .mp3 in a disc image is not read", shown_file(found).c_str());
             return false;
         }
         if (info.kind == BgmKind::wav) {
@@ -482,7 +489,7 @@ bool song_samples(const std::wstring &data, const std::string &file, std::vector
         }
         *rate = (int)info.rate;
         if (mono->empty()) {
-            *why = shown_file(found) + L": no samples could be read from the disc image";
+            *why = trf(L"%s: no samples could be read from the disc image", shown_file(found).c_str());
             return false;
         }
         return true;
@@ -491,7 +498,7 @@ bool song_samples(const std::wstring &data, const std::string &file, std::vector
         gt3media::MfScope mf;
         gt3media::Mp4AudioReader reader;
         if (!mf.ok() || !reader.open(path.c_str())) {
-            *why = shown_file(found) + L": Media Foundation does not decode it";
+            *why = trf(L"%s: Media Foundation does not decode it", shown_file(found).c_str());
             return false;
         }
         const int ch = reader.channels();
@@ -545,7 +552,7 @@ bool song_samples(const std::wstring &data, const std::string &file, std::vector
         *rate = (int)info.rate;
     }
     if (mono->empty()) {
-        *why = shown_file(found) + L": no samples could be read";
+        *why = trf(L"%s: no samples could be read", shown_file(found).c_str());
         return false;
     }
     return true;
@@ -747,11 +754,12 @@ std::vector<NewSong> find_new_songs(const std::wstring &data, std::vector<std::w
         if (key.compare(0, 2, "i_") == 0 && is_song(key.substr(2)))
             continue;                           /* an intro: i_<a song> (kept out with it) */
         if (!m.nameOk) {
-            unplayable->push_back(m.name + L": its name has characters the game cannot open (rename it)");
+            unplayable->push_back(trf(L"%s: its name has characters the game cannot open (rename it)", m.name.c_str()));
             continue;
         }
         if (!m.playable) {
-            unplayable->push_back(m.name + L": not a format the game plays (a .wav of PCM or float samples, an .mp3)");
+            unplayable->push_back(
+                trf(L"%s: not a format the game plays (a .wav of PCM or float samples, an .mp3)", m.name.c_str()));
             continue;
         }
         NewSong s;
@@ -785,8 +793,8 @@ bool add_songs(const std::wstring &data, const std::vector<NewSong> &songs, std:
     }
     if (!write_list(data, ads_text_add(list_text(data), ADS_GROUP_RACE_SONGS, tracks), message))
         return false;
-    *message = std::to_wstring(songs.size()) + (songs.size() == 1 ? L" new song" : L" new songs") +
-               L" added to the race songs.";
+    *message = songs.size() == 1 ? std::wstring(tr(L"1 new song added to the race songs."))
+                                 : trf(L"%d new songs added to the race songs.", (int)songs.size());
     return true;
 }
 

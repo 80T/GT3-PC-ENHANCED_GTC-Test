@@ -4,6 +4,7 @@
 #include "util.h"
 
 #include "platform/gcf_tables.h"
+#include "platform/ui_text.h"  /* PC (2026-11-16): the interface's languages */
 
 #include <windows.h>
 
@@ -131,8 +132,8 @@ bool convert_one(const std::wstring &dir, const std::wstring &name, std::wstring
     std::vector<uint8_t> img;
     if (!database_image(part, &back, &img, why) || img != image_of(config)) {
         if (why->empty())
-            *why = L"the database does not read as the file";
-        *why = L"the check of its database failed (" + *why + L"); the .gcf is kept";
+            *why = tr(L"the database does not read as the file");
+        *why = trf(L"the check of its database failed (%s); the .gcf is kept", why->c_str());
         DeleteFileW(part.c_str());
         return false;
     }
@@ -163,12 +164,12 @@ bool remove_one(const std::wstring &dir, const std::wstring &name, std::wstring 
     std::string error;
     std::vector<std::string> warnings;
     if (!gcftables::read_gcf(gcf.data(), gcf.size(), &file, &error, &warnings)) {
-        *why = util::widen(error) + L" (kept)";
+        *why = trf(L"%s (kept)", util::widen(error).c_str());
         return false;
     }
     std::vector<uint8_t> img;
     if (!database_image(dbPath, &db, &img, why)) {
-        *why = L"its database cannot be read without warnings (" + *why + L"): kept";
+        *why = trf(L"its database cannot be read without warnings (%s): kept", why->c_str());
         return false;
     }
     const bool same = img == image_of(file);
@@ -177,11 +178,11 @@ bool remove_one(const std::wstring &dir, const std::wstring &name, std::wstring 
         for (int s : file.sections)
             all = all && db.has(s);
         if (!all) {
-            *why = L"its database lacks tables the game takes from it: kept";
+            *why = tr(L"its database lacks tables the game takes from it: kept");
             return false;
         }
         if (created(gcfPath) > created(dbPath)) {
-            *why = L"newer than its database, which the game reads: kept (delete the database to have it converted)";
+            *why = tr(L"newer than its database, which the game reads: kept (delete the database to have it converted)");
             return false;
         }
     }
@@ -189,8 +190,8 @@ bool remove_one(const std::wstring &dir, const std::wstring &name, std::wstring 
         const std::wstring part = dbPath + L".part";
         if (!CopyFileW(dbPath.c_str(), part.c_str(), FALSE) || !gcftables::keep_file(gcf, util::narrow(part), &error) ||
             !MoveFileExW(part.c_str(), dbPath.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
-            *why = (error.empty() ? util::system_error_text(GetLastError()) : util::widen(error)) +
-                   L": kept (its sections no table holds could not be put in the database)";
+            *why = trf(L"%s: kept (its sections no table holds could not be put in the database)",
+                       (error.empty() ? util::system_error_text(GetLastError()) : util::widen(error)).c_str());
             DeleteFileW(part.c_str());
             return false;
         }
@@ -235,13 +236,13 @@ bool convert(const std::wstring &data, std::wstring *message, std::vector<std::w
         return s;
     };
     if (!done.empty())
-        *message = L"Game configs written as databases (gameconf\\<config>.sqlite3), their .gcf files deleted: " +
-                   list(done) + L".";
+        *message = trf(L"Game configs written as databases (gameconf\\<config>.sqlite3), their .gcf files deleted: %s.",
+                       list(done).c_str());
     if (!removed.empty())
-        *message += (message->empty() ? L"" : L" ") + std::wstring(L"The .gcf files beside their databases deleted: ") +
-                    list(removed) + L".";
+        *message += (message->empty() ? L"" : L" ") +
+                    trf(L"The .gcf files beside their databases deleted: %s.", list(removed).c_str());
     for (const std::wstring &p : problems)
-        *message += (message->empty() ? L"" : L" ") + std::wstring(L"Left as it was: ") + p + L".";
+        *message += (message->empty() ? L"" : L" ") + trf(L"Left as it was: %s.", p.c_str());
     if (doneOut != nullptr)
         *doneOut = done;
     if (problemsOut != nullptr)

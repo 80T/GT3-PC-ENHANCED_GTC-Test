@@ -6,6 +6,7 @@
 #include "platform/input_map.h"
 #include "platform/overlay.h"
 #include "platform/settings.h"                  /* split_screen: the panel over the player's half */
+#include "platform/ui_text.h"                   /* PC (2026-11-16): the interface's languages */
 
 #include <algorithm>
 #include <atomic>
@@ -95,13 +96,25 @@ void ask(int action)
         g_action = action;
 }
 
-/* text cut to `width' pixels at scale s ("..." at its end) */
+/* text cut to `width' pixels at scale s ("..." at its end; PC 2026-11-16:
+ * whole UTF-8 characters, counted in cells - a Japanese one two) */
 std::string fit(const std::string &text, float width, int s)
 {
     if (overlay::text_width(text.c_str(), s) <= width)
         return text;
-    const int chars = (int)(width / (6.0f * (float)s)) - 3;
-    return chars > 0 ? text.substr(0, (size_t)chars) + "..." : std::string("...");
+    const int cells = (int)(width / (6.0f * (float)s)) - 3;
+    std::string out;
+    int used = 0;
+    for (size_t i = 0, n; i < text.size(); i += n) {
+        for (n = 1; i + n < text.size() && ((unsigned char)text[i + n] & 0xC0) == 0x80; n++) {
+        }
+        const std::string ch = text.substr(i, n);
+        used += overlay::text_cells(ch.c_str());
+        if (used > cells)
+            break;
+        out += ch;
+    }
+    return out + "...";
 }
 
 /* Hotkey h's device - its own binding, else the player's pad control that
@@ -363,28 +376,29 @@ void present(ID3D11RenderTargetView *bb)
     const int rowCount = (int)rows.size();
     const int cur = rowCount > 0 ? std::min(axis(), rowCount - 1) : -1;
     /* (the hotkeys are read once, at the game's start; the pad's names as
-     * the controller connected then names them) */
+     * the controller connected then names them.  PC 2026-11-16: the text
+     * made at each frame, in the interface's language - it may change) */
     static const gamepad::ButtonNames names = gamepad::button_names();
-    static const std::string controls1 = [] {
-        std::string h;
+    std::string controls1;
+    {
         const std::string parts[] = {
-            pair_text(input_map::kHotCalibrationUp, input_map::kHotCalibrationDown, "UP", "DOWN", "AXIS"),
-            pair_text(input_map::kHotCalibrationLeft, input_map::kHotCalibrationRight, "LEFT", "RIGHT", "ADJUST"),
-            "CAMERA CONTROLS TOO"};
+            pair_text(input_map::kHotCalibrationUp, input_map::kHotCalibrationDown, tr("UP"), tr("DOWN"), tr("AXIS")),
+            pair_text(input_map::kHotCalibrationLeft, input_map::kHotCalibrationRight, tr("LEFT"), tr("RIGHT"),
+                      tr("ADJUST")),
+            tr("CAMERA CONTROLS TOO")};
         for (const std::string &p : parts)
             if (!p.empty())
-                h += (h.empty() ? "" : "   ") + p;
-        return h;
-    }();
-    const std::string controls = two ? controls1 + "   THE OTHER PAD: TAKE OVER" : controls1;
-    static const std::string saveKey = control_name(input_map::kHotCalibrationSave, names.south);
-    static const std::string cancelKey = control_name(input_map::kHotCalibrationCancel, names.east);
-    static const std::string resetKey = control_name(input_map::kHotCalibrationReset, names.north);
-    std::string keys = saveKey + " SAVE";
+                controls1 += (controls1.empty() ? "" : "   ") + p;
+    }
+    const std::string controls = two ? controls1 + "   " + tr("THE OTHER PAD: TAKE OVER") : controls1;
+    const std::string saveKey = control_name(input_map::kHotCalibrationSave, tr(names.south));
+    const std::string cancelKey = control_name(input_map::kHotCalibrationCancel, tr(names.east));
+    const std::string resetKey = control_name(input_map::kHotCalibrationReset, tr(names.north));
+    std::string keys = saveKey + " " + tr("SAVE");
     if (!cancelKey.empty())
-        keys += "   " + cancelKey + " CANCEL";
+        keys += "   " + cancelKey + " " + tr("CANCEL");
     if (!resetKey.empty() && cur >= 0)
-        keys += "   " + resetKey + " RESET " + rows[cur].name;
+        keys += "   " + resetKey + " " + trf("RESET %s", rows[cur].name);
 
     int bw, bh;
     overlay::size(&bw, &bh);
@@ -393,7 +407,8 @@ void present(ID3D11RenderTargetView *bb)
     const float maxText = (float)bw * 0.6f - 2.0f * pad;
     /* (the car's model name as the file's, "r_gt_00", in the font's upper
      * case) */
-    const std::string head = std::string(two ? (who == 1 ? "PLAYER 2   " : "PLAYER 1   ") : "") + headText;
+    const std::string head =
+        two ? std::string(who == 1 ? tr("PLAYER 2") : tr("PLAYER 1")) + "   " + headText : headText;
     /* the lines: the title, the head, the rows (a caption above the ones
      * that have one), the controls, the keys */
     struct Line {
@@ -409,14 +424,18 @@ void present(ID3D11RenderTargetView *bb)
     if (!title.empty())
         lines.push_back({title, fine, rgba(255, 200, 80, 200), -1, false});
     lines.push_back({fit(head, maxText, big), big, rowCount > 0 ? amber : grey, -1, false});
-    size_t nameW = 0;
+    /* (PC 2026-11-16: the names' column in cells - the race's side's text in
+     * the interface's language, UTF-8 -, padded so) */
+    int nameW = 0;
     for (const Row &r : rows)
-        nameW = std::max(nameW, strlen(r.name));
+        nameW = std::max(nameW, overlay::text_cells(r.name));
     for (int a = 0; a < rowCount; a++) {
         if (rows[a].caption[0] != '\0')
             lines.push_back({rows[a].caption, fine, grey, -1, true});
-        char row[80];
-        snprintf(row, sizeof(row), "%-*s  %s", (int)nameW, rows[a].name, rows[a].value);
+        std::string row = rows[a].name;
+        row.append((size_t)std::max(0, nameW - overlay::text_cells(rows[a].name)), ' ');
+        row += "  ";
+        row += rows[a].value;
         lines.push_back({row, fine, a == cur ? white : dim, a, false});
     }
     lines.push_back({fit(controls, maxText, fine), fine, grey, -1, true});

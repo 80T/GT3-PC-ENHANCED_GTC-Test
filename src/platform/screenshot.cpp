@@ -4,6 +4,7 @@
 #include "platform/osd.h"
 #include "platform/paths.h"
 #include "platform/png_image.h"
+#include "platform/ui_text.h"                  /* PC (2026-11-16): the interface's languages */
 
 #include <windows.h>
 
@@ -54,13 +55,13 @@ void write(const std::vector<uint8_t> &px, int w, int h, const SYSTEMTIME &at)
             break;
     }
     const bool ok = png_image::encode_file(wdir + wide(file), px.data(), w, h);
-    char msg[64];
+    char msg[256];                              /* PC (2026-11-16): 64 before (UTF-8 translations) */
     if (ok) {
         pclog::write("screenshot: %s%s (%d x %d)", dir.c_str(), file, w, h);
-        snprintf(msg, sizeof(msg), "SCREENSHOT: %s %d X %d", file, w, h);
+        snprintf(msg, sizeof(msg), tr("SCREENSHOT: %s %d X %d"), file, w, h);
     } else {
         pclog::write("screenshot: %s%s (%d x %d) could not be written", dir.c_str(), file, w, h);
-        snprintf(msg, sizeof(msg), "SCREENSHOT COULD NOT BE WRITTEN (SEE THE LOG)");
+        snprintf(msg, sizeof(msg), "%s", tr("SCREENSHOT COULD NOT BE WRITTEN (SEE THE LOG)"));
     }
     osd::show(msg);
 }
@@ -70,7 +71,7 @@ void write(const std::vector<uint8_t> &px, int w, int h, const SYSTEMTIME &at)
 void request()
 {
     if (g_writing.load() >= kMaxWriting) {
-        osd::show("SCREENSHOT: STILL WRITING THE LAST ONES");
+        osd::show(tr("SCREENSHOT: STILL WRITING THE LAST ONES"));
         return;
     }
     g_asked = true;
@@ -87,8 +88,10 @@ bool take_request()
 void failed(const char *why)
 {
     pclog::write("screenshot: not taken: %s", why);
-    char msg[64];
-    snprintf(msg, sizeof(msg), "NO SCREENSHOT: %s", why);
+    /* (PC 2026-11-16: `why' in English, marked N_ where written; shown
+     * translated) */
+    char msg[256];
+    snprintf(msg, sizeof(msg), tr("NO SCREENSHOT: %s"), tr(why));
     osd::show(msg);
     g_taking = 0;
 }
@@ -107,7 +110,7 @@ void save(std::vector<uint8_t> &&rgba, int w, int h)
         }).detach();
     } catch (...) {
         g_writing--;
-        failed("NO THREAD TO WRITE IT");
+        failed(N_("NO THREAD TO WRITE IT"));
     }
 }
 

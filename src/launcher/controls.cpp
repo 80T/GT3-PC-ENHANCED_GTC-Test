@@ -10,6 +10,7 @@
 #include "controls.h"
 #include "panel.h"
 #include "platform/input_map.h"
+#include "platform/ui_text.h"  /* PC (2026-11-16): the interface's languages */
 
 #include <SDL3/SDL.h>
 #include <commctrl.h>
@@ -84,7 +85,7 @@ static_assert(kHotkeyCount <= kHotkeyIds && IDC_END - 1 <= kLastId, "the hotkeys
 
 /* The sub-tabs. */
 enum Sub { kMapping, kCalibration, kHotkeys, kSubCount };
-const wchar_t *const kSubNames[kSubCount] = {L"Mapping", L"Calibration", L"Hotkeys"};
+const wchar_t *const kSubNames[kSubCount] = {N_(L"Mapping"), N_(L"Calibration"), N_(L"Hotkeys")};
 
 /* ---- SDL ------------------------------------------------------------------ */
 
@@ -310,6 +311,24 @@ HWND make_label(HWND parent, const wchar_t *text, int id)
     return make(parent, WC_STATICW, text, SS_LEFT | SS_NOPREFIX, id);
 }
 
+/* PC (2026-11-16): a label's text's height wrapped at `width' in its own
+ * font (the notes and heads grow with a translation: layout) */
+int text_height(HWND c, int width)
+{
+    if (c == nullptr || width <= 0)
+        return 0;
+    wchar_t text[2048] = L"";
+    GetWindowTextW(c, text, 2048);
+    HDC dc = GetDC(c);
+    HFONT f = (HFONT)SendMessageW(c, WM_GETFONT, 0, 0);
+    HGDIOBJ old = SelectObject(dc, f != nullptr ? (HGDIOBJ)f : GetStockObject(DEFAULT_GUI_FONT));
+    RECT r = {0, 0, width, 0};
+    DrawTextW(dc, text, -1, &r, DT_CALCRECT | DT_WORDBREAK | DT_NOPREFIX);
+    SelectObject(dc, old);
+    ReleaseDC(c, dc);
+    return (int)r.bottom;
+}
+
 HWND make_combo(HWND parent, int id)
 {
     return make(parent, WC_COMBOBOXW, L"", WS_TABSTOP | WS_VSCROLL | CBS_DROPDOWNLIST, id);
@@ -443,15 +462,15 @@ void slot_text(int c, int s)
         if (!t.capNote.empty())
             text = t.capNote;
         else if (takes_motion(c, s))
-            text = L"Press a key, click or move the mouse... (Esc)";
+            text = tr(L"Press a key, click or move the mouse... (Esc)");
         else if (is_hshifter(t.prof))       /* PC (2026-11-09): any device, key or mouse button */
-            text = L"Press or move on any device, press a key or click... (Esc)";
+            text = tr(L"Press or move on any device, press a key or click... (Esc)");
         else if (s == 1)
-            text = L"Press a key or click... (Esc)";
+            text = tr(L"Press a key or click... (Esc)");
         else
-            text = L"Press or move, on any device... (Esc)";
+            text = tr(L"Press or move, on any device... (Esc)");
     } else {
-        char d[128];
+        char d[256];                            /* (PC 2026-11-16: translated UTF-8) */
         describe(t.p.map[c][s], d, sizeof(d));
         text = d[0] != '\0' ? widen(d) : L"-";
     }
@@ -466,9 +485,9 @@ void hot_text(int h, int slot)
         if (!t.capHotNote.empty())
             text = t.capHotNote;
         else
-            text = slot == 0 ? L"Press the key... (click: cancel)" : L"Press, on any controller or device... (Esc)";
+            text = slot == 0 ? tr(L"Press the key... (click: cancel)") : tr(L"Press, on any controller or device... (Esc)");
     } else {
-        char d[160];
+        char d[256];                            /* (PC 2026-11-16: translated UTF-8) */
         if (slot == 0)
             describe_combo(t.hot[h], d, sizeof(d));
         else
@@ -488,17 +507,17 @@ void heads_text()
 {
     if (t.sub == kHotkeys) {
         /* PC: the hotkeys' columns */
-        SetWindowTextW(t.head[0], L"Hotkey");
-        SetWindowTextW(t.head[1], L"Keyboard");
-        SetWindowTextW(t.head[2], g_sdl < 0 ? L"Controller / device (no SDL3.dll)" : L"Controller / device");
+        SetWindowTextW(t.head[0], tr(L"Hotkey"));
+        SetWindowTextW(t.head[1], tr(L"Keyboard"));
+        SetWindowTextW(t.head[2], g_sdl < 0 ? tr(L"Controller / device (no SDL3.dll)") : tr(L"Controller / device"));
         return;
     }
-    SetWindowTextW(t.head[0], L"Control");
-    std::wstring dev = is_hshifter(t.prof) ? L"Any device, key or mouse button" : is_wheel(t.prof) ? L"Wheel" : L"Gamepad";
+    SetWindowTextW(t.head[0], tr(L"Control"));
+    std::wstring dev = is_hshifter(t.prof) ? tr(L"Any device, key or mouse button") : is_wheel(t.prof) ? tr(L"Wheel") : tr(L"Gamepad");
     if (g_sdl < 0)
-        dev += L" (no SDL3.dll)";
+        dev = trf(L"%s (no SDL3.dll)", dev.c_str());
     SetWindowTextW(t.head[1], dev.c_str());
-    SetWindowTextW(t.head[2], is_hshifter(t.prof) ? L"" : L"Keyboard / mouse");     /* (PC 2026-11-09: one binding; hidden) */
+    SetWindowTextW(t.head[2], is_hshifter(t.prof) ? L"" : tr(L"Keyboard / mouse"));     /* (PC 2026-11-09: one binding; hidden) */
 }
 
 /* The Device list: auto, the connected joysticks that are not plain
@@ -512,7 +531,7 @@ void fill_devices(const Snapshot &s)
     SendMessageW(t.device, CB_RESETCONTENT, 0, 0);
     t.deviceNames.assign(1, std::string());
     SendMessageW(t.device, CB_ADDSTRING, 0,
-                 (LPARAM)(t.prof == kWheel1 ? L"Automatic (the first wheel)" : L"Automatic (the next wheel)"));
+                 (LPARAM)(t.prof == kWheel1 ? tr(L"Automatic (the first wheel)") : tr(L"Automatic (the next wheel)")));
     int sel = 0;
     for (const JoyState &j : s.joys) {
         if (j.gamepad && !j.wheel)
@@ -520,12 +539,13 @@ void fill_devices(const Snapshot &s)
         if (_stricmp(j.name.c_str(), t.p.device) == 0)
             sel = (int)t.deviceNames.size();
         t.deviceNames.push_back(j.name);
-        SendMessageW(t.device, CB_ADDSTRING, 0, (LPARAM)(widen(j.name.c_str()) + (j.wheel ? L" (wheel)" : L"")).c_str());
+        SendMessageW(t.device, CB_ADDSTRING, 0,
+                     (LPARAM)(j.wheel ? trf(L"%s (wheel)", widen(j.name.c_str()).c_str()) : widen(j.name.c_str())).c_str());
     }
     if (sel == 0 && t.p.device[0] != '\0') {
         sel = (int)t.deviceNames.size();
         t.deviceNames.push_back(t.p.device);
-        SendMessageW(t.device, CB_ADDSTRING, 0, (LPARAM)(widen(t.p.device) + L" (not connected)").c_str());
+        SendMessageW(t.device, CB_ADDSTRING, 0, (LPARAM)trf(L"%s (not connected)", widen(t.p.device).c_str()).c_str());
     }
     SendMessageW(t.device, CB_SETCURSEL, sel, 0);
 }
@@ -533,13 +553,13 @@ void fill_devices(const Snapshot &s)
 /* The live view: the profile's analog controls after the dead zones. */
 void live_text(const Snapshot &s)
 {
-    wchar_t buf[256];
+    std::wstring buf;
     if (g_sdl < 0) {
-        swprintf(buf, 256, L"SDL3.dll is missing next to the launcher: no gamepads or wheels.");
+        buf = tr(L"SDL3.dll is missing next to the launcher: no gamepads or wheels.");
     } else if (is_wheel(t.prof)) {
         const JoyState *j = wheel_device(s);
         if (j == nullptr) {
-            swprintf(buf, 256, L"No wheel connected for %hs.", profile_name(t.prof));
+            buf = trf(L"No wheel connected for %s.", widen(tr(profile_name(t.prof))).c_str());
         } else {
             const JoySource js = joy_source(*j);
             Named named;                    /* (pedals of their own...) */
@@ -560,14 +580,14 @@ void live_text(const Snapshot &s)
             wchar_t clutch[16] = L"-";
             if (clutchMapped)
                 swprintf(clutch, 16, L"%.2f", apply_deadzone(v(cl), t.p.deadzone[kWheelClutchDeadzone] / 100.0f));
-            swprintf(buf, 256, L"%s\nSteering %+.2f    Gas %.2f    Brake %.2f    Clutch %s", widen(j->name.c_str()).c_str(),
-                     steer, apply_deadzone(v(WHEEL_GAS), t.p.deadzone[1] / 100.0f),
-                     apply_deadzone(v(WHEEL_BRAKE), t.p.deadzone[2] / 100.0f), clutch);
+            buf = trf(L"%s\nSteering %+.2f    Gas %.2f    Brake %.2f    Clutch %s", widen(j->name.c_str()).c_str(),
+                      steer, apply_deadzone(v(WHEEL_GAS), t.p.deadzone[1] / 100.0f),
+                      apply_deadzone(v(WHEEL_BRAKE), t.p.deadzone[2] / 100.0f), clutch);
         }
     } else {
         const PadState *p = pad_device(s);
         if (p == nullptr) {
-            swprintf(buf, 256, L"No gamepad connected for %hs.", profile_name(t.prof));
+            buf = trf(L"No gamepad connected for %s.", widen(tr(profile_name(t.prof))).c_str());
         } else {
             float st[2][2];
             for (int k = 0; k < 2; k++) {
@@ -579,15 +599,15 @@ void live_text(const Snapshot &s)
                 st[k][1] = y * f;
             }
             const float d = t.p.deadzone[2] / 100.0f;
-            swprintf(buf, 256, L"%s\nLeft stick %+.2f %+.2f    Right stick %+.2f %+.2f    L2 %.2f    R2 %.2f",
-                     widen(p->name.c_str()).c_str(), st[0][0], st[0][1], st[1][0], st[1][1],
-                     apply_deadzone(p->src.axes[kPadAxisLeftTrigger] / 32767.0f, d),
-                     apply_deadzone(p->src.axes[kPadAxisRightTrigger] / 32767.0f, d));
+            buf = trf(L"%s\nLeft stick %+.2f %+.2f    Right stick %+.2f %+.2f    L2 %.2f    R2 %.2f",
+                      widen(p->name.c_str()).c_str(), st[0][0], st[0][1], st[1][0], st[1][1],
+                      apply_deadzone(p->src.axes[kPadAxisLeftTrigger] / 32767.0f, d),
+                      apply_deadzone(p->src.axes[kPadAxisRightTrigger] / 32767.0f, d));
         }
     }
     if (t.liveText != buf) {
         t.liveText = buf;
-        SetWindowTextW(t.live, buf);
+        SetWindowTextW(t.live, buf.c_str());
     }
 }
 
@@ -599,7 +619,7 @@ void refresh()
     for (int c = 0; c < kMaxControls; c++) {
         const bool on = map && c < n;
         if (c < n) {
-            SetWindowTextW(t.label[c], widen(control(t.prof, c).name).c_str());
+            SetWindowTextW(t.label[c], widen(tr(control(t.prof, c).name)).c_str());
             for (int s = 0; s < kSlots; s++)
                 slot_text(c, s);
         }
@@ -615,7 +635,7 @@ void refresh()
     ShowWindow(t.profile, hot ? SW_HIDE : SW_SHOW);
     const bool zones = cal && has_deadzones(t.prof);    /* (PC 2026-11-09: not an H-Shifter's) */
     for (int i = 0; i < kDeadzones; i++) {
-        SetWindowTextW(t.deadzoneLabel[i], widen(deadzone_name(t.prof, i)).c_str());
+        SetWindowTextW(t.deadzoneLabel[i], widen(tr(deadzone_name(t.prof, i))).c_str());
         deadzone_text(i);
         const bool on = zones && i < deadzone_count(t.prof);    /* (PC 2026-11-10: a wheel's fourth, the clutch's) */
         ShowWindow(t.deadzoneLabel[i], on ? SW_SHOW : SW_HIDE);
@@ -625,37 +645,37 @@ void refresh()
     const bool dev = cal && is_wheel(t.prof);
     ShowWindow(t.device, dev ? SW_SHOW : SW_HIDE);
     ShowWindow(t.deviceLabel, dev ? SW_SHOW : SW_HIDE);
-    SetWindowTextW(t.inputLabel, t.prof == kWheel2 ? L"Player 2 plays with" : L"Player 1 plays with");
+    SetWindowTextW(t.inputLabel, t.prof == kWheel2 ? tr(L"Player 2 plays with") : tr(L"Player 1 plays with"));
     SendMessageW(t.input, CB_SETCURSEL, t.p.controller ? 1 : 0, 0);
     ShowWindow(t.input, dev ? SW_SHOW : SW_HIDE);
     ShowWindow(t.inputLabel, dev ? SW_SHOW : SW_HIDE);
     ShowWindow(t.live, zones ? SW_SHOW : SW_HIDE);
     ShowWindow(t.note, cal ? SW_SHOW : SW_HIDE);
-    char menu[96];
+    char menu[256];                             /* (PC 2026-11-16: translated UTF-8) */
     describe_combo(t.hot[kHotSettingsMenu], menu, sizeof(menu));
-    char cam[96];
+    char cam[256];
     describe_combo(t.hot[kHotDebugCamera], cam, sizeof(cam));
     /* (the debug camera's are not in the game's menu: its key instead) */
     const std::wstring inMenu =
         t.prof == kDebugCamera
-            ? std::wstring(L" The debug camera: ") + (cam[0] != '\0' ? widen(cam) : std::wstring(L"its hotkey")) +
-                  L" in a race (the Hotkeys sub-tab)."
-            : std::wstring(L" Also in the game's settings menu") +
-                  (menu[0] != '\0' ? L" (" + widen(menu) + L")" : L"") + L", CONTROLS.";
+            ? L" " + trf(L"The debug camera: %s in a race (the Hotkeys sub-tab).",
+                         cam[0] != '\0' ? widen(cam).c_str() : tr(L"its hotkey"))
+            : L" " + (menu[0] != '\0' ? trf(L"Also in the game's settings menu (%s), CONTROLS.", widen(menu).c_str())
+                                      : std::wstring(tr(L"Also in the game's settings menu, CONTROLS.")));
     SetWindowTextW(t.note, is_hshifter(t.prof)
                                /* PC (2026-11-09) */
-                               ? L"An H-Shifter has nothing to calibrate: its gates are buttons. Its gears are "
-                                 L"read with Gear shift behavior Realistic + Clutch and H-shifter On (Game tab, "
-                                 L"Extras)."
+                               ? tr(L"An H-Shifter has nothing to calibrate: its gates are buttons. Its gears are "
+                                    L"read with Gear shift behavior Realistic + Clutch and H-shifter On (Game tab, "
+                                    L"Extras).")
                                : ((is_wheel(t.prof)
-                                       ? std::wstring(L"Analog stick center deadzone and "
-                                                      L"Pedal starting travel.")
-                                       : std::wstring(L"Analog stick center deadzone and "
-                                                      L"Trigger starting travel.")) +
+                                       ? std::wstring(tr(L"Analog stick center deadzone and "
+                                                         L"Pedal starting travel."))
+                                       : std::wstring(tr(L"Analog stick center deadzone and "
+                                                         L"Trigger starting travel."))) +
                                   inMenu)
                                      .c_str());
     for (int h = 0; h < kHotkeyCount; h++) {
-        SetWindowTextW(t.hotLabel[h], widen(hotkey_name(h)).c_str());
+        SetWindowTextW(t.hotLabel[h], widen(tr(hotkey_name(h))).c_str());
         hot_text(h);
         ShowWindow(t.hotLabel[h], hot ? SW_SHOW : SW_HIDE);
         ShowWindow(t.hotKey[h], hot ? SW_SHOW : SW_HIDE);
@@ -705,7 +725,7 @@ void start_capture(int c, int s)
     t.capControl = c;
     t.capSlot = s;
     t.capUntil = GetTickCount64() + kCaptureMs;
-    t.capNote = s == 0 && g_sdl < 0 ? L"No SDL3.dll (Esc)" : L"";
+    t.capNote = s == 0 && g_sdl < 0 ? tr(L"No SDL3.dll (Esc)") : L"";
     t.rest = snapshot();
     GetCursorPos(&t.capMouse);
     slot_text(c, s);
@@ -785,7 +805,7 @@ void start_hot_capture(int h, int slot)
     t.capHotSlot = slot;
     t.capUntil = GetTickCount64() + kCaptureMs;
     if (slot == 1) {
-        t.capHotNote = g_sdl < 0 ? L"No SDL3.dll (Esc)" : L"";
+        t.capHotNote = g_sdl < 0 ? tr(L"No SDL3.dll (Esc)") : L"";
         t.rest = snapshot();
     }
     hot_text(h, slot);
@@ -804,7 +824,7 @@ void take_hot_device(Binding b, const PadState *pad, const JoyState *joy)
     for (int o = 0; o < kHotkeyCount; o++)
         if (o != h && t.hotDevice[o].source == b.source && t.hotDevice[o].index == b.index &&
             t.hotDevice[o].dir == b.dir && t.hotDevice[o].device == b.device) {
-            t.capHotNote = L"Taken by " + widen(hotkey_name(o)) + L" (Esc)";
+            t.capHotNote = trf(L"Taken by %s (Esc)", widen(tr(hotkey_name(o))).c_str());
             hot_text(h, 1);
             t.capHotNote.clear();           /* (the prompt's text stays until the next input) */
             return;
@@ -822,10 +842,10 @@ void take_hot_device(Binding b, const PadState *pad, const JoyState *joy)
 std::wstring hot_refusal(int h, const KeyCombo &k)
 {
     if (k.vk == VK_F4 && k.alt && !k.ctrl && !k.shift)
-        return L"Alt+F4 closes the game";
+        return tr(L"Alt+F4 closes the game");
     for (int o = 0; o < kHotkeyCount; o++)
         if (o != h && t.hot[o] == k)
-            return L"Taken by " + widen(hotkey_name(o));
+            return trf(L"Taken by %s", widen(tr(hotkey_name(o))).c_str());
     if (!k.ctrl && !k.alt && !k.shift && !hotkey_shares_keys(h))
         for (int p = 0; p < kProfileCount; p++) {
             Profile pr;
@@ -833,7 +853,7 @@ std::wstring hot_refusal(int h, const KeyCombo &k)
             for (int c = 0; c < control_count(p); c++) {
                 const Binding &b = pr.map[c][is_hshifter(p) ? 0 : 1];   /* (PC 2026-11-09: an H-Shifter's slot 0) */
                 if (b.source == Source::key && b.index == k.vk)
-                    return L"Taken by " + widen(profile_name(p)) + L", " + widen(control(p, c).name);
+                    return trf(L"Taken by %s, %s", widen(tr(profile_name(p))).c_str(), widen(tr(control(p, c).name)).c_str());
             }
         }
     return L"";
@@ -846,7 +866,7 @@ void take_hot(const KeyCombo &k)
         return;
     const std::wstring why = hot_refusal(h, k);
     if (!why.empty()) {
-        t.capHotNote = why + L" (click: cancel)";
+        t.capHotNote = trf(L"%s (click: cancel)", why.c_str());
         hot_text(h);
         t.capHotNote.clear();               /* (the prompt's text stays until the next input) */
         return;
@@ -993,12 +1013,12 @@ void create(HWND page, HINSTANCE inst, const std::wstring &ini)
     /* creation order = tab order */
     t.profile = make_combo(page, IDC_PROFILE);
     for (int p = 0; p < kProfileCount; p++)
-        SendMessageW(t.profile, CB_ADDSTRING, 0, (LPARAM)widen(profile_name(p)).c_str());
+        SendMessageW(t.profile, CB_ADDSTRING, 0, (LPARAM)widen(tr(profile_name(p))).c_str());
     SendMessageW(t.profile, CB_SETCURSEL, 0, 0);
     ShowWindow(t.profile, SW_SHOW);
     const int subIds[kSubCount] = {IDC_SUB_MAPPING, IDC_SUB_CALIBRATION, IDC_SUB_HOTKEYS};
     for (int i = 0; i < kSubCount; i++)
-        t.subTab[i] = make(page, WC_BUTTONW, kSubNames[i], WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, subIds[i]);
+        t.subTab[i] = make(page, WC_BUTTONW, tr(kSubNames[i]), WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, subIds[i]);
     for (int i = 0; i < 3; i++)
         t.head[i] = make_label(page, L"", IDC_HEAD0 + i);
     t.list = panel::create(page, inst, IDC_LIST);
@@ -1008,7 +1028,7 @@ void create(HWND page, HINSTANCE inst, const std::wstring &ini)
         for (int s = 0; s < kSlots; s++)
             t.slot[c][s] = make(t.list, WC_BUTTONW, L"", WS_TABSTOP | BS_PUSHBUTTON, IDC_SLOT0 + c * kSlots + s);
     }
-    t.reset = make(t.list, WC_BUTTONW, L"Reset to defaults", WS_TABSTOP | BS_PUSHBUTTON, IDC_RESET);
+    t.reset = make(t.list, WC_BUTTONW, tr(L"Reset to defaults"), WS_TABSTOP | BS_PUSHBUTTON, IDC_RESET);
     for (int i = 0; i < kDeadzones; i++) {
         t.deadzoneLabel[i] = make_label(t.list, L"", IDC_DEADZONE_LABEL0 + i);
         t.deadzone[i] = make_slider(t.list, IDC_DEADZONE0 + i);
@@ -1019,9 +1039,9 @@ void create(HWND page, HINSTANCE inst, const std::wstring &ini)
     }
     t.inputLabel = make_label(t.list, L"", IDC_INPUT_LABEL);
     t.input = make_combo(t.list, IDC_INPUT);
-    SendMessageW(t.input, CB_ADDSTRING, 0, (LPARAM)L"The wheel (while both are connected)");
-    SendMessageW(t.input, CB_ADDSTRING, 0, (LPARAM)L"The controller (while both are connected)");
-    t.deviceLabel = make_label(t.list, L"Device", IDC_DEVICE_LABEL);
+    SendMessageW(t.input, CB_ADDSTRING, 0, (LPARAM)tr(L"The wheel (while both are connected)"));
+    SendMessageW(t.input, CB_ADDSTRING, 0, (LPARAM)tr(L"The controller (while both are connected)"));
+    t.deviceLabel = make_label(t.list, tr(L"Device"), IDC_DEVICE_LABEL);
     t.device = make_combo(t.list, IDC_DEVICE);
     t.live = make_label(t.list, L"", IDC_LIVE);
     t.note = make_label(t.list, L"", IDC_NOTE);
@@ -1030,14 +1050,14 @@ void create(HWND page, HINSTANCE inst, const std::wstring &ini)
         t.hotKey[h] = make(t.list, WC_BUTTONW, L"", WS_TABSTOP | BS_PUSHBUTTON, IDC_HOT_KEY0 + h);
         t.hotDev[h] = make(t.list, WC_BUTTONW, L"", WS_TABSTOP | BS_PUSHBUTTON, IDC_HOT_DEV0 + h);
     }
-    t.hotReset = make(t.list, WC_BUTTONW, L"Reset to defaults", WS_TABSTOP | BS_PUSHBUTTON, IDC_HOT_RESET);
+    t.hotReset = make(t.list, WC_BUTTONW, tr(L"Reset to defaults"), WS_TABSTOP | BS_PUSHBUTTON, IDC_HOT_RESET);
     t.hotNote = make_label(t.list,
-                           L"A click, then the key, with any of Ctrl, Alt and Shift held; a click again cancels. "
-                           L"A right-click or Delete: no key. The game keeps a hotkey's key from the controls, and "
-                           L"reads the hotkeys when it starts. "
-                           L"Controller / device: a click, then a button, D-pad direction or axis on any "
-                           L"controller, wheel or other device (Esc cancels). A controller's works on any "
-                           L"controller; the press also reaches the game.",
+                           tr(L"A click, then the key, with any of Ctrl, Alt and Shift held; a click again cancels. "
+                              L"A right-click or Delete: no key. The game keeps a hotkey's key from the controls, and "
+                              L"reads the hotkeys when it starts. "
+                              L"Controller / device: a click, then a button, D-pad direction or axis on any "
+                              L"controller, wheel or other device (Esc cancels). A controller's works on any "
+                              L"controller; the press also reaches the game."),
                            IDC_HOT_NOTE);
     load_profile();
     refresh();
@@ -1095,18 +1115,29 @@ void layout(UINT dpi)
     const int labelW = px(t.sub == kHotkeys ? kHotLabelW : kLabelW);
     const int slotW = (w - scroll - 2 * x - labelW - px(kGap)) / 2;
     if (t.sub == kMapping || t.sub == kHotkeys) {
-        /* (PC 2026-11-09: an H-Shifter's head over both columns, as its slot) */
+        /* (PC 2026-11-09: an H-Shifter's head over both columns, as its slot)
+         * (PC 2026-11-16: two lines when a head's translation needs them) */
         const bool both = t.sub == kMapping && is_hshifter(t.prof);
-        panel::place(t.page, t.head[0], x, y, labelW, px(kHeadH));
-        panel::place(t.page, t.head[1], x + labelW, y, both ? 2 * slotW + px(kGap) : slotW, px(kHeadH));
-        panel::place(t.page, t.head[2], x + labelW + slotW + px(kGap), y, slotW, px(kHeadH));
-        y += px(kHeadH);
+        const int hw[3] = {labelW, both ? 2 * slotW + px(kGap) : slotW, slotW};
+        int headH = px(kHeadH);
+        for (int i = 0; i < 3; i++)
+            headH = std::max(headH, std::min(2 * px(kHeadH), text_height(t.head[i], hw[i]) + px(2)));
+        panel::place(t.page, t.head[0], x, y, hw[0], headH);
+        panel::place(t.page, t.head[1], x + labelW, y, hw[1], headH);
+        panel::place(t.page, t.head[2], x + labelW + slotW + px(kGap), y, hw[2], headH);
+        y += headH;
     }
+    /* PC (2026-11-16): the notes as tall as their text at their width (a
+     * translation runs longer; the hotkeys' note was a line short at 150 %
+     * dpi in English too), their old heights at least */
+    const int noteW = w - scroll - 2 * x;
+    const int hotNoteH = std::max(px(kHotNoteH), text_height(t.hotNote, noteW) + px(2));
+    const int noteH = std::max(px(kNoteH), text_height(t.note, noteW) + px(2));
     panel::place(t.page, t.list, 0, y, w, h - y);
 
     const int n = control_count(t.prof);
     if (t.sub == kHotkeys) {
-        const int content = kHotkeyCount * px(kRowH) + px(kRowH) + px(kHotNoteH) + px(kPad);
+        const int content = kHotkeyCount * px(kRowH) + px(kRowH) + hotNoteH + px(kPad);
         const int cw = panel::begin(t.list, content, px(kRowH));
         HWND after = HWND_TOP;
         for (int h = 0; h < kHotkeyCount; h++) {
@@ -1122,7 +1153,7 @@ void layout(UINT dpi)
         SetWindowPos(t.hotReset, after, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
         const int ry = kHotkeyCount * px(kRowH) + px(6);
         panel::place(t.list, t.hotReset, x, ry, px(150), px(kSlotH));
-        panel::place(t.list, t.hotNote, x, ry + px(kRowH) + px(4), cw - 2 * x, px(kHotNoteH));
+        panel::place(t.list, t.hotNote, x, ry + px(kRowH) + px(4), cw - 2 * x, hotNoteH);
     } else if (t.sub == kMapping) {
         const int content = n * px(kRowH) + px(kRowH) + px(kPad);
         panel::begin(t.list, content, px(kRowH));
@@ -1146,11 +1177,11 @@ void layout(UINT dpi)
         panel::place(t.list, t.reset, x, n * px(kRowH) + px(6), px(150), px(kSlotH));
     } else if (is_hshifter(t.prof)) {
         /* PC (2026-11-09): an H-Shifter's: its note alone */
-        const int cw = panel::begin(t.list, px(kNoteH) + px(kPad), px(kRowH));
-        panel::place(t.list, t.note, x, px(6), cw - 2 * x, px(kNoteH));
+        const int cw = panel::begin(t.list, noteH + px(kPad), px(kRowH));
+        panel::place(t.list, t.note, x, px(6), cw - 2 * x, noteH);
     } else {
         const int rows = deadzone_count(t.prof) + (is_wheel(t.prof) ? 2 : 0);
-        const int content = rows * px(kRowH) + px(kLiveH) + px(kNoteH) + px(kPad);
+        const int content = rows * px(kRowH) + px(kLiveH) + noteH + px(kPad);
         const int cw = panel::begin(t.list, content, px(kRowH));
         int ry = px(2);
         if (is_wheel(t.prof)) {
@@ -1170,7 +1201,7 @@ void layout(UINT dpi)
                          px(20));
         }
         panel::place(t.list, t.live, x, ry + px(4), cw - 2 * x, px(kLiveH));
-        panel::place(t.list, t.note, x, ry + px(4) + px(kLiveH), cw - 2 * x, px(kNoteH));
+        panel::place(t.list, t.note, x, ry + px(4) + px(kLiveH), cw - 2 * x, noteH);
     }
     InvalidateRect(t.page, nullptr, TRUE);
 }
@@ -1313,9 +1344,9 @@ bool draw_item(const DRAWITEMSTRUCT *d)
     SetBkMode(d->hDC, TRANSPARENT);
     SetTextColor(d->hDC, chosen ? RGB(255, 255, 255) : RGB(168, 168, 168));
     HGDIOBJ old = SelectObject(d->hDC, t.tabFont != nullptr ? t.tabFont : t.font);
-    RECT tr = r;
-    tr.bottom -= px(3);
-    DrawTextW(d->hDC, kSubNames[sb], -1, &tr, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+    RECT box = r;
+    box.bottom -= px(3);
+    DrawTextW(d->hDC, tr(kSubNames[sb]), -1, &box, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
     SelectObject(d->hDC, old);
     if ((d->itemState & ODS_FOCUS) && !(d->itemState & ODS_NOFOCUSRECT)) {
         RECT f = r;
@@ -1433,7 +1464,7 @@ bool filter(const MSG &m)
             if (!input)
                 return true;
             if (reserved(vk) >= 0) {
-                t.capNote = L"The hotkey " + widen(hotkey_name(reserved(vk))) + L"'s (Esc)";
+                t.capNote = trf(L"The hotkey %s's (Esc)", widen(tr(hotkey_name(reserved(vk)))).c_str());
                 slot_text(t.capControl, t.capSlot);
                 t.capNote.clear();          /* (the prompt's text stays until the next input) */
                 return true;

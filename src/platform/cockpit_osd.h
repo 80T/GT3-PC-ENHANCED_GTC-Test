@@ -71,12 +71,15 @@ enum Action { kNone, kSave, kCancel, kReset };
 enum Mode { kModeCockpit, kModeCustom };
 enum Request { kRequestNone, kRequestNewGlobal, kRequestNewCar, kRequestEdit, kRequestDelete };
 /* A row of the panel: its name and its value as shown; `caption', when not
- * empty, is a line of its own above it (a heading for the rows from here). */
+ * empty, is a line of its own above it (a heading for the rows from here).
+ * PC (2026-11-16): the texts in the interface's language (platform/
+ * ui_text.h, the race's side translates them), UTF-8 - 48, 24 and 24 bytes
+ * before. */
 constexpr int kMaxRows = 24;
 struct Row {
-    char caption[48];
-    char name[24];
-    char value[24];
+    char caption[160];
+    char name[80];
+    char value[80];
 };
 
 /* The F2 menu's item: the cockpit camera's calibration started / stopped

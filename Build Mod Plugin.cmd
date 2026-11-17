@@ -20,21 +20,23 @@ rem versions (data_US ...) and its caches.  Packaging
 rem again copies the programs over the old ones and leaves all that alone.
 rem A mod's data is not part of the plugin: a mod folder of its own
 rem (docs\launcher.md "Engines").
+rem The build brings the interface's translations up to date and asks for the
+rem ones missing at the console (build.cmd: blank skips one, skipall the rest).
 setlocal
 set "ROOT=%~dp0"
 set "NAME=%~1"
 set "NAMED=1"
 if "%NAME%"=="" set "NAMED=" & set "NAME=GT3 PC Mod"
 call "%ROOT%build.cmd"
-if errorlevel 1 exit /b 1
+if errorlevel 1 set "RESULT=1" & goto end
 set "OUT=%ROOT%build\plugins\%NAME%"
 if not exist "%OUT%\" mkdir "%OUT%"
-if not exist "%OUT%\" echo The folder "%OUT%" could not be made: a name a folder cannot have? & exit /b 1
+if not exist "%OUT%\" echo The folder "%OUT%" could not be made: a name a folder cannot have? & set "RESULT=1" & goto end
 rem (no parentheses in the texts of this block: one would end it)
 for %%F in (gt3launcher.exe gt3pc.exe SDL3.dll) do (
-    if not exist "%ROOT%build\bin\%%F" echo build\bin\%%F is missing: the build did not make it. & exit /b 1
+    if not exist "%ROOT%build\bin\%%F" echo build\bin\%%F is missing: the build did not make it. & set "RESULT=1" & goto end
     copy /Y "%ROOT%build\bin\%%F" "%OUT%\" >nul
-    if errorlevel 1 echo "%OUT%\%%F" could not be written: is that engine running? & exit /b 1
+    if errorlevel 1 echo "%OUT%\%%F" could not be written: is that engine running? & set "RESULT=1" & goto end
 )
 rem (a name given, or none yet: an engine.txt edited by hand is kept otherwise)
 if defined NAMED goto name
@@ -46,4 +48,8 @@ echo.
 echo Engine plugin "%NAME%":
 echo   %OUT%
 echo Add that folder in the launcher's engine selector (Add engine...).
-exit /b 0
+set "RESULT=0"
+:end
+rem (started from Explorer - double-clicked: keep the window open)
+echo %cmdcmdline% | findstr /i /c:"%~nx0" >nul && call "%ROOT%tools\from_explorer.cmd" && pause
+exit /b %RESULT%

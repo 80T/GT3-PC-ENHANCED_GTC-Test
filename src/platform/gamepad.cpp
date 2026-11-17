@@ -11,6 +11,7 @@
 #include "platform/log.h"
 #include "platform/settings_menu.h"
 #include "platform/system_menu.h"
+#include "platform/ui_text.h"                  /* PC (2026-11-16): the interface's languages (N_) */
 #include "platform/window.h"
 
 #include <SDL3/SDL.h>
@@ -108,8 +109,9 @@ int g_devCount;                             /* the ids opened, 1 .. g_devCount (
 std::mutex g_mutex;
 bool g_present[kPorts];
 State g_state[kPorts];
-/* PC (2026-11-07): each port's controller's button names (button_names) */
-const ButtonNames kDefaultNames = {"CROSS", "CIRCLE", "SQUARE", "TRIANGLE", "GUIDE"};
+/* PC (2026-11-07): each port's controller's button names (button_names;
+ * PC 2026-11-16: English, translated where shown - tr(names.south)) */
+const ButtonNames kDefaultNames = {N_("CROSS"), N_("CIRCLE"), N_("SQUARE"), N_("TRIANGLE"), N_("GUIDE")};
 ButtonNames g_names[kPorts] = {kDefaultNames, kDefaultNames};
 input_map::PadSource g_raw[kPorts];
 /* SDL's buttons seen down since the last take_pressed_raw (a tap between
@@ -175,18 +177,18 @@ ButtonNames names_of(SDL_Gamepad *pad)
         case SDL_GAMEPAD_BUTTON_LABEL_B: return "B";
         case SDL_GAMEPAD_BUTTON_LABEL_X: return "X";
         case SDL_GAMEPAD_BUTTON_LABEL_Y: return "Y";
-        case SDL_GAMEPAD_BUTTON_LABEL_CROSS: return "CROSS";
-        case SDL_GAMEPAD_BUTTON_LABEL_CIRCLE: return "CIRCLE";
-        case SDL_GAMEPAD_BUTTON_LABEL_SQUARE: return "SQUARE";
-        case SDL_GAMEPAD_BUTTON_LABEL_TRIANGLE: return "TRIANGLE";
+        case SDL_GAMEPAD_BUTTON_LABEL_CROSS: return N_("CROSS");
+        case SDL_GAMEPAD_BUTTON_LABEL_CIRCLE: return N_("CIRCLE");
+        case SDL_GAMEPAD_BUTTON_LABEL_SQUARE: return N_("SQUARE");
+        case SDL_GAMEPAD_BUTTON_LABEL_TRIANGLE: return N_("TRIANGLE");
         default: return own;
         }
     };
     ButtonNames n = kDefaultNames;
-    n.south = label(SDL_GAMEPAD_BUTTON_SOUTH, "CROSS");
-    n.east = label(SDL_GAMEPAD_BUTTON_EAST, "CIRCLE");
-    n.west = label(SDL_GAMEPAD_BUTTON_WEST, "SQUARE");
-    n.north = label(SDL_GAMEPAD_BUTTON_NORTH, "TRIANGLE");
+    n.south = label(SDL_GAMEPAD_BUTTON_SOUTH, N_("CROSS"));
+    n.east = label(SDL_GAMEPAD_BUTTON_EAST, N_("CIRCLE"));
+    n.west = label(SDL_GAMEPAD_BUTTON_WEST, N_("SQUARE"));
+    n.north = label(SDL_GAMEPAD_BUTTON_NORTH, N_("TRIANGLE"));
     switch (SDL_GetGamepadType(pad)) {
     case SDL_GAMEPAD_TYPE_PS3:
     case SDL_GAMEPAD_TYPE_PS4:
@@ -201,10 +203,10 @@ ButtonNames names_of(SDL_Gamepad *pad)
     case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_LEFT:
     case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_RIGHT:
     case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_PAIR:
-        n.guide = "HOME";
+        n.guide = N_("HOME");
         break;
     default:
-        n.guide = "GUIDE";
+        n.guide = N_("GUIDE");
         break;
     }
     return n;

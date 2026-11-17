@@ -7,6 +7,7 @@
 #include "platform/frame_step.h"
 #include "platform/scheduler.h"
 #include "platform/settings.h"
+#include "platform/ui_text.h"                   /* PC (2026-11-16): the interface's languages */
 
 #include <math.h>
 #include <stdio.h>
@@ -286,7 +287,7 @@ void pc_debugcam_frame(void)
     s.pitch = clampf(s.pitch + shape(c.lookUp) * DEBUGCAM_PITCH_RATE * dt + (f32)c.lookUpCounts * DEBUGCAM_MOUSE_DEG,
                      -DEBUGCAM_PITCH_MAX, DEBUGCAM_PITCH_MAX);
     /* the speed and the field of view, said as they change */
-    char text[64];
+    char text[256];                         /* (PC 2026-11-16: 64 before - UTF-8 translations) */
     const f32 speed = s.speed;
     if (c.faster != 0.0f)
         s.speed *= powf(DEBUGCAM_SPEED_HOLD, shape(c.faster) * dt);
@@ -294,7 +295,7 @@ void pc_debugcam_frame(void)
         s.speed *= powf(DEBUGCAM_SPEED_STEP, (f32)c.fasterSteps);
     s.speed = clampf(s.speed, DEBUGCAM_SPEED_MIN, DEBUGCAM_SPEED_MAX);
     if (s.speed != speed) {
-        snprintf(text, sizeof(text), "DEBUG CAMERA SPEED %.1f M/S", s.speed);
+        snprintf(text, sizeof(text), tr("DEBUG CAMERA SPEED %.1f M/S"), s.speed);
         debug_camera::notice(text, 1.0);
     }
     if (s.fov > 0.0f && (c.fov != 0.0f || c.fovSteps != 0)) {
@@ -302,7 +303,7 @@ void pc_debugcam_frame(void)
         s.fov = clampf(s.fov + shape(c.fov) * DEBUGCAM_FOV_RATE * dt + (f32)c.fovSteps * DEBUGCAM_FOV_STEP,
                        DEBUGCAM_FOV_MIN, DEBUGCAM_FOV_MAX);
         if (s.fov != fov) {
-            snprintf(text, sizeof(text), "DEBUG CAMERA FIELD OF VIEW %.0f", s.fov);
+            snprintf(text, sizeof(text), tr("DEBUG CAMERA FIELD OF VIEW %.0f"), s.fov);
             debug_camera::notice(text, 1.0);
         }
     }

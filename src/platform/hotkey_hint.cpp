@@ -2,6 +2,7 @@
 #include "platform/hotkey_hint.h"
 #include "platform/gamepad.h"
 #include "platform/input_map.h"
+#include "platform/ui_text.h"                  /* PC (2026-11-16): the interface's languages */
 
 namespace hotkey_hint {
 namespace {
@@ -9,18 +10,20 @@ namespace {
 /* A short name for a device's binding in the panel ("UP", "SELECT"; a
  * joystick's: as the launcher names it, without the device).  PC
  * (2026-11-07): the face buttons and the Guide button as the controller
- * names them (gamepad::button_names: A, B, X, Y, XBOX on an Xbox one). */
+ * names them (gamepad::button_names: A, B, X, Y, XBOX on an Xbox one).  PC
+ * (2026-11-16): in the interface's language (platform/ui_text.h). */
 std::string device_name(const input_map::Binding &b)
 {
     using input_map::Source;
-    static const char *const kButtons[] = {"CROSS", "CIRCLE", "SQUARE", "TRIANGLE", "SELECT", "GUIDE", "START",
-                                           "L3", "R3", "L1", "R1", "UP", "DOWN", "LEFT", "RIGHT"};
+    static const char *const kButtons[] = {N_("CROSS"), N_("CIRCLE"), N_("SQUARE"), N_("TRIANGLE"), N_("SELECT"),
+                                           N_("GUIDE"), N_("START"),  "L3",         "R3",           "L1",
+                                           "R1",        N_("UP"),     N_("DOWN"),   N_("LEFT"),     N_("RIGHT")};
     if (b.source == Source::pad_button && b.index < sizeof(kButtons) / sizeof(kButtons[0])) {
         const gamepad::ButtonNames pad = gamepad::button_names();
         const char *const own[] = {pad.south, pad.east, pad.west, pad.north, nullptr, pad.guide};
         if (b.index < sizeof(own) / sizeof(own[0]) && own[b.index] != nullptr)
-            return own[b.index];
-        return kButtons[b.index];
+            return tr(own[b.index]);
+        return tr(kButtons[b.index]);
     }
     if (b.source == Source::pad_axis && b.index == input_map::kPadAxisLeftTrigger)
         return "L2";
@@ -28,7 +31,7 @@ std::string device_name(const input_map::Binding &b)
         return "R2";
     input_map::Binding own = b;
     own.device = 0;
-    char d[96];
+    char d[256];                            /* PC (2026-11-16): 96 before (UTF-8 translations) */
     input_map::describe(own, d, sizeof(d));
     return d;
 }
@@ -53,7 +56,7 @@ std::string device_text(int h)
 
 std::string key_text(int h)
 {
-    char key[64];
+    char key[256];                          /* PC (2026-11-16): 64 before (describe's UTF-8 translations) */
     input_map::describe_combo(input_map::hotkey(h), key, sizeof(key));
     return key;
 }

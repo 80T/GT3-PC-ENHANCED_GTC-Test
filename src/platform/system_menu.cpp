@@ -5,6 +5,7 @@
 #include "platform/log.h"
 #include "platform/memcard.h"
 #include "platform/overlay.h"
+#include "platform/ui_text.h"                  /* PC (2026-11-16): the interface's languages */
 #include "platform/window.h"
 
 #include <windows.h>
@@ -29,14 +30,14 @@ struct Item {
     Action action;
 };
 
-/* (help: any number of lines, '\n' between) */
+/* (help: any number of lines, '\n' between; both translated where drawn) */
 const Item kItems[] = {
-    {"BACK", "CLOSES THIS MENU.", ACT_BACK},
-    {"RESTART", "THE GAME STARTS AGAIN FROM THE BEGINNING.\nWHAT IS NOT SAVED IS LOST.", ACT_RESTART},
-    {"RESTART AS NEW GAME",
-     "THE GAME STARTS AGAIN WITHOUT LOADING A SAVE.\nYOUR SAVES STAY ON THE MEMORY CARD.\nWHAT IS NOT SAVED IS LOST.",
+    {N_("BACK"), N_("CLOSES THIS MENU."), ACT_BACK},
+    {N_("RESTART"), N_("THE GAME STARTS AGAIN FROM THE BEGINNING.\nWHAT IS NOT SAVED IS LOST."), ACT_RESTART},
+    {N_("RESTART AS NEW GAME"),
+     N_("THE GAME STARTS AGAIN WITHOUT LOADING A SAVE.\nYOUR SAVES STAY ON THE MEMORY CARD.\nWHAT IS NOT SAVED IS LOST."),
      ACT_RESTART_NEW_GAME},
-    {"EXIT", "CLOSES THE GAME.\nWHAT IS NOT SAVED IS LOST.", ACT_EXIT},
+    {N_("EXIT"), N_("CLOSES THE GAME.\nWHAT IS NOT SAVED IS LOST."), ACT_EXIT},
 };
 constexpr int kItemCount = (int)(sizeof(kItems) / sizeof(kItems[0]));
 
@@ -134,23 +135,25 @@ const uint32_t kHelp = rgba(200, 200, 150, 255);
 const uint32_t kHint = rgba(130, 130, 130, 255);
 const uint32_t kNotice = rgba(255, 200, 80, 255);
 
-const char kWaiting[] = "WAITING FOR THE MEMORY CARD:\nTHE SAVE GOES ON. ESC: CANCEL.";
-const char kHint1[] = "UP/DOWN CHOOSE   ENTER SELECT   ESC CLOSE";
+const char kWaiting[] = N_("WAITING FOR THE MEMORY CARD:\nTHE SAVE GOES ON. ESC: CANCEL.");
+const char kHint1[] = N_("UP/DOWN CHOOSE   ENTER SELECT   ESC CLOSE");
 /* (%s: the controller's names of its south and east buttons - CROSS,
  * CIRCLE; A, B... - gamepad::button_names) */
-const char kHint2[] = "PAD: D-PAD, %s SELECT, %s CLOSE";
+const char kHint2[] = N_("PAD: D-PAD, %s SELECT, %s CLOSE");
 
-/* The lines of text and the longest (characters). */
+/* The lines of text and the longest (PC 2026-11-16: in cells - a Japanese
+ * character two -, the text translated). */
 void text_extent(const char *t, int *rows, int *cols)
 {
-    int n = 1, len = 0;
-    for (const char *p = t; *p != '\0'; p++) {
-        if (*p == '\n') {
-            n++;
-            len = 0;
-            continue;
-        }
-        *cols = std::max(*cols, ++len);
+    char buf[1024];
+    snprintf(buf, sizeof(buf), "%s", t);
+    int n = 0;
+    for (char *line = buf; line != nullptr; n++) {
+        char *next = strchr(line, '\n');
+        if (next != nullptr)
+            *next++ = '\0';
+        *cols = std::max(*cols, overlay::text_cells(line));
+        line = next;
     }
     *rows = std::max(*rows, n);
 }
@@ -158,7 +161,7 @@ void text_extent(const char *t, int *rows, int *cols)
 /* Each line of `t' from y down. */
 void draw_lines(float x, float y, int s, float lineH, const char *t, uint32_t color)
 {
-    char buf[256];
+    char buf[1024];                             /* PC (2026-11-16): 256 before (UTF-8 translations) */
     snprintf(buf, sizeof(buf), "%s", t);
     for (char *line = buf; line != nullptr; y += lineH) {
         char *next = strchr(line, '\n');
@@ -171,14 +174,19 @@ void draw_lines(float x, float y, int s, float lineH, const char *t, uint32_t co
 
 void build(int bw, int bh)
 {
-    int helpRows = 1, cols = (int)strlen(kHint1);
-    for (const Item &it : kItems)
-        text_extent(it.help, &helpRows, &cols);
-    text_extent(kWaiting, &helpRows, &cols);
-    char hint2[64];                             /* PC (2026-11-07): the controller's button names */
+    /* PC (2026-11-16): the text in the interface's language (platform/ui_text.h),
+     * its widths in cells (overlay::text_cells), the buffers for UTF-8 */
+    const char *const hint1 = tr(kHint1);
+    int helpRows = 1, cols = overlay::text_cells(hint1);
+    for (const Item &it : kItems) {
+        text_extent(tr(it.help), &helpRows, &cols);
+        cols = std::max(cols, overlay::text_cells(tr(it.label)));     /* (a translation may be the widest) */
+    }
+    text_extent(tr(kWaiting), &helpRows, &cols);
+    char hint2[256];                            /* PC (2026-11-07): the controller's button names */
     const gamepad::ButtonNames names = gamepad::button_names();
-    snprintf(hint2, sizeof(hint2), kHint2, names.south, names.east);
-    cols = std::max(cols, (int)strlen(hint2));
+    snprintf(hint2, sizeof(hint2), tr(kHint2), tr(names.south), tr(names.east));
+    cols = std::max(cols, overlay::text_cells(hint2));
     /* title, a gap, the items, a gap, the help, a gap, two hints */
     const int rows = kItemCount + helpRows + 6;
     const int s = std::max(1, std::min({bh / 360, (bw - 16) / (cols * 6 + 20), (bh - 16) / (rows * 12 + 20)}));
@@ -205,16 +213,16 @@ void build(int bw, int bh)
         const bool sel = i == g_sel;
         if (sel)
             overlay::rect(x0 - 4.0f * s, y - 3.0f * s, x1 - x0 + 8.0f * s, lineH, kHighlight);
-        overlay::text(x0, y, s, kItems[i].label, sel ? kLabelSel : kLabel);
+        overlay::text(x0, y, s, tr(kItems[i].label), sel ? kLabelSel : kLabel);
         y += lineH;
     }
     y += lineH;
     if (g_pending != ACT_NONE)
-        draw_lines(x0, y, s, lineH, kWaiting, kNotice);
+        draw_lines(x0, y, s, lineH, tr(kWaiting), kNotice);
     else
-        draw_lines(x0, y, s, lineH, kItems[g_sel].help, kHelp);
+        draw_lines(x0, y, s, lineH, tr(kItems[g_sel].help), kHelp);
     y += (float)(helpRows + 1) * lineH;
-    overlay::text(x0, y, s, kHint1, kHint);
+    overlay::text(x0, y, s, hint1, kHint);
     y += lineH;
     overlay::text(x0, y, s, hint2, kHint);
 }

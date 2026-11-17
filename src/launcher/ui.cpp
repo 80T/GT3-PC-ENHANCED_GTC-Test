@@ -41,6 +41,7 @@
 #include "util.h"
 #include "platform/hud_colors.h"
 #include "platform/input_map.h"                 /* PC (2026-11-09): the clutch mode's popup */
+#include "platform/ui_text.h"                   /* PC (2026-11-16): the interface's languages */
 
 #include <windows.h>
 #include <commctrl.h>
@@ -61,7 +62,7 @@ namespace ui {
 namespace {
 
 const wchar_t kClassName[] = L"GT3LauncherWindow";
-const wchar_t kTitle[] = L"Gran Turismo 3 A-Spec - Launcher";
+const wchar_t kTitle[] = N_(L"Gran Turismo 3 A-Spec - Launcher");
 const wchar_t kAppName[] = L"Gran Turismo 3 A-Spec";   /* message box captions */
 const wchar_t kGameExe[] = L"gt3pc.exe";
 
@@ -89,7 +90,8 @@ constexpr int kPanelShade = 150;    /* of 256: the art kept */
 
 constexpr DWORD kStyle = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_CLIPCHILDREN;
 
-const wchar_t *const kTabNames[kTabs] = {L"Play", L"Display", L"Graphics", L"Audio", L"Game", L"Controls", L"Debug"};
+const wchar_t *const kTabNames[kTabs] = {N_(L"Play"), N_(L"Display"), N_(L"Graphics"), N_(L"Audio"),
+                                         N_(L"Game"), N_(L"Controls"), N_(L"Debug")};
 enum { TAB_PLAY, TAB_DISPLAY, TAB_GRAPHICS, TAB_AUDIO, TAB_GAME, TAB_CONTROLS, TAB_DEBUG };
 
 /* The Play tab: a version a row (its name and state, a Play button at the
@@ -116,16 +118,16 @@ constexpr int kVersionRowH = 48, kPlayW = 90;
  * to the window's margin), one under the other, what each has on under its
  * button. */
 constexpr int kDiscPlayW = 58, kDiscRemoveW = 28, kDiscGap = 4;
-const wchar_t kDiscRemoveTip[] = L"Remove from this list (the file stays)";
+const wchar_t kDiscRemoveTip[] = N_(L"Remove from this list (the file stays)");
 constexpr int kSideGap = 10;
-const wchar_t *const kPlaySubNames[2] = {L"Installed", L"Disc"};
+const wchar_t *const kPlaySubNames[2] = {N_(L"Installed"), N_(L"Disc")};
 enum { PLAY_INSTALLED, PLAY_DISC };
 /* (PC 2026-11-15, user request: "only add the disc without automatically
  * starting it. The play button in the disc tab's list item should be the only
  * way to start it": the sub-tab's button is Add disc..., which only adds) */
 const wchar_t kDiscNoneText[] =
-    L"No disc image has been added yet.\n\n\"Add disc...\" adds a Gran Turismo 3 disc image (USA, Europe, "
-    L"Japan) straight from its file, without installing it, and keeps it in this list.";
+    N_(L"No disc image has been added yet.\n\n\"Add disc...\" adds a Gran Turismo 3 disc image (USA, Europe, "
+       L"Japan) straight from its file, without installing it, and keeps it in this list.");
 /* The Audio tab: two sub-tabs over its page - Settings (its rows), Songs (the
  * music's notices of this run, the race songs of each version, the song
  * manager's button: song_manager.h).  The Game tab: six, General, HUD,
@@ -140,10 +142,10 @@ const wchar_t kDiscNoneText[] =
  * narrower, as far as kSubTabMinPad, until they fit: game_sub_tab_pad) */
 constexpr int kSubTabMinW = 56, kSubTabPad = 14, kSubTabMinPad = 6, kSubTabH = 28, kSongsLineH = 18,
               kSongsOpenW = 170;
-const wchar_t *const kAudioSubNames[2] = {L"Settings", L"Songs"};
+const wchar_t *const kAudioSubNames[2] = {N_(L"Settings"), N_(L"Songs")};
 enum { GAME_GENERAL, GAME_HUD, GAME_CAMERAS, GAME_EXTRAS, GAME_SURFACES, GAME_CHALLENGES, kGameSubs };
-const wchar_t *const kGameSubNames[kGameSubs] = {L"General", L"HUD", L"Cameras", L"Extras", L"Surfaces",
-                                                 L"Challenges"};
+const wchar_t *const kGameSubNames[kGameSubs] = {N_(L"General"), N_(L"HUD"), N_(L"Cameras"), N_(L"Extras"),
+                                                 N_(L"Surfaces"), N_(L"Challenges")};
 
 enum : int {
     IDC_INSTALL = 1001,
@@ -267,6 +269,7 @@ struct Window {
     HINSTANCE inst = nullptr;
     HWND wnd = nullptr;
     HWND install = nullptr, cancel = nullptr, exit = nullptr, status = nullptr, progress = nullptr;
+    int statusX = 0, statusBottom = 0;      /* PC (2026-11-16): where the status line ends (place_status) */
     HWND tabs[kTabs] = {};
     HWND pages[kTabs] = {};                 /* each tab's controls (panels: panel.h) */
     int tab = TAB_PLAY;
@@ -505,7 +508,7 @@ void draw_header(const DRAWITEMSTRUCT *d, const wchar_t *name, bool chosen, bool
 void draw_tab(const DRAWITEMSTRUCT *d)
 {
     const int i = (int)d->CtlID - IDC_TAB0;
-    draw_header(d, kTabNames[i], i == g.tab, i == TAB_AUDIO && g.musicUnread);
+    draw_header(d, tr(kTabNames[i]), i == g.tab, i == TAB_AUDIO && g.musicUnread);
 }
 
 /* A sub-tab's width on `page': its name in the headers' font with kSubTabPad
@@ -538,7 +541,7 @@ int game_sub_tab_pad()
     for (; pad > px(kSubTabMinPad); pad--) {
         int total = 0;
         for (int s = 0; s < kGameSubs; s++)
-            total += sub_tab_width(g.pages[TAB_GAME], kGameSubNames[s], pad);
+            total += sub_tab_width(g.pages[TAB_GAME], tr(kGameSubNames[s]), pad);
         if (total <= room)
             break;
     }
@@ -557,19 +560,19 @@ std::wstring state_text()
 {
     /* PC (2026-11-14): the Disc sub-tab's */
     if (g.playSub == PLAY_DISC)
-        return g.discs.empty() ? L"No disc image has been added yet.\n"
-                                 L"Choose \"Play from disc...\" and pick a Gran Turismo 3 disc image."
-                               : L"Ready.\n"
-                                 L"\"Add disc...\" adds another disc image; its Play plays it without installing it.";
+        return g.discs.empty() ? tr(L"No disc image has been added yet.\n"
+                                    L"Choose \"Add disc...\" and pick a Gran Turismo 3 disc image.")
+                               : tr(L"Ready.\n"
+                                    L"\"Add disc...\" adds another disc image; its Play plays it without installing it.");
     for (int v = 0; v < install::kVersions; v++)
         if (version_state(v) == install::InstallState::ok)
-            return L"Ready.\n"
-                   L"\"Install game files...\" installs another version from its disc image.";
+            return tr(L"Ready.\n"
+                      L"\"Install game files...\" installs another version from its disc image.");
     if (install::has_volume(g.folder))
-        return L"The game files need unpacking from gt3.vol (installed by an earlier version).\n"
-               L"Choose \"Install game files...\" to unpack them.";
-    return L"No version is installed.\n"
-           L"Choose \"Install game files...\" and pick a Gran Turismo 3 disc image.";
+        return tr(L"The game files need unpacking from gt3.vol (installed by an earlier version).\n"
+                  L"Choose \"Install game files...\" to unpack them.");
+    return tr(L"No version is installed.\n"
+              L"Choose \"Install game files...\" and pick a Gran Turismo 3 disc image.");
 }
 
 /* A version's state in the Play tab. */
@@ -578,11 +581,11 @@ std::wstring version_text(int v)
     const std::wstring data = install::version_folder((install::Version)v);
     switch (install::install_state(g.folder, data)) {
     case install::InstallState::ok:
-        return L"Installed from " + install::installed_release(g.folder, data) + L".";
+        return trf(L"Installed from %s.", install::installed_release(g.folder, data).c_str());
     case install::InstallState::damaged:
-        return L"Incomplete (" + data + L"): install it again from its disc image.";
+        return trf(L"Incomplete (%s): install it again from its disc image.", data.c_str());
     default:
-        return L"Not installed: \"Install game files...\" with its disc image.";
+        return tr(L"Not installed: \"Install game files...\" with its disc image.");
     }
 }
 
@@ -592,7 +595,7 @@ std::wstring extractions_text(int *lines)
     std::wstring t;
     *lines = 0;
     for (const install::Extraction &e : install::extractions(g.folder)) {
-        t += (t.empty() ? L"Data only, not playable:" : L"") + std::wstring(L"\n  ") + e.release + L" (" + e.data + L")";
+        t += (t.empty() ? tr(L"Data only, not playable:") : L"") + std::wstring(L"\n  ") + e.release + L" (" + e.data + L")";
         *lines += *lines == 0 ? 2 : 1;
     }
     return t;
@@ -608,10 +611,10 @@ std::wstring mods_text()
     const std::vector<mod_manager::Mod> mods = mod_manager::load(engine_ini_path());
     const long on = (long)std::count_if(mods.begin(), mods.end(), [](const mod_manager::Mod &m) { return m.on; });
     if (mods.empty())
-        return L"No mod folders are installed";
+        return tr(L"No mod folders are installed");
     if (on == 0)
-        return L"No mod folders enabled";
-    return std::to_wstring(on) + (on == 1 ? L" mod folder" : L" mod folders");
+        return tr(L"No mod folders enabled");
+    return on == 1 ? std::wstring(tr(L"1 mod folder")) : trf(L"%ld mod folders", on);
 }
 
 /* PC (2026-11-13): the texture folders of gt3pc.ini [Textures]: how many are
@@ -622,10 +625,10 @@ std::wstring textures_text()
     const long on =
         (long)std::count_if(packs.begin(), packs.end(), [](const texture_manager::Pack &p) { return p.on; });
     if (packs.empty())
-        return L"No texture folders are installed";
+        return tr(L"No texture folders are installed");
     if (on == 0)
-        return L"No texture folders enabled";
-    return std::to_wstring(on) + (on == 1 ? L" texture folder" : L" texture folders");
+        return tr(L"No texture folders enabled");
+    return on == 1 ? std::wstring(tr(L"1 texture folder")) : trf(L"%ld texture folders", on);
 }
 
 /* PC (2026-11-15): the engine's save folders (platform/save_folders.h):
@@ -642,9 +645,7 @@ std::wstring play_time_text()
 {
     wchar_t v[32] = L"";
     GetPrivateProfileStringW(L"Stats", L"PlayTime", L"0", v, 32, ini_path().c_str());
-    wchar_t t[64];
-    swprintf(t, 64, L"Time played: %.1f hours", (double)_wcstoui64(v, nullptr, 10) / 3600.0);
-    return t;
+    return trf(L"Time played: %.1f hours", (double)_wcstoui64(v, nullptr, 10) / 3600.0);
 }
 
 /* The chosen tab's page shown, the others hidden (the focus, if it was in
@@ -694,7 +695,7 @@ struct SongFolder {
 /* "Disc image: Gran Turismo 3 A-Spec (USA, SCUS-97102)" */
 std::wstring disc_song_name(const std::wstring &release)
 {
-    return L"Disc image: " + release;
+    return trf(L"Disc image: %s", release.c_str());
 }
 
 std::vector<SongFolder> disc_song_folders()
@@ -745,17 +746,19 @@ std::wstring songs_text()
         spu2::AdsList list;
         spu2::ads_list_parse(music::list_text(g.folder + install::version_folder((install::Version)v)), &list, nullptr);
         const size_t n = list.group[spu2::ADS_GROUP_RACE_SONGS].size();
-        t += (t.empty() ? L"" : L"\n") + std::wstring(install::version_name((install::Version)v)) + L": " +
-             std::to_wstring(n) + (n == 1 ? L" race song" : L" race songs");
+        const wchar_t *name = install::version_name((install::Version)v);
+        t += (t.empty() ? L"" : L"\n") +
+             (n == 1 ? trf(L"%s: 1 race song", name) : trf(L"%s: %zu race songs", name, n));
     }
     /* PC (2026-11-15): the disc images added */
     for (const SongFolder &d : disc_song_folders()) {
         const size_t n = disc_race_songs(d.data);
-        t += (t.empty() ? L"" : L"\n") + d.name + L": " + std::to_wstring(n) + (n == 1 ? L" race song" : L" race songs");
+        t += (t.empty() ? L"" : L"\n") +
+             (n == 1 ? trf(L"%s: 1 race song", d.name.c_str()) : trf(L"%s: %zu race songs", d.name.c_str(), n));
     }
     if (t.empty())
-        t = L"No version is installed and no disc image is added.";
-    t += g.musicNotes.empty() ? L"\n\nNo new songs. Add .wav / .mp3 / .ads files into the bgm folder and restart the launcher to add more" : L"\n";
+        t = tr(L"No version is installed and no disc image is added.");
+    t += g.musicNotes.empty() ? std::wstring(L"\n\n") + tr(L"No new songs. Add .wav / .mp3 / .ads files into the bgm folder and restart the launcher to add more") : std::wstring(L"\n");
     for (const std::wstring &n : g.musicNotes)
         t += L"\n" + n;
     return t;
@@ -812,6 +815,74 @@ void side_layout()
     InvalidateRect(g.wnd, &side, TRUE);
 }
 
+/* PC (2026-11-16): the interface's languages run longer than English.  A
+ * tab's row labels' column: its widest label (and some air), kLabelW at
+ * least, kLabelMaxW at most - a label wider still wraps to two lines in its
+ * row (place_label). */
+constexpr int kLabelMaxW = 220;
+
+int label_column(int tab)
+{
+    int widest = 0;
+    for (const Row &r : g.rows) {
+        if (r.tab != tab || r.label == nullptr)
+            continue;
+        wchar_t t[256] = L"";
+        GetWindowTextW(r.label, t, 256);
+        widest = std::max(widest, text_width(g.pages[tab], t));
+    }
+    return std::max(px(kLabelW), std::min(px(kLabelMaxW), widest + px(10)));
+}
+
+void place_label(HWND page, HWND label, int x, int y, int lw)
+{
+    wchar_t t[256] = L"";
+    GetWindowTextW(label, t, 256);
+    if (text_width(page, t) + px(4) <= lw) {
+        panel::place(page, label, x, y + px(4), lw, px(20));
+        return;
+    }
+    /* two lines: as tall as they are (the font's lines at 150 % dpi are
+     * more than half a row), centred on the row */
+    HDC dc = GetDC(page);
+    HGDIOBJ old = SelectObject(dc, g.font);
+    RECT r = {0, 0, lw - px(6), 0};
+    DrawTextW(dc, t, -1, &r, DT_CALCRECT | DT_WORDBREAK | DT_NOPREFIX);
+    SelectObject(dc, old);
+    ReleaseDC(page, dc);
+    const int h = (int)r.bottom + px(1);
+    panel::place(page, label, x, y + (px(kRowH) - h) / 2, lw - px(6), h);
+}
+
+/* PC (2026-11-16): the status line's height - its text's lines at its
+ * width, two (kStatusH) to three - its bottom where layout() put it (a
+ * translation of a two-line message can take three). */
+void place_status()
+{
+    if (g.status == nullptr || g.statusBottom <= 0)
+        return;
+    wchar_t t[2048] = L"";
+    GetWindowTextW(g.status, t, 2048);
+    HDC dc = GetDC(g.status);
+    HFONT f = (HFONT)SendMessageW(g.status, WM_GETFONT, 0, 0);
+    HGDIOBJ old = SelectObject(dc, f != nullptr ? (HGDIOBJ)f : (HGDIOBJ)g.font);
+    RECT r = {0, 0, px(kStatusW), 0};
+    DrawTextW(dc, t, -1, &r, DT_CALCRECT | DT_WORDBREAK | DT_NOPREFIX);
+    SelectObject(dc, old);
+    ReleaseDC(g.status, dc);
+    const int h = std::max(px(kStatusH), std::min(px(kStatusH) * 3 / 2, (int)r.bottom + px(1)));
+    RECT cur;
+    GetWindowRect(g.status, &cur);
+    const bool resized = cur.bottom - cur.top != h;
+    /* (not its old pixels moved: the static's text is laid out again whole) */
+    SetWindowPos(g.status, nullptr, g.statusX, g.statusBottom - h, px(kStatusW), h,
+                 SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOCOPYBITS);
+    if (resized) {
+        InvalidateRect(g.wnd, nullptr, TRUE);
+        InvalidateRect(g.status, nullptr, TRUE);
+    }
+}
+
 void layout()
 {
     int w = px(kClientW), h = px(kClientH), m = px(kMargin);
@@ -838,13 +909,13 @@ void layout()
     /* its height as it wraps (the width less a scroll bar's) */
     int textH = px(kSongsLineH);
     {
-        RECT tr = {0, 0, px(kPanelW) - 2 * px(kPanelPad) - GetSystemMetricsForDpi(SM_CXVSCROLL, g.dpi), 0};
+        RECT box = {0, 0, px(kPanelW) - 2 * px(kPanelPad) - GetSystemMetricsForDpi(SM_CXVSCROLL, g.dpi), 0};
         HDC dc = GetDC(g.songsText);
         HGDIOBJ old = SelectObject(dc, g.font);
-        DrawTextW(dc, songs.c_str(), -1, &tr, DT_CALCRECT | DT_WORDBREAK | DT_NOPREFIX);
+        DrawTextW(dc, songs.c_str(), -1, &box, DT_CALCRECT | DT_WORDBREAK | DT_NOPREFIX);
         SelectObject(dc, old);
         ReleaseDC(g.songsText, dc);
-        textH = std::max(textH, (int)tr.bottom + px(2));
+        textH = std::max(textH, (int)box.bottom + px(2));
     }
     const int songsH = textH + px(8) + px(kButtonH);
     int cw[kTabs] = {}, index[kTabs][kGameSubs] = {};
@@ -860,7 +931,7 @@ void layout()
     {
         HWND p = g.pages[TAB_AUDIO];
         for (int s = 0, tx = px(kPanelPad); s < 2; s++) {
-            const int w = sub_tab_width(p, kAudioSubNames[s]);
+            const int w = sub_tab_width(p, tr(kAudioSubNames[s]));
             panel::place(p, g.audioSubTab[s], tx, px(2), w, px(kSubTabH));
             tx += w;
         }
@@ -870,7 +941,7 @@ void layout()
     }
     const int gamePad = game_sub_tab_pad();     /* PC (2026-11-14) */
     for (int s = 0, tx = px(kPanelPad); s < kGameSubs; s++) {
-        const int w = sub_tab_width(g.pages[TAB_GAME], kGameSubNames[s], gamePad);
+        const int w = sub_tab_width(g.pages[TAB_GAME], tr(kGameSubNames[s]), gamePad);
         panel::place(g.pages[TAB_GAME], g.gameSubTab[s], tx, px(2), w, px(kSubTabH));
         tx += w;
     }
@@ -894,7 +965,7 @@ void layout()
         const int pw = panel::begin(p, height, px(kRowH));
         const int x = px(kPanelPad), bw = px(kPlayW);
         for (int s = 0, tx = x; s < 2; s++) {
-            const int sw = sub_tab_width(p, kPlaySubNames[s]);
+            const int sw = sub_tab_width(p, tr(kPlaySubNames[s]));
             panel::place(p, g.playSubTab[s], tx, px(2), sw, px(kSubTabH));
             tx += sw;
         }
@@ -921,19 +992,23 @@ void layout()
         }
     }
     side_layout();
+    int labelW[kTabs] = {};
+    for (int t = 0; t < kTabs; t++)
+        labelW[t] = label_column(t);        /* PC (2026-11-16) */
     for (const Row &r : g.rows) {
         if (!row_shown(r))
             continue;                       /* PC (2026-11-09): hidden (show_game_rows), no place */
         int y = px(kPanelPad) / 2 + index[r.tab][r.sub]++ * px(kRowH) +
                 (r.tab == TAB_AUDIO || r.tab == TAB_GAME ? audioTop : 0);
         int x = px(kPanelPad);
-        const int w = std::min(px(kComboW), cw[r.tab] - x - px(kLabelW) - px(kPanelPad) / 2);
-        panel::place(g.pages[r.tab], r.label, x, y + px(4), px(kLabelW), px(20));
+        const int kw = labelW[r.tab];       /* (the label column: kLabelW before 2026-11-16) */
+        const int w = std::min(px(kComboW), cw[r.tab] - x - kw - px(kPanelPad) / 2);
+        place_label(g.pages[r.tab], r.label, x, y, kw);
         if (r.cap) {
             /* "FPS" [ 7 digits ][^v]   "ms" [ 7 digits ][^v] */
             const int lw = px(30), ew = text_width(g.pages[r.tab], L"0000000") + px(12), uw = px(16),
                       gap = px(12);
-            int cx = x + px(kLabelW);
+            int cx = x + kw;
             panel::place(g.pages[r.tab], r.extra[0], cx, y + px(4), lw, px(20));
             panel::place(g.pages[r.tab], r.combo, cx + lw, y, ew, px(kSliderH));
             panel::place(g.pages[r.tab], r.extra[1], cx + lw + ew, y, uw, px(kSliderH));
@@ -943,20 +1018,29 @@ void layout()
             panel::place(g.pages[r.tab], r.extra[3], cx + lw + ew, y, uw, px(kSliderH));
         } else if (r.number) {
             /* PC (2026-11-14): a number's field, nine digits and their commas wide */
-            panel::place(g.pages[r.tab], r.combo, x + px(kLabelW), y,
+            panel::place(g.pages[r.tab], r.combo, x + kw, y,
                          text_width(g.pages[r.tab], L"000,000,000") + px(16), px(kSliderH));
         } else if (r.value != nullptr) {
             /* the slider, its value right of it (a colour's Default button),
              * a slider's Default button in the value's right half */
-            const int vw = std::min(px(kValueW), w / 2);
-            const int dw = r.reset != nullptr ? vw / 2 : 0;
-            panel::place(g.pages[r.tab], r.combo, x + px(kLabelW), y, w - vw - px(kValueGap), px(kSliderH));
-            panel::place(g.pages[r.tab], r.value, x + px(kLabelW) + w - vw, r.button ? y : y + px(4),
+            int vw = std::min(px(kValueW), w / 2);
+            int dw = 0;
+            if (r.reset != nullptr) {
+                /* PC (2026-11-16): the Default button as wide as its text (a
+                 * translation runs longer: "Predeterminado"), the value's part
+                 * 48 px at least; the slider gives the room */
+                wchar_t t[64] = L"";
+                GetWindowTextW(r.reset, t, 64);
+                dw = std::max(vw / 2, text_width(g.pages[r.tab], t) + px(16));
+                vw = std::max(vw, dw + px(kValueGap) + px(48));
+            }
+            panel::place(g.pages[r.tab], r.combo, x + kw, y, w - vw - px(kValueGap), px(kSliderH));
+            panel::place(g.pages[r.tab], r.value, x + kw + w - vw, r.button ? y : y + px(4),
                          r.reset != nullptr ? vw - dw - px(kValueGap) : vw, r.button ? px(kSliderH) : px(20));
             if (r.reset != nullptr)
-                panel::place(g.pages[r.tab], r.reset, x + px(kLabelW) + w - dw, y, dw, px(kSliderH));
+                panel::place(g.pages[r.tab], r.reset, x + kw + w - dw, y, dw, px(kSliderH));
         } else {
-            panel::place(g.pages[r.tab], r.combo, x + px(kLabelW), y, w, px(kComboListH));
+            panel::place(g.pages[r.tab], r.combo, x + kw, y, w, px(kComboListH));
         }
     }
     controls::layout(g.dpi);
@@ -976,12 +1060,17 @@ void layout()
      * of the art's logo. */
     int py = by - px(12) - px(kProgressH);
     SetWindowPos(g.progress, nullptr, m, py, px(kStatusW), px(kProgressH), SWP_NOZORDER | SWP_NOACTIVATE);
-    int sy = g.installing ? py - px(6) - px(kStatusH) : by - px(12) - px(kStatusH);
-    SetWindowPos(g.status, nullptr, m, sy, px(kStatusW), px(kStatusH), SWP_NOZORDER | SWP_NOACTIVATE);
+    g.statusX = m;
+    g.statusBottom = g.installing ? py - px(6) : by - px(12);
+    place_status();
     InvalidateRect(g.wnd, nullptr, TRUE);
 }
 
-void set_status(const std::wstring &text) { SetWindowTextW(g.status, text.c_str()); }
+void set_status(const std::wstring &text)
+{
+    SetWindowTextW(g.status, text.c_str());
+    place_status();                         /* PC (2026-11-16) */
+}
 
 void show_progress_text()
 {
@@ -990,7 +1079,7 @@ void show_progress_text()
     if (g.copying && total) {
         wchar_t pct[16];
         swprintf(pct, 16, L"%u%%", (unsigned)(done * 100 / total));
-        s += L"  " + util::format_size(done) + L" of " + util::format_size(total) + L" (" + pct + L")";
+        s += L"  " + trf(L"%s of %s (%s)", util::format_size(done).c_str(), util::format_size(total).c_str(), pct);
         SendMessageW(g.progress, PBM_SETPOS, (WPARAM)(done * 1000 / total), 0);
     }
     set_status(s);
@@ -1061,7 +1150,7 @@ void refresh(const std::wstring &note = std::wstring())
     for (size_t i = 0; i < g.discRows.size() && i < g.discs.size(); i++) {
         g.discThere[i] = disc_there(g.discs[i]) ? 1 : 0;
         SetWindowTextW(g.discRows[i].path,
-                       (g.discThere[i] ? g.discs[i].path : L"Not found: " + g.discs[i].path).c_str());
+                       (g.discThere[i] ? g.discs[i].path : trf(L"Not found: %s", g.discs[i].path.c_str())).c_str());
         EnableWindow(g.discRows[i].play, !g.installing && g.discThere[i]);
         EnableWindow(g.discRows[i].remove, !g.installing);
     }
@@ -1182,8 +1271,8 @@ void open_song_manager()
         versions.push_back({d.name, d.data});
     }
     if (versions.empty()) {
-        MessageBoxW(g.wnd, L"No version is installed and no disc image is added: install one, or add a disc image (Play "
-                           L"tab).",
+        MessageBoxW(g.wnd, tr(L"No version is installed and no disc image is added: install one, or add a disc image (Play "
+                              L"tab)."),
                     kAppName, MB_OK | MB_ICONINFORMATION);
         return;
     }
@@ -1375,13 +1464,13 @@ void fill_rates()
     combo_reset(g.rate);
     g.rateValues.clear();
     if (g.disp.mode != display::Mode::fullscreen) {
-        combo_add(g.rate, g.disp.mode == display::Mode::borderless ? L"The desktop's" : L"-");
+        combo_add(g.rate, g.disp.mode == display::Mode::borderless ? tr(L"The desktop's") : L"-");
         SendMessageW(g.rate, CB_SETCURSEL, 0, 0);
         EnableWindow(g.rate, FALSE);
         return;
     }
     display::Size s = g.disp.width > 0 ? display::Size{g.disp.width, g.disp.height} : display::desktop_size();
-    combo_add(g.rate, L"Default (60 Hz)");
+    combo_add(g.rate, tr(L"Default (60 Hz)"));
     g.rateValues.push_back(0);
     int sel = 0;
     for (int r : display::refresh_rates(s.w, s.h)) {
@@ -1405,7 +1494,7 @@ void fill_resolutions()
     const display::Size desk = display::desktop_size();
     int sel = 0;
     if (g.disp.mode == display::Mode::fullscreen) {
-        combo_add(g.res, L"Desktop (" + size_text(desk.w, desk.h) + L")");
+        combo_add(g.res, trf(L"Desktop (%s)", size_text(desk.w, desk.h).c_str()));
         g.resSizes.push_back(display::Size{0, 0});
         for (const display::Size &s : display::fullscreen_sizes()) {
             if (s.w == g.disp.width && s.h == g.disp.height)
@@ -1427,11 +1516,11 @@ void fill_resolutions()
         }
         if (!found) {
             sel = (int)g.resSizes.size();
-            combo_add(g.res, size_text(g.disp.windowW, g.disp.windowH) + L" (the window's size)");
+            combo_add(g.res, trf(L"%s (the window's size)", size_text(g.disp.windowW, g.disp.windowH).c_str()));
             g.resSizes.push_back(display::Size{g.disp.windowW, g.disp.windowH});
         }
     } else {
-        combo_add(g.res, L"Desktop (" + size_text(desk.w, desk.h) + L")");
+        combo_add(g.res, trf(L"Desktop (%s)", size_text(desk.w, desk.h).c_str()));
         g.resSizes.push_back(display::Size{0, 0});
     }
     SendMessageW(g.res, CB_SETCURSEL, sel, 0);
@@ -1468,7 +1557,7 @@ void fill_monitors()
 
     combo_reset(g.span);
     g.spanValues.assign(1, std::wstring());
-    combo_add(g.span, L"Off");
+    combo_add(g.span, tr(L"Off"));
     int sel = 0;
     for (const display::Span &s : display::spans(mons)) {
         std::wstring text;
@@ -1489,7 +1578,7 @@ void fill_monitors()
             all = all && connected(d);
         }
         sel = (int)g.spanValues.size();
-        combo_add(g.span, text + (all ? L" (not side by side)" : L" (not connected)"));
+        combo_add(g.span, all ? trf(L"%s (not side by side)", text.c_str()) : trf(L"%s (not connected)", text.c_str()));
         g.spanValues.push_back(g.disp.spanMonitors);
     }
     SendMessageW(g.span, CB_SETCURSEL, sel, 0);
@@ -1497,7 +1586,7 @@ void fill_monitors()
 
     combo_reset(g.split);
     g.splitValues.assign(1, std::wstring());
-    combo_add(g.split, L"Automatic");
+    combo_add(g.split, tr(L"Automatic"));
     sel = 0;
     for (const display::Monitor &m : mons) {
         if (_wcsicmp(m.device.c_str(), g.disp.splitMonitor.c_str()) == 0)
@@ -1508,7 +1597,7 @@ void fill_monitors()
     }
     if (sel == 0 && !g.disp.splitMonitor.empty()) {
         sel = (int)g.splitValues.size();
-        combo_add(g.split, device_text(g.disp.splitMonitor) + L" (not connected)");
+        combo_add(g.split, trf(L"%s (not connected)", device_text(g.disp.splitMonitor).c_str()));
         g.splitValues.push_back(g.disp.splitMonitor);
     }
     SendMessageW(g.split, CB_SETCURSEL, sel, 0);
@@ -1526,16 +1615,20 @@ std::wstring fmt(const wchar_t *f, double v)
 
 /* The sliders' values shown. */
 std::wstring percent_text(double v) { return fmt(L"%g%%", v); }
-std::wstring scale_text(double v) { return percent_text(v) + (v > 100.0 ? L" (supersampling)" : L""); }
+std::wstring scale_text(double v) { return v > 100.0 ? trf(L"%s (supersampling)", percent_text(v).c_str()) : percent_text(v); }
 std::wstring safe_zone_text(double v) { return percent_text(v); }
-std::wstring course_scale_text(double v) { return percent_text(v) + (v < 0 ? L" (horizontal, mirrored)" : L" (horizontal)"); }
-std::wstring course_height_text(double v) { return percent_text(v) + L" (height)"; }
+std::wstring course_scale_text(double v)
+{
+    return v < 0 ? trf(L"%s (horizontal, mirrored)", percent_text(v).c_str())
+                 : trf(L"%s (horizontal)", percent_text(v).c_str());
+}
+std::wstring course_height_text(double v) { return trf(L"%s (height)", percent_text(v).c_str()); }
 std::wstring ms_text(double v) { return fmt(L"%.1f ms", v); }
 std::wstring raw_text(double v) { return fmt(L"%.2f", v); }
 std::wstring count_text(double v) { return fmt(L"%.0f", v); }
-std::wstring angle_text(double v) { return fmt(L"%.0f degrees", v); }
+std::wstring angle_text(double v) { return trf(L"%.0f degrees", v); }
 /* PC (2026-11-12): MenuWheelsSpeed (0: the menu wheels at every speed) */
-std::wstring wheel_speed_text(double v) { return v < 0.5 ? std::wstring(L"Always menu wheels") : fmt(L"%.0f km/h", v); }
+std::wstring wheel_speed_text(double v) { return v < 0.5 ? std::wstring(tr(L"Always menu wheels")) : fmt(L"%.0f km/h", v); }
 
 /* The languages (src/platform/language.h): their country codes (the menus'
  * folders), names and ini values. */
@@ -1544,9 +1637,10 @@ struct Language {
     const wchar_t *name, *value;
 };
 const Language kLanguages[] = {
-    {"JP", L"Japanese", L"japanese"}, {"US", L"English (US)", L"english_us"}, {"BR", L"English (UK)", L"english_uk"},
-    {"FR", L"French", L"french"},     {"GR", L"German", L"german"},           {"IT", L"Italian", L"italian"},
-    {"SP", L"Spanish", L"spanish"},
+    {"JP", N_(L"Japanese"), L"japanese"}, {"US", N_(L"English (US)"), L"english_us"},
+    {"BR", N_(L"English (UK)"), L"english_uk"}, {"FR", N_(L"French"), L"french"},
+    {"GR", N_(L"German"), L"german"}, {"IT", N_(L"Italian"), L"italian"},
+    {"SP", N_(L"Spanish"), L"spanish"},
 };
 
 /* The language's list: automatic (each version's own) and the languages
@@ -1564,10 +1658,21 @@ std::vector<Choice> language_choices()
         for (size_t i = 0; i < sizeof(kLanguages) / sizeof(kLanguages[0]); i++)
             has[i] = has[i] || install::language_installed(g.folder, data, kLanguages[i].code);
     }
-    std::vector<Choice> c = {{L"Default", L"auto"}};
+    std::vector<Choice> c = {{tr(L"Default"), L"auto"}};
     for (size_t i = 0; i < sizeof(kLanguages) / sizeof(kLanguages[0]); i++)
         if (!any || has[i])
-            c.push_back({kLanguages[i].name, kLanguages[i].value});
+            c.push_back({tr(kLanguages[i].name), kLanguages[i].value});
+    return c;
+}
+
+/* PC (2026-11-16): GT3 PC's own text's languages (platform/ui_text.h), each in
+ * its own words; Automatic with the one it stands for. */
+std::vector<Choice> interface_language_choices()
+{
+    std::vector<Choice> c = {
+        {trf(L"Automatic (%s)", ui_text::native_name_w(ui_text::windows_language())), L"auto"}};
+    for (int i = 0; i < ui_text::kCount; i++)
+        c.push_back({ui_text::native_name_w(i), util::widen(ui_text::value(i))});
     return c;
 }
 
@@ -1616,117 +1721,121 @@ void build_options()
         g.options.push_back(std::move(o));
     };
     /* Display */
-    add(TAB_DISPLAY, L"Vertical sync", L"Graphics", L"VSync", L"off",
-        {{L"Off", L"off"}, {L"1 frame", L"1"}, {L"2 frames", L"2"}, {L"3 frames", L"3"}});
+    add(TAB_DISPLAY, tr(L"Vertical sync"), L"Graphics", L"VSync", L"off",
+        {{tr(L"Off"), L"off"}, {tr(L"1 frame"), L"1"}, {tr(L"2 frames"), L"2"}, {tr(L"3 frames"), L"3"}});
     /* (the frame cap: its own row of two fields, add_cap_row - PC 2026-11-08,
      * user request; a list of rates before) */
     /* (PC 2026-11-15, user request: "Menu aspect: 16:9 option") */
-    add(TAB_DISPLAY, L"Menu aspect", L"Display", L"MenuAspect", L"original",
-        {{L"Original (4:3)", L"original"}, {L"16:9", L"16:9"}, {L"Stretch", L"stretch"}});
-    add(TAB_DISPLAY, L"Movie aspect", L"Display", L"MovieAspect", L"original",
-        {{L"Original", L"original"}, {L"Stretch", L"stretch"}});
+    add(TAB_DISPLAY, tr(L"Menu aspect"), L"Display", L"MenuAspect", L"original",
+        {{tr(L"Original (4:3)"), L"original"}, {L"16:9", L"16:9"}, {tr(L"Stretch"), L"stretch"}});
+    add(TAB_DISPLAY, tr(L"Movie aspect"), L"Display", L"MovieAspect", L"original",
+        {{tr(L"Original"), L"original"}, {tr(L"Stretch"), L"stretch"}});
     /* Graphics */
-    add(TAB_GRAPHICS, L"Anti-aliasing", L"Graphics", L"AntiAliasing", L"off",
-        {{L"Off", L"off"}, {L"FXAA", L"fxaa"}, {L"MSAA 2x", L"msaa2"}, {L"MSAA 4x", L"msaa4"}, {L"MSAA 8x", L"msaa8"},
+    add(TAB_GRAPHICS, tr(L"Anti-aliasing"), L"Graphics", L"AntiAliasing", L"off",
+        {{tr(L"Off"), L"off"}, {L"FXAA", L"fxaa"}, {L"MSAA 2x", L"msaa2"}, {L"MSAA 4x", L"msaa4"}, {L"MSAA 8x", L"msaa8"},
          /* PC (2026-11-15, user request): settings.h's AGSS */
          {L"AGSS 2x", L"agss2"}, {L"AGSS 4x", L"agss4"}, {L"AGSS 8x", L"agss8"}});
     /* PC (2026-11-10): settings.h's AnisotropicFiltering (the F2 menu's
      * ANISOTROPIC FILTERING) */
-    add(TAB_GRAPHICS, L"Anisotropic filtering", L"Graphics", L"AnisotropicFiltering", L"off",
-        {{L"Off", L"off"}, {L"2x", L"2"}, {L"4x", L"4"}, {L"8x", L"8"}, {L"16x", L"16"}});
+    add(TAB_GRAPHICS, tr(L"Anisotropic filtering"), L"Graphics", L"AnisotropicFiltering", L"off",
+        {{tr(L"Off"), L"off"}, {L"2x", L"2"}, {L"4x", L"4"}, {L"8x", L"8"}, {L"16x", L"16"}});
     /* (the sliders' ranges: settings.h's kRenderScaleMin .. kRenderScaleMax,
      * kRenderDistanceMin .., kFovMin .., kHudSafeZoneMin .., kAudioBufferMin ..) */
-    add_slider(TAB_GRAPHICS, L"Resolution scale", L"Graphics", L"RenderScale", L"100", 10, 400, 5, 0, scale_text);
+    add_slider(TAB_GRAPHICS, tr(L"Resolution scale"), L"Graphics", L"RenderScale", L"100", 10, 400, 5, 0, scale_text);
     /* (the labels and the values' names as the F2 menu's, settings_menu.cpp:
      * user request, 2026-11-08) */
-    add(TAB_GRAPHICS, L"Levels of detail", L"Graphics", L"Lod", L"on",
-        {{L"Normal", L"on"}, {L"Always best", L"off"}});
-    add(TAB_GRAPHICS, L"Road reflection", L"Graphics", L"ReflectionDetail", L"original",
-        {{L"Normal", L"original"}, {L"High", L"full"}});
+    add(TAB_GRAPHICS, tr(L"Levels of detail"), L"Graphics", L"Lod", L"on",
+        {{tr(L"Normal"), L"on"}, {tr(L"Always best"), L"off"}});
+    add(TAB_GRAPHICS, tr(L"Road reflection"), L"Graphics", L"ReflectionDetail", L"original",
+        {{tr(L"Normal"), L"original"}, {tr(L"High"), L"full"}});
     /* PC (2026-11-14): settings.h's ReflectionResolution (the F2 menu's ROAD
      * REFLECTION RESOLUTION) */
-    add(TAB_GRAPHICS, L"Road reflection resolution", L"Graphics", L"ReflectionResolution", L"normal",
-        {{L"Normal", L"normal"}, {L"Half", L"half"}, {L"Full", L"full"}});
-    add(TAB_GRAPHICS, L"Car reflections", L"Graphics", L"CarReflections", L"all",
-        {{L"Normal", L"all"}, {L"Low", L"large"}, {L"Off", L"none"}});
-    add(TAB_GRAPHICS, L"Env map detail", L"Graphics", L"EnvMapDetail", L"scaled",
-        {{L"High", L"scaled"}, {L"Normal", L"original"}});
-    add(TAB_GRAPHICS, L"Replay depth of field", L"Graphics", L"ReplayDepthOfField", L"original",
-        {{L"Normal", L"original"}, {L"Reduced", L"reduced"}, {L"Off", L"off"}});
-    add_slider(TAB_GRAPHICS, L"Render distance", L"Graphics", L"RenderDistance", L"100", 100, 400, 5, 0,
+    add(TAB_GRAPHICS, tr(L"Road reflection resolution"), L"Graphics", L"ReflectionResolution", L"normal",
+        {{tr(L"Normal"), L"normal"}, {tr(L"Half"), L"half"}, {tr(L"Full"), L"full"}});
+    add(TAB_GRAPHICS, tr(L"Car reflections"), L"Graphics", L"CarReflections", L"all",
+        {{tr(L"Normal"), L"all"}, {tr(L"Low"), L"large"}, {tr(L"Off"), L"none"}});
+    add(TAB_GRAPHICS, tr(L"Env map detail"), L"Graphics", L"EnvMapDetail", L"scaled",
+        {{tr(L"High"), L"scaled"}, {tr(L"Normal"), L"original"}});
+    add(TAB_GRAPHICS, tr(L"Replay depth of field"), L"Graphics", L"ReplayDepthOfField", L"original",
+        {{tr(L"Normal"), L"original"}, {tr(L"Reduced"), L"reduced"}, {tr(L"Off"), L"off"}});
+    add_slider(TAB_GRAPHICS, tr(L"Render distance"), L"Graphics", L"RenderDistance", L"100", 100, 400, 5, 0,
                percent_text);
-    add(TAB_GRAPHICS, L"Smoke opacity", L"Graphics", L"SmokeOpacity", L"normal",
-        {{L"Normal", L"normal"}, {L"Reduced (75%)", L"reduced"}, {L"Half", L"half"}});
+    /* ("%%": its percent sign - a format, so a translation keeps it as one) */
+    add(TAB_GRAPHICS, tr(L"Smoke opacity"), L"Graphics", L"SmokeOpacity", L"normal",
+        {{tr(L"Normal"), L"normal"}, {trf(L"Reduced (75%%)"), L"reduced"}, {tr(L"Half"), L"half"}});
     /* PC (2026-11-12): the menu (showroom) wheel models on the race cars (the
      * F2 menu's MENU WHEELS, RACE WHEELS FROM) */
-    add(TAB_GRAPHICS, L"Menu wheels", L"Graphics", L"MenuWheels", L"off", {{L"Off", L"off"}, {L"On", L"on"}});
-    add_slider(TAB_GRAPHICS, L"Race wheels from", L"Graphics", L"MenuWheelsSpeed", L"20", 0, 400, 1, 0,
+    add(TAB_GRAPHICS, tr(L"Menu wheels"), L"Graphics", L"MenuWheels", L"off", {{tr(L"Off"), L"off"}, {tr(L"On"), L"on"}});
+    add_slider(TAB_GRAPHICS, tr(L"Race wheels from"), L"Graphics", L"MenuWheelsSpeed", L"20", 0, 400, 1, 0,
                wheel_speed_text);
     /* PC (2026-11-13): the menu (showroom) tyres on the race cars (the F2
      * menu's MENU TIRES) */
-    add(TAB_GRAPHICS, L"Menu tires", L"Graphics", L"MenuTires", L"off", {{L"Off", L"off"}, {L"On", L"on"}});
+    add(TAB_GRAPHICS, tr(L"Menu tires"), L"Graphics", L"MenuTires", L"off", {{tr(L"Off"), L"off"}, {tr(L"On"), L"on"}});
     /* PC (2026-11-15: as the F2 menu's, user request "Move Rear view settings
      * into graphics category"; were Game > Cameras' rows) */
-    add(TAB_GRAPHICS, L"Rear view: bumper cam", L"Graphics", L"RearViewBumper", L"on", {{L"Off", L"off"}, {L"On", L"on"}});
-    add(TAB_GRAPHICS, L"Rear view: chase cam", L"Graphics", L"RearViewChase", L"off", {{L"Off", L"off"}, {L"On", L"on"}});
+    add(TAB_GRAPHICS, tr(L"Rear view: bumper cam"), L"Graphics", L"RearViewBumper", L"on", {{tr(L"Off"), L"off"}, {tr(L"On"), L"on"}});
+    add(TAB_GRAPHICS, tr(L"Rear view: chase cam"), L"Graphics", L"RearViewChase", L"off", {{tr(L"Off"), L"off"}, {tr(L"On"), L"on"}});
     /* Audio (PC 2026-11-15, user request: "Volume goes above the output
      * settings") - the volumes: settings.h's [Audio] MenuBgm .. ReplaySe, 0 .. 100 */
-    add_slider(TAB_AUDIO, L"Menu music", L"Audio", L"MenuBgm", L"100", 0, 100, 1, 0, percent_text);
-    add_slider(TAB_AUDIO, L"Race music", L"Audio", L"RaceBgm", L"50", 0, 100, 1, 0, percent_text);
-    add_slider(TAB_AUDIO, L"Replay music", L"Audio", L"ReplayBgm", L"50", 0, 100, 1, 0, percent_text);
-    add_slider(TAB_AUDIO, L"Menu sound effects", L"Audio", L"MenuSe", L"100", 0, 100, 1, 0, percent_text);
-    add_slider(TAB_AUDIO, L"Race sound effects", L"Audio", L"RaceSe", L"100", 0, 100, 1, 0, percent_text);
-    add_slider(TAB_AUDIO, L"Replay sound effects", L"Audio", L"ReplaySe", L"100", 0, 100, 1, 0, percent_text);
+    add_slider(TAB_AUDIO, tr(L"Menu music"), L"Audio", L"MenuBgm", L"100", 0, 100, 1, 0, percent_text);
+    add_slider(TAB_AUDIO, tr(L"Race music"), L"Audio", L"RaceBgm", L"50", 0, 100, 1, 0, percent_text);
+    add_slider(TAB_AUDIO, tr(L"Replay music"), L"Audio", L"ReplayBgm", L"50", 0, 100, 1, 0, percent_text);
+    add_slider(TAB_AUDIO, tr(L"Menu sound effects"), L"Audio", L"MenuSe", L"100", 0, 100, 1, 0, percent_text);
+    add_slider(TAB_AUDIO, tr(L"Race sound effects"), L"Audio", L"RaceSe", L"100", 0, 100, 1, 0, percent_text);
+    add_slider(TAB_AUDIO, tr(L"Replay sound effects"), L"Audio", L"ReplaySe", L"100", 0, 100, 1, 0, percent_text);
     /* (PC 2026-11-15, user request: "Audio Output: Windows Wasapi is the
      * default"; was Auto) */
-    add(TAB_AUDIO, L"Audio output", L"Audio", L"Output", L"wasapi",
-        {{L"Auto", L"auto"}, {L"Low latency kernel streaming", L"ks"}, {L"Windows WASAPI", L"wasapi"}});
-    add_slider(TAB_AUDIO, L"Audio buffer", L"Audio", L"Buffer", L"2", 1.0, 20.0, 0.1, 1, ms_text);
+    add(TAB_AUDIO, tr(L"Audio output"), L"Audio", L"Output", L"wasapi",
+        {{tr(L"Auto"), L"auto"}, {tr(L"Low latency kernel streaming"), L"ks"}, {L"Windows WASAPI", L"wasapi"}});
+    add_slider(TAB_AUDIO, tr(L"Audio buffer"), L"Audio", L"Buffer", L"2", 1.0, 20.0, 0.1, 1, ms_text);
     /* Game */
-    add(TAB_GAME, L"Language", L"Game", L"Language", L"auto", language_choices());
-    add(TAB_GAME, L"Speed unit", L"Game", L"SpeedUnit", L"auto",
-        {{L"Auto", L"auto"},
+    add(TAB_GAME, tr(L"Language"), L"Game", L"Language", L"auto", language_choices());
+    /* PC (2026-11-16): the launcher's and the game's PC panels' language
+     * (the F2 menu's INTERFACE LANGUAGE): the launcher starts again in it */
+    add(TAB_GAME, tr(L"Interface language"), L"Interface", L"Language", L"auto", interface_language_choices());
+    add(TAB_GAME, tr(L"Speed unit"), L"Game", L"SpeedUnit", L"auto",
+        {{tr(L"Auto"), L"auto"},
          {L"km/h, km", L"kmh"},
-         {L"mph, miles", L"mph"}});
-    add(TAB_GAME, L"Power unit", L"Game", L"PowerUnit", L"auto",
-        {{L"Auto", L"auto"},
+         {tr(L"mph, miles"), L"mph"}});
+    add(TAB_GAME, tr(L"Power unit"), L"Game", L"PowerUnit", L"auto",
+        {{tr(L"Auto"), L"auto"},
          {L"PS", L"ps"},
          {L"HP", L"hp"},
          {L"BHP", L"bhp"},
          {L"CV", L"cv"},
          {L"kW", L"kw"}});
-    add(TAB_GAME, L"Torque unit", L"Game", L"TorqueUnit", L"auto",
-        {{L"Auto", L"auto"},
+    add(TAB_GAME, tr(L"Torque unit"), L"Game", L"TorqueUnit", L"auto",
+        {{tr(L"Auto"), L"auto"},
          {L"kgf.m", L"kgfm"},
          {L"ft.lb", L"ftlb"},
          {L"Nm", L"nm"}});
-    add(TAB_GAME, L"Starting credits", L"Game", L"StartingCredits", L"auto",
-        {{L"Default", L"auto"},
+    add(TAB_GAME, tr(L"Starting credits"), L"Game", L"StartingCredits", L"auto",
+        {{tr(L"Default"), L"auto"},
          {L"15,000", L"15000"},
          {L"18,000", L"18000"},
-         {L"Custom", L"custom"}});
+         {tr(L"Custom"), L"custom"}});
     /* PC (2026-11-14): custom's amount (settings.h's kStartingCreditsCustomMin .. Max), shown with it */
-    add_number(TAB_GAME, L"Custom starting credits", L"Game", L"StartingCreditsCustom", L"18000", 0, 999999999);
+    add_number(TAB_GAME, tr(L"Custom starting credits"), L"Game", L"StartingCreditsCustom", L"18000", 0, 999999999);
     g.options.back().whenKey = L"StartingCredits";
     g.options.back().whenValue = L"custom";
-    add(TAB_GAME, L"Split screen", L"Graphics", L"SplitScreen", L"horizontal",
-        {{L"Horizontal", L"horizontal"},
-         {L"Vertical", L"vertical"},
-         {L"Two monitors", L"monitors"}});
+    add(TAB_GAME, tr(L"Split screen"), L"Graphics", L"SplitScreen", L"horizontal",
+        {{tr(L"Horizontal"), L"horizontal"},
+         {tr(L"Vertical"), L"vertical"},
+         {tr(L"Two monitors"), L"monitors"}});
     /* Game > HUD (the colours: platform/hud_colors.h) */
     const size_t hud = g.options.size();
-    add(TAB_GAME, L"Split screen HUD", L"Graphics", L"SplitHud", L"digital",
-        {{L"Digital", L"digital"}, {L"Analog", L"analog"}});
-    add(TAB_GAME, L"Single player HUD", L"Graphics", L"SingleHud", L"analog",
-        {{L"Analog", L"analog"}, {L"Digital", L"digital"}});
-    add(TAB_GAME, L"Race HUD max width", L"Display", L"HudMaxAspect", L"21:9",
+    add(TAB_GAME, tr(L"Split screen HUD"), L"Graphics", L"SplitHud", L"digital",
+        {{tr(L"Digital"), L"digital"}, {tr(L"Analog"), L"analog"}});
+    add(TAB_GAME, tr(L"Single player HUD"), L"Graphics", L"SingleHud", L"analog",
+        {{tr(L"Analog"), L"analog"}, {tr(L"Digital"), L"digital"}});
+    add(TAB_GAME, tr(L"Race HUD max width"), L"Display", L"HudMaxAspect", L"21:9",
         {{L"4:3", L"4:3"}, {L"16:10", L"16:10"}, {L"16:9", L"16:9"}, {L"21:9", L"21:9"}, {L"32:9", L"32:9"}});
-    add_slider(TAB_GAME, L"HUD safe zone", L"Graphics", L"HudSafeZone", L"100", 75, 100, 1, 0, safe_zone_text);
-    add(TAB_GAME, L"Replay logo", L"Graphics", L"ReplayLogo", L"on", {{L"On", L"on"}, {L"Off", L"off"}});
+    add_slider(TAB_GAME, tr(L"HUD safe zone"), L"Graphics", L"HudSafeZone", L"100", 75, 100, 1, 0, safe_zone_text);
+    add(TAB_GAME, tr(L"Replay logo"), L"Graphics", L"ReplayLogo", L"on", {{tr(L"On"), L"on"}, {tr(L"Off"), L"off"}});
     for (const HudColorInfo &c : kHudColors) {
         Option o;
         o.tab = TAB_GAME;
-        o.label = c.label;
+        o.label = tr(c.label);              /* (hud_colors.h's table) */
         o.section = L"Hud";
         o.key = c.wideKey;
         o.def = L"";
@@ -1740,13 +1849,13 @@ void build_options()
      * in [Graphics]): settings.h's kFovMin .., kChaseAngleMin ..,
      * kCockpitFovMin .. */
     const size_t cameras = g.options.size();
-    add_slider(TAB_GAME, L"Field of view", L"Graphics", L"Fov", L"100", 50, 200, 1, 0, percent_text);
-    add_slider(TAB_GAME, L"Replay field of view", L"Graphics", L"ReplayFov", L"100", 50, 200, 1, 0, percent_text);
+    add_slider(TAB_GAME, tr(L"Field of view"), L"Graphics", L"Fov", L"100", 50, 200, 1, 0, percent_text);
+    add_slider(TAB_GAME, tr(L"Replay field of view"), L"Graphics", L"ReplayFov", L"100", 50, 200, 1, 0, percent_text);
     /* (PC 2026-11-15: the rear view's two rows moved to the Graphics tab) */
-    add(TAB_GAME, L"Replay cameras", L"Graphics", L"ExtraCameras", L"off", {{L"Off", L"off"}, {L"On", L"on"}});
-    add_slider(TAB_GAME, L"Chase cam angle", L"Graphics", L"ChaseAngle", L"0", -45, 45, 1, 0, angle_text);
-    add(TAB_GAME, L"Cockpit camera", L"Graphics", L"CockpitCamera", L"off", {{L"Off", L"off"}, {L"On", L"on"}});
-    add_slider(TAB_GAME, L"Cockpit field of view", L"Graphics", L"CockpitFov", L"90", 30, 120, 1, 0, angle_text);
+    add(TAB_GAME, tr(L"Replay cameras"), L"Graphics", L"ExtraCameras", L"off", {{tr(L"Off"), L"off"}, {tr(L"On"), L"on"}});
+    add_slider(TAB_GAME, tr(L"Chase cam angle"), L"Graphics", L"ChaseAngle", L"0", -45, 45, 1, 0, angle_text);
+    add(TAB_GAME, tr(L"Cockpit camera"), L"Graphics", L"CockpitCamera", L"off", {{tr(L"Off"), L"off"}, {tr(L"On"), L"on"}});
+    add_slider(TAB_GAME, tr(L"Cockpit field of view"), L"Graphics", L"CockpitFov", L"90", 30, 120, 1, 0, angle_text);
     /* (PC 2026-11-15: Cockpit menu model is per car now, the in-game
      * calibration's row: [CockpitMenuModels], settings.h) */
     for (size_t i = cameras; i < g.options.size(); i++)
@@ -1754,43 +1863,43 @@ void build_options()
     /* Game > Extras (settings.h's kCourseScaleMin .. kCourseScaleMax, not 0; the
      * height from kCourseScaleNearest: no negative, settings::course_scale_min) */
     const size_t extras = g.options.size();
-    add_slider(TAB_GAME, L"Course scale X", L"Game", L"CourseScaleX", L"100", -1000, 1000, 5, 0, course_scale_text);
-    add_slider(TAB_GAME, L"Course scale Y", L"Game", L"CourseScaleY", L"100", 5, 1000, 5, 0, course_height_text);
-    add_slider(TAB_GAME, L"Course scale Z", L"Game", L"CourseScaleZ", L"100", -1000, 1000, 5, 0, course_scale_text);
+    add_slider(TAB_GAME, tr(L"Course scale X"), L"Game", L"CourseScaleX", L"100", -1000, 1000, 5, 0, course_scale_text);
+    add_slider(TAB_GAME, tr(L"Course scale Y"), L"Game", L"CourseScaleY", L"100", 5, 1000, 5, 0, course_height_text);
+    add_slider(TAB_GAME, tr(L"Course scale Z"), L"Game", L"CourseScaleZ", L"100", -1000, 1000, 5, 0, course_scale_text);
     for (size_t i = g.options.size() - 3; i < g.options.size(); i++)
         g.options[i].noZero = true;
-    add(TAB_GAME, L"Prize car randomizer", L"Game", L"PrizeCarRandomizer", L"off",
-        {{L"Off", L"off"}, {L"On", L"on"}});
-    add(TAB_GAME, L"Course randomizer", L"Game", L"CourseRandomizer", L"off",
-        {{L"Off", L"off"}, {L"On", L"on"}, {L"Extended", L"extended"}});
+    add(TAB_GAME, tr(L"Prize car randomizer"), L"Game", L"PrizeCarRandomizer", L"off",
+        {{tr(L"Off"), L"off"}, {tr(L"On"), L"on"}});
+    add(TAB_GAME, tr(L"Course randomizer"), L"Game", L"CourseRandomizer", L"off",
+        {{tr(L"Off"), L"off"}, {tr(L"On"), L"on"}, {tr(L"Extended"), L"extended"}});
     /* PC (2026-11-13): settings.h's unrestricted_wheels (game/app/pc_wheel_shop.h) */
-    add(TAB_GAME, L"Unrestrict wheels", L"Game", L"UnrestrictedWheels", L"off",
-        {{L"Off", L"off"}, {L"On", L"on"}});
+    add(TAB_GAME, tr(L"Unrestrict wheels"), L"Game", L"UnrestrictedWheels", L"off",
+        {{tr(L"Off"), L"off"}, {tr(L"On"), L"on"}});
     /* PC (2026-11-14): settings.h's buy_not_for_sale (game/app/pc_car_shop.h) */
-    add(TAB_GAME, L"Buy cars not for sale", L"Game", L"BuyNotForSale", L"off",
-        {{L"Off", L"off"}, {L"On", L"on"}});
+    add(TAB_GAME, tr(L"Buy cars not for sale"), L"Game", L"BuyNotForSale", L"off",
+        {{tr(L"Off"), L"off"}, {tr(L"On"), L"on"}});
     /* (settings.h's kRaceCarsMin .. kRaceCarsMax) */
-    add_slider(TAB_GAME, L"Cars in a race", L"Game", L"RaceCars", L"6", 6, 32, 1, 0, count_text);
-    add(TAB_GAME, L"Override race limits", L"Game", L"RaceCarsOverride", L"off",
-        {{L"Off", L"off"}, {L"On", L"on"}});
+    add_slider(TAB_GAME, tr(L"Cars in a race"), L"Game", L"RaceCars", L"6", 6, 32, 1, 0, count_text);
+    add(TAB_GAME, tr(L"Override race limits"), L"Game", L"RaceCarsOverride", L"off",
+        {{tr(L"Off"), L"off"}, {tr(L"On"), L"on"}});
     /* PC (2026-11-08): settings.h's RevCut (game/app/pc_rev_cut.h) */
-    add(TAB_GAME, L"Rev cut behavior", L"Game", L"RevCut", L"original",
-        {{L"Original", L"original"}, {L"Realistic", L"realistic"}});
+    add(TAB_GAME, tr(L"Rev cut behavior"), L"Game", L"RevCut", L"original",
+        {{tr(L"Original"), L"original"}, {tr(L"Realistic"), L"realistic"}});
     /* PC (2026-11-08): settings.h's ShiftBehavior (game/app/pc_shift.h) */
-    add(TAB_GAME, L"Gear shift behavior", L"Game", L"ShiftBehavior", L"original",
-        {{L"Original", L"original"}, {L"Realistic", L"realistic"}, {L"Realistic + Clutch", L"clutch"}});
+    add(TAB_GAME, tr(L"Gear shift behavior"), L"Game", L"ShiftBehavior", L"original",
+        {{tr(L"Original"), L"original"}, {tr(L"Realistic"), L"realistic"}, {tr(L"Realistic + Clutch"), L"clutch"}});
     /* PC (2026-11-09): settings.h's HShifter, shown with the clutch mode
      * (game/app/pc_clutch.h) */
-    add(TAB_GAME, L"H-shifter", L"Game", L"HShifter", L"off", {{L"Off", L"off"}, {L"On", L"on"}});
+    add(TAB_GAME, tr(L"H-shifter"), L"Game", L"HShifter", L"off", {{tr(L"Off"), L"off"}, {tr(L"On"), L"on"}});
     g.options.back().whenKey = L"ShiftBehavior";
     g.options.back().whenValue = L"clutch";
     /* (the car multipliers: settings.h's car_tune_min .. kCarTuneMax) */
-    add_slider(TAB_GAME, L"Tire wear (player)", L"Game", L"TireWearPlayer", L"100", 0, 1000, 5, 0, percent_text);
-    add_slider(TAB_GAME, L"Tire wear (enemies)", L"Game", L"TireWearEnemies", L"100", 0, 1000, 5, 0, percent_text);
-    add_slider(TAB_GAME, L"Power (player)", L"Game", L"PowerPlayer", L"100", 10, 1000, 5, 0, percent_text);
-    add_slider(TAB_GAME, L"Power (enemies)", L"Game", L"PowerEnemies", L"100", 10, 1000, 5, 0, percent_text);
-    add_slider(TAB_GAME, L"Grip (player)", L"Game", L"GripPlayer", L"100", 10, 1000, 5, 0, percent_text);
-    add_slider(TAB_GAME, L"Grip (enemies)", L"Game", L"GripEnemies", L"100", 10, 1000, 5, 0, percent_text);
+    add_slider(TAB_GAME, tr(L"Tire wear (player)"), L"Game", L"TireWearPlayer", L"100", 0, 1000, 5, 0, percent_text);
+    add_slider(TAB_GAME, tr(L"Tire wear (enemies)"), L"Game", L"TireWearEnemies", L"100", 0, 1000, 5, 0, percent_text);
+    add_slider(TAB_GAME, tr(L"Power (player)"), L"Game", L"PowerPlayer", L"100", 10, 1000, 5, 0, percent_text);
+    add_slider(TAB_GAME, tr(L"Power (enemies)"), L"Game", L"PowerEnemies", L"100", 10, 1000, 5, 0, percent_text);
+    add_slider(TAB_GAME, tr(L"Grip (player)"), L"Game", L"GripPlayer", L"100", 10, 1000, 5, 0, percent_text);
+    add_slider(TAB_GAME, tr(L"Grip (enemies)"), L"Game", L"GripEnemies", L"100", 10, 1000, 5, 0, percent_text);
     for (size_t i = extras; i < g.options.size(); i++)
         g.options[i].sub = GAME_EXTRAS;
     /* Game > Surfaces: each surface type's grip (0.01 .. 10.00) and rolling
@@ -1798,14 +1907,16 @@ void build_options()
      * order, the defaults its surface_tune_default (a key not written, or
      * removed by the row's Default button: the game's own) */
     {
-        static const wchar_t *const grip[] = {L"Tarmac grip", L"Kerbs grip", L"Grass grip", L"Sand grip",
-                                              L"Gravel grip", L"Dirt grip", L"SF grip", L"WD grip", L"HT grip",
-                                              L"Wet tarmac grip", L"Wet kerbs grip", L"Wet HT grip"};
-        static const wchar_t *const resist[] = {L"Tarmac resistance", L"Kerbs resistance", L"Grass resistance",
-                                                L"Sand resistance", L"Gravel resistance", L"Dirt resistance",
-                                                L"SF resistance", L"WD resistance", L"HT resistance",
-                                                L"Wet tarmac resistance", L"Wet kerbs resistance",
-                                                L"Wet HT resistance"};
+        static const wchar_t *const grip[] = {N_(L"Tarmac grip"), N_(L"Kerbs grip"), N_(L"Grass grip"),
+                                              N_(L"Sand grip"), N_(L"Gravel grip"), N_(L"Dirt grip"),
+                                              N_(L"SF grip"), N_(L"WD grip"), N_(L"HT grip"),
+                                              N_(L"Wet tarmac grip"), N_(L"Wet kerbs grip"), N_(L"Wet HT grip")};
+        static const wchar_t *const resist[] = {N_(L"Tarmac resistance"), N_(L"Kerbs resistance"),
+                                                N_(L"Grass resistance"), N_(L"Sand resistance"),
+                                                N_(L"Gravel resistance"), N_(L"Dirt resistance"),
+                                                N_(L"SF resistance"), N_(L"WD resistance"), N_(L"HT resistance"),
+                                                N_(L"Wet tarmac resistance"), N_(L"Wet kerbs resistance"),
+                                                N_(L"Wet HT resistance")};
         static const wchar_t *const gripKeys[] = {L"SurfaceGripTA", L"SurfaceGripGU", L"SurfaceGripGR",
                                                   L"SurfaceGripSA", L"SurfaceGripGV", L"SurfaceGripDT",
                                                   L"SurfaceGripSF", L"SurfaceGripWD", L"SurfaceGripHT",
@@ -1820,9 +1931,9 @@ void build_options()
                                                     L"0.10", L"0.10", L"0.10", L"0.10", L"0.10", L"0.10"};
         const size_t surfaces = g.options.size();
         for (int s = 0; s < 12; s++)
-            add_slider(TAB_GAME, grip[s], L"Game", gripKeys[s], gripDefs[s], 0.01, 10.0, 0.01, 2, raw_text);
+            add_slider(TAB_GAME, tr(grip[s]), L"Game", gripKeys[s], gripDefs[s], 0.01, 10.0, 0.01, 2, raw_text);
         for (int s = 0; s < 12; s++)
-            add_slider(TAB_GAME, resist[s], L"Game", resistKeys[s], resistDefs[s], 0.0, 327.67, 0.01, 2, raw_text);
+            add_slider(TAB_GAME, tr(resist[s]), L"Game", resistKeys[s], resistDefs[s], 0.0, 327.67, 0.01, 2, raw_text);
         for (size_t i = surfaces; i < g.options.size(); i++) {
             g.options[i].sub = GAME_SURFACES;
             g.options[i].resettable = true;
@@ -1832,35 +1943,35 @@ void build_options()
      * pc_challenge.h; user request) */
     {
         const size_t challenges = g.options.size();
-        add(TAB_GAME, L"Money decay", L"Challenges", L"MoneyDecay", L"off", {{L"Off", L"off"}, {L"On", L"on"}});
-        add(TAB_GAME, L"Car decay", L"Challenges", L"CarDecay", L"off", {{L"Off", L"off"}, {L"On", L"on"}});
-        add(TAB_GAME, L"Course shrinkage", L"Challenges", L"CourseShrinkage", L"off",
-            {{L"Off", L"off"}, {L"On", L"on"}});
+        add(TAB_GAME, tr(L"Money decay"), L"Challenges", L"MoneyDecay", L"off", {{tr(L"Off"), L"off"}, {tr(L"On"), L"on"}});
+        add(TAB_GAME, tr(L"Car decay"), L"Challenges", L"CarDecay", L"off", {{tr(L"Off"), L"off"}, {tr(L"On"), L"on"}});
+        add(TAB_GAME, tr(L"Course shrinkage"), L"Challenges", L"CourseShrinkage", L"off",
+            {{tr(L"Off"), L"off"}, {tr(L"On"), L"on"}});
         for (size_t i = challenges; i < g.options.size(); i++)
             g.options[i].sub = GAME_CHALLENGES;
     }
     /* Debug */
-    add(TAB_DEBUG, L"Debug console", L"Debug", L"Console", L"off",
-        {{L"Off", L"off"}, {L"On", L"on"}});
-    add(TAB_DEBUG, L"Log file loads", L"Debug", L"FileLog", L"off",
-        {{L"Off", L"off"}, {L"On", L"on"}});
-    add(TAB_DEBUG, L"Log D3D syncs", L"Debug", L"SyncLog", L"off",
-        {{L"Off", L"off"}, {L"On", L"on"}});
-    add(TAB_DEBUG, L"Physics threads", L"Debug", L"PhysicsThreads", L"auto",
-        {{L"Auto (all cores)", L"auto"}, {L"Off", L"0"}, {L"2", L"2"}, {L"4", L"4"}, {L"8", L"8"}, {L"16", L"16"}});
-    add(TAB_DEBUG, L"Fill garage", L"Debug", L"FillGarage", L"off",
-        {{L"Off", L"off"}, {L"On", L"on"}});
-    add(TAB_DEBUG, L"Fill money", L"Debug", L"FillMoney", L"off",
-        {{L"Off", L"off"}, {L"On", L"on"}});
-    add(TAB_DEBUG, L"Unlock arcade tracks", L"Debug", L"UnlockArcade", L"off",
-        {{L"Off", L"off"}, {L"On", L"on"}});
-    add(TAB_DEBUG, L"Unlock all licenses", L"Debug", L"UnlockLicenses", L"off",
-        {{L"Off", L"off"}, {L"On", L"on"}});
+    add(TAB_DEBUG, tr(L"Debug console"), L"Debug", L"Console", L"off",
+        {{tr(L"Off"), L"off"}, {tr(L"On"), L"on"}});
+    add(TAB_DEBUG, tr(L"Log file loads"), L"Debug", L"FileLog", L"off",
+        {{tr(L"Off"), L"off"}, {tr(L"On"), L"on"}});
+    add(TAB_DEBUG, tr(L"Log D3D syncs"), L"Debug", L"SyncLog", L"off",
+        {{tr(L"Off"), L"off"}, {tr(L"On"), L"on"}});
+    add(TAB_DEBUG, tr(L"Physics threads"), L"Debug", L"PhysicsThreads", L"auto",
+        {{tr(L"Auto (all cores)"), L"auto"}, {tr(L"Off"), L"0"}, {L"2", L"2"}, {L"4", L"4"}, {L"8", L"8"}, {L"16", L"16"}});
+    add(TAB_DEBUG, tr(L"Fill garage"), L"Debug", L"FillGarage", L"off",
+        {{tr(L"Off"), L"off"}, {tr(L"On"), L"on"}});
+    add(TAB_DEBUG, tr(L"Fill money"), L"Debug", L"FillMoney", L"off",
+        {{tr(L"Off"), L"off"}, {tr(L"On"), L"on"}});
+    add(TAB_DEBUG, tr(L"Unlock arcade tracks"), L"Debug", L"UnlockArcade", L"off",
+        {{tr(L"Off"), L"off"}, {tr(L"On"), L"on"}});
+    add(TAB_DEBUG, tr(L"Unlock all licenses"), L"Debug", L"UnlockLicenses", L"off",
+        {{tr(L"Off"), L"off"}, {tr(L"On"), L"on"}});
     /* PC (2026-11-12): the menus' cars with their race models */
-    add(TAB_DEBUG, L"Menu race model", L"Debug", L"MenuRaceModel", L"off",
-        {{L"Off", L"off"}, {L"On", L"on"}});
-    add(TAB_DEBUG, L"Race model level of detail", L"Debug", L"MenuRaceModelLod", L"auto",
-        {{L"Auto", L"auto"}, {L"0 (finest)", L"0"}, {L"1", L"1"}, {L"2 (coarsest)", L"2"}});
+    add(TAB_DEBUG, tr(L"Menu race model"), L"Debug", L"MenuRaceModel", L"off",
+        {{tr(L"Off"), L"off"}, {tr(L"On"), L"on"}});
+    add(TAB_DEBUG, tr(L"Race model level of detail"), L"Debug", L"MenuRaceModelLod", L"auto",
+        {{tr(L"Auto"), L"auto"}, {tr(L"0 (finest)"), L"0"}, {L"1", L"1"}, {tr(L"2 (coarsest)"), L"2"}});
 }
 
 /* A number of an ini value: "12.5", or "W:H" as W / H. */
@@ -1961,7 +2072,7 @@ void fill_option(Option &o)
     }
     /* a value none of the entries stands for, kept */
     if (sel < 0) {
-        o.choices.push_back({cur + L" (as set)", cur});
+        o.choices.push_back({trf(L"%s (as set)", cur.c_str()), cur});
         combo_add(o.combo, o.choices.back().text);
         sel = (int)o.choices.size() - 1;
     }
@@ -1977,9 +2088,9 @@ void load_settings()
 {
     g.disp = display::load(ini_path());
     combo_reset(g.mode);
-    combo_add(g.mode, L"Windowed");             /* in display::Mode's order */
-    combo_add(g.mode, L"Borderless window");
-    combo_add(g.mode, L"Fullscreen");
+    combo_add(g.mode, tr(L"Windowed"));         /* in display::Mode's order */
+    combo_add(g.mode, tr(L"Borderless window"));
+    combo_add(g.mode, tr(L"Fullscreen"));
     SendMessageW(g.mode, CB_SETCURSEL, (WPARAM)g.disp.mode, 0);
     fill_resolutions();
     fill_monitors();
@@ -2107,20 +2218,52 @@ void clutch_popup()
             what += (what.empty() ? L"" : L" / ") + std::wstring(w);
         }
         if (!what.empty()) {
-            wchar_t name[32];
-            MultiByteToWideChar(CP_UTF8, 0, input_map::profile_name(p), -1, name, 32);
+            wchar_t name[128];              /* (input_map.cpp's table: "Controller 1" .. "Wheel 2") */
+            MultiByteToWideChar(CP_UTF8, 0, tr(input_map::profile_name(p)), -1, name, 128);
             mapped += std::wstring(L"\n") + name + L": " + what;
         }
     }
+    /* ("85 %%": formats, so the percent sign is one in a translation too) */
     if (mapped.empty())
-        message(L"Realistic + Clutch: nothing is mapped to the clutch.\n\nAdd a mapping in the Controls tab: choose a "
-                L"controller or a wheel, then its Clutch row (an axis or a pedal; 85 % of its travel is fully "
-                L"out).\n\nUntil then the gears shift as Realistic.",
+        message(trf(L"Realistic + Clutch: nothing is mapped to the clutch.\n\nAdd a mapping in the Controls tab: choose a "
+                    L"controller or a wheel, then its Clutch row (an axis or a pedal; 85 %% of its travel is fully "
+                    L"out).\n\nUntil then the gears shift as Realistic."),
                 MB_ICONWARNING);
     else
-        message(L"Realistic + Clutch: the clutch is mapped to" + mapped +
-                    L"\n\n85 % of its travel is fully out. Change it in the Controls tab.",
+        message(trf(L"Realistic + Clutch: the clutch is mapped to%s\n\n85 %% of its travel is fully out. Change it in "
+                    L"the Controls tab.",
+                    mapped.c_str()),
                 MB_ICONINFORMATION);
+}
+
+/* PC (2026-11-16): the interface's language ([Interface] Language,
+ * platform/ui_text.h) chosen: the launcher starts again in it - its window at
+ * once (--engine), with the gt3pc.ini it reads (--shared) - unless an install
+ * runs (then from its next start). */
+void restart_in_language()
+{
+    if (g.worker.joinable()) {
+        message(tr(L"The launcher shows the new language from its next start."), MB_ICONINFORMATION);
+        return;
+    }
+    wchar_t exe[MAX_PATH];
+    GetModuleFileNameW(nullptr, exe, MAX_PATH);
+    std::wstring cmd = L"\"" + std::wstring(exe) + L"\" --engine";
+    if (_wcsicmp(g.shared.c_str(), g.folder.c_str()) != 0) {
+        std::wstring s = g.shared;
+        while (!s.empty() && (s.back() == L'\\' || s.back() == L'/'))
+            s.pop_back();               /* (a \ before the closing quote would escape it) */
+        cmd += L" --shared \"" + s + L"\"";
+    }
+    STARTUPINFOW si = {sizeof(si)};
+    PROCESS_INFORMATION pi = {};
+    if (!CreateProcessW(exe, &cmd[0], nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi)) {
+        message(tr(L"The launcher shows the new language from its next start."), MB_ICONINFORMATION);
+        return;
+    }
+    CloseHandle(pi.hThread);
+    CloseHandle(pi.hProcess);
+    PostMessageW(g.wnd, WM_CLOSE, 0, 0);
 }
 
 /* A list's choice, written to gt3pc.ini at once. */
@@ -2143,6 +2286,11 @@ void setting_changed(int id)
             if (_wcsicmp(o.key, L"StartingCredits") == 0) {
                 show_game_rows();
                 layout();
+            }
+            /* PC (2026-11-16): the interface's language */
+            if (_wcsicmp(o.section, L"Interface") == 0 && _wcsicmp(o.key, L"Language") == 0) {
+                restart_in_language();
+                return;
             }
         }
         return;
@@ -2201,10 +2349,10 @@ void play(int v)
     }
     std::wstring exe = g.folder + kGameExe;
     if (GetFileAttributesW(exe.c_str()) == INVALID_FILE_ATTRIBUTES) {
-        message(L"The game (" + std::wstring(kGameExe) + L") was not found in " + g.folder + L".", MB_ICONERROR);
+        message(trf(L"The game (%s) was not found in %s.", kGameExe, g.folder.c_str()), MB_ICONERROR);
         return;
     }
-    add_new_songs(v);                       /* (songs put into its music folder since the launcher started) */
+    add_new_songs(v);                    /* (songs put into its music folder since the launcher started) */
     /* (PC 2026-11-14: in the engine's own file, engines.h; no disc image is
      * the last played: platform/paths.h) */
     WritePrivateProfileStringW(L"Game", L"Version", util::widen(install::version_code((install::Version)v)).c_str(),
@@ -2218,7 +2366,7 @@ void play(int v)
     si.cb = sizeof(si);
     PROCESS_INFORMATION pi = {};
     if (!CreateProcessW(exe.c_str(), &cmd[0], nullptr, nullptr, FALSE, 0, nullptr, g.folder.c_str(), &si, &pi)) {
-        message(L"The game could not be started: " + util::system_error_text(GetLastError()) + L".", MB_ICONERROR);
+        message(trf(L"The game could not be started: %s.", util::system_error_text(GetLastError()).c_str()), MB_ICONERROR);
         controls::show(g.tab == TAB_CONTROLS);
         return;
     }
@@ -2304,15 +2452,15 @@ void add_new_songs_in(const std::wstring &data, const std::wstring &name)
                 song_manager::mark_new(data, songs[i].file);
                 files += (i ? L", " : L"") + songs[i].file;
             }
-            music_note(name + L": " + m + L" (" + files +
-                       L") Set their titles, artists and tempos (BPM: the replay cameras' beat markers) in the song "
-                       L"manager.");
+            music_note(trf(L"%s: %s (%s) Set their titles, artists and tempos (BPM: the replay cameras' beat markers) in "
+                           L"the song manager.",
+                           name.c_str(), m.c_str(), files.c_str()));
         } else {
             music_note(name + L": " + m);
         }
     }
     for (const std::wstring &u : unplayable)
-        music_note(name + L": not added, " + u + L".");
+        music_note(trf(L"%s: not added, %s.", name.c_str(), u.c_str()));
 }
 
 /* add_new_songs for every installed version, and (PC 2026-11-15) every disc
@@ -2397,7 +2545,7 @@ void convert_all_tables()
             if (!install::refresh_demos(data, &written, &note))
                 problems += L"\n    " + version + L": " + note;
             else if (written != 0)
-                add(&demoDone, version, {std::to_wstring(written) + L" demo replays"});
+                add(&demoDone, version, {trf(L"%d demo replays", written)});
         }
     }
     if (confDone.empty() && confRemoved.empty() && dbDone.empty() && dbUpdated.empty() && stillDone.empty() &&
@@ -2405,51 +2553,51 @@ void convert_all_tables()
         return;
     std::wstring text;
     if (!confDone.empty())
-        text = L"The game configs were written as SQLite databases, which the game reads from now on:\n" + confDone +
-               L"\n\nEach is gameconf\\<config>.sqlite3 in the version's folder, a table for each part of the "
-               L"config, for any SQLite editor (DB Browser for SQLite...); the tables' schema says what the columns "
-               L"are. The .gcf files they were made of are deleted.";
+        text = trf(L"The game configs were written as SQLite databases, which the game reads from now on:\n%s"
+                   L"\n\nEach is gameconf\\<config>.sqlite3 in the version's folder, a table for each part of the "
+                   L"config, for any SQLite editor (DB Browser for SQLite...); the tables' schema says what the columns "
+                   L"are. The .gcf files they were made of are deleted.",
+                   confDone.c_str());
     if (!confRemoved.empty())
         text += (text.empty() ? L"" : L"\n\n") +
-                std::wstring(L"The game configs' .gcf files were deleted - their databases "
-                             L"(gameconf\\<config>.sqlite3), which the game reads, hold what they held:\n") +
-                confRemoved;
+                trf(L"The game configs' .gcf files were deleted - their databases "
+                    L"(gameconf\\<config>.sqlite3), which the game reads, hold what they held:\n%s",
+                    confRemoved.c_str());
     if (!dbDone.empty())
         text += (text.empty() ? L"" : L"\n\n") +
-                std::wstring(L"Game data files were written as SQLite databases, which the game reads from now "
-                             L"on:\n") +
-                dbDone +
-                L"\n\nA region's car database is database\\paramdb<region>.sqlite3 in the version's folder (its "
-                L"parameters, strings and labels in one), the colours and race modes database\\common.sqlite3, "
-                L"the texts the game prints in each language text\\realtime.sqlite3, for any SQLite editor; the "
-                L"tables' schema says what the columns are. The files they were made of are deleted.";
+                trf(L"Game data files were written as SQLite databases, which the game reads from now "
+                    L"on:\n%s"
+                    L"\n\nA region's car database is database\\paramdb<region>.sqlite3 in the version's folder (its "
+                    L"parameters, strings and labels in one), the colours and race modes database\\common.sqlite3, "
+                    L"the texts the game prints in each language text\\realtime.sqlite3, for any SQLite editor; the "
+                    L"tables' schema says what the columns are. The files they were made of are deleted.",
+                    dbDone.c_str());
     if (!dbUpdated.empty())
         text += (text.empty() ? L"" : L"\n\n") +
-                std::wstring(L"Databases updated (the race display's rows that had only a number for a name now "
-                             L"have names, which the game takes as before):\n") +
-                dbUpdated;
+                trf(L"Databases updated (the race display's rows that had only a number for a name now "
+                    L"have names, which the game takes as before):\n%s",
+                    dbUpdated.c_str());
     if (!stillDone.empty())
         text += (text.empty() ? L"" : L"\n\n") +
-                std::wstring(L"The arcade menus' course and class stills were written as PNG files, which the game "
-                             L"reads from now on:\n") +
-                stillDone;
+                trf(L"The arcade menus' course and class stills were written as PNG files, which the game "
+                    L"reads from now on:\n%s",
+                    stillDone.c_str());
     if (!packDone.empty())
         text += (text.empty() ? L"" : L"\n\n") +
-                std::wstring(L"The image packs (.imgs: the race HUD's pictures, race\\<language>\\display.imgs, and "
-                             L"the packs the game leaves unused) were written as folders of PNG files, which the game "
-                             L"reads from now on - race\\US\\display\\<picture>.png, any picture editor's, alpha "
-                             L"included; a picture of another size is drawn at its original's (the folder's "
-                             L"sizes.txt):\n") +
-                packDone;
+                trf(L"The image packs (.imgs: the race HUD's pictures, race\\<language>\\display.imgs, and "
+                    L"the packs the game leaves unused) were written as folders of PNG files, which the game "
+                    L"reads from now on - race\\US\\display\\<picture>.png, any picture editor's, alpha "
+                    L"included; a picture of another size is drawn at its original's (the folder's "
+                    L"sizes.txt):\n%s",
+                    packDone.c_str());
     if (!demoDone.empty())
         text += (text.empty() ? L"" : L"\n\n") +
-                std::wstring(L"The demo replays of the licence tests and the arcade time trials built into this "
-                             L"launcher were written where the installed ones differed (demo\\<name>, and the "
-                             L"disc's copies of it):\n") +
-                demoDone;
+                trf(L"The demo replays of the licence tests and the arcade time trials built into this "
+                    L"launcher were written where the installed ones differed (demo\\<name>, and the "
+                    L"disc's copies of it):\n%s",
+                    demoDone.c_str());
     if (!problems.empty())
-        text += (text.empty() ? L"" : L"\n\n") +
-                std::wstring(L"Left as they were:\n") + problems;
+        text += (text.empty() ? L"" : L"\n\n") + trf(L"Left as they were:\n%s", problems.c_str());
     MessageBoxW(g.wnd, text.c_str(), kAppName, MB_OK | (problems.empty() ? MB_ICONINFORMATION : MB_ICONWARNING));
 }
 
@@ -2494,8 +2642,8 @@ bool start_conversion()
         install::Result worst = install::Result::ok;
         std::wstring msg;
         for (int v : versions) {
-            listener.phase(L"Converting the music of " + std::wstring(install::version_name((install::Version)v)) +
-                           L" to WAV (once)...");
+            listener.phase(trf(L"Converting the music of %s to WAV (once)...",
+                               install::version_name((install::Version)v)));
             std::wstring m;
             install::Result r =
                 music::convert(folder + install::version_folder((install::Version)v), listener, &m);
@@ -2522,12 +2670,13 @@ void offer_volume_delete()
     uint64_t size = GetFileAttributesExW(vol.c_str(), GetFileExInfoStandard, &a)
                         ? ((uint64_t)a.nFileSizeHigh << 32) | a.nFileSizeLow
                         : 0;
-    std::wstring q = L"The game now reads the unpacked files in the data folder, and no longer uses gt3.vol (" +
-                     util::format_size(size) + L"), which an earlier version installed.\n\nDelete gt3.vol?";
+    std::wstring q = trf(L"The game now reads the unpacked files in the data folder, and no longer uses gt3.vol (%s), "
+                         L"which an earlier version installed.\n\nDelete gt3.vol?",
+                         util::format_size(size).c_str());
     if (MessageBoxW(g.wnd, q.c_str(), kAppName, MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) != IDYES)
         return;
     if (!DeleteFileW(vol.c_str()))
-        message(L"gt3.vol could not be deleted: " + util::system_error_text(GetLastError()) + L".", MB_ICONWARNING);
+        message(trf(L"gt3.vol could not be deleted: %s.", util::system_error_text(GetLastError()).c_str()), MB_ICONWARNING);
     refresh();
 }
 
@@ -2545,18 +2694,19 @@ void install_done()
         g.converting = false;
         refresh();
         if (g.result == install::Result::cancelled)
-            music_note(L"The music conversion was stopped: it carries on the next time the launcher starts.");
+            music_note(tr(L"The music conversion was stopped: it carries on the next time the launcher starts."));
         else
-            music_note(g.result_message + (g.result == install::Result::ok ? L""
-                                                                            : L"\n(The game plays the files not "
-                                                                              L"converted as they were.)"));
+            music_note(g.result_message + (g.result == install::Result::ok
+                                               ? std::wstring()
+                                               : L"\n" + std::wstring(tr(L"(The game plays the files not "
+                                                                         L"converted as they were.)"))));
         add_all_new_songs();                /* (a mod's .ads, converted: new songs) */
         SetFocus(default_button());
         return;
     }
     /* the languages the files have now */
     for (Option &o : g.options)
-        if (o.step <= 0 && wcscmp(o.key, L"Language") == 0) {
+        if (o.step <= 0 && wcscmp(o.key, L"Language") == 0 && wcscmp(o.section, L"Game") == 0) {
             o.choices = language_choices();
             fill_option(o);
         }
@@ -2567,7 +2717,7 @@ void install_done()
         SetFocus(default_button());
         break;
     case install::Result::cancelled:
-        refresh(L"The installation was cancelled.");
+        refresh(tr(L"The installation was cancelled."));
         SetFocus(g.install);
         break;
     case install::Result::wrong_disc:
@@ -2576,11 +2726,28 @@ void install_done()
         SetFocus(g.install);
         break;
     default:
-        refresh(L"The installation failed.");
+        refresh(tr(L"The installation failed."));
         message(g.result_message, MB_ICONERROR);
         SetFocus(g.install);
         break;
     }
+}
+
+/* The Open dialog's filter for a disc image: "PlayStation 2 disc image
+ * (*.iso)\0*.iso\0All files (*.*)\0*.*\0" (its descriptions translated). */
+std::wstring disc_image_filter()
+{
+    std::wstring f = tr(L"PlayStation 2 disc image");
+    f += L" (*.iso)";
+    f.push_back(L'\0');
+    f += L"*.iso";
+    f.push_back(L'\0');
+    f += tr(L"All files");
+    f += L" (*.*)";
+    f.push_back(L'\0');
+    f += L"*.*";
+    f.push_back(L'\0');
+    return f;                               /* (c_str()'s own L'\0' ends the list) */
 }
 
 void choose_and_install()
@@ -2591,8 +2758,8 @@ void choose_and_install()
      * needed while that version is not installed. */
     if (version_state((int)install::Version::us) != install::InstallState::ok && install::has_volume(g.folder)) {
         int a = MessageBoxW(g.wnd,
-                            L"This folder has gt3.vol, the game files as an earlier version installed them.\n\n"
-                            L"Unpack the game files from gt3.vol? (No: install them from a disc image instead.)",
+                            tr(L"This folder has gt3.vol, the game files as an earlier version installed them.\n\n"
+                               L"Unpack the game files from gt3.vol? (No: install them from a disc image instead.)"),
                             kAppName, MB_YESNOCANCEL | MB_ICONQUESTION);
         if (a == IDCANCEL)
             return;
@@ -2603,14 +2770,15 @@ void choose_and_install()
     }
 
     std::wstring file(32768, L'\0');
+    const std::wstring filter = disc_image_filter();
     OPENFILENAMEW ofn = {};
     ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = g.wnd;
-    ofn.lpstrFilter = L"PlayStation 2 disc image (*.iso)\0*.iso\0All files (*.*)\0*.*\0";
+    ofn.lpstrFilter = filter.c_str();
     ofn.nFilterIndex = 1;
     ofn.lpstrFile = &file[0];
     ofn.nMaxFile = (DWORD)file.size();
-    ofn.lpstrTitle = L"Choose a Gran Turismo 3 disc image (USA, Europe, Japan; other Gran Turismo 3 engine discs: data only)";
+    ofn.lpstrTitle = tr(L"Choose a Gran Turismo 3 disc image (USA, Europe, Japan; other Gran Turismo 3 engine discs: data only)");
     ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY | OFN_NOCHANGEDIR | OFN_DONTADDTORECENT;
     if (!GetOpenFileNameW(&ofn))
         return;
@@ -2623,7 +2791,7 @@ void choose_and_install()
     install::DiscInfo disc;
     bool wrong = false;
     if (!image.open(file, &err)) {
-        message(L"The disc image could not be used: " + err + L".", MB_ICONERROR);
+        message(trf(L"The disc image could not be used: %s.", err.c_str()), MB_ICONERROR);
         return;
     }
     if (!install::check_disc(image, &disc, &msg, &wrong)) {
@@ -2632,13 +2800,16 @@ void choose_and_install()
     }
     image.close();
     const bool dataOnly = disc.version == install::Version::data_only;
-    std::wstring q = dataOnly ? disc.release + L" is not a version the game plays: its files are extracted as data "
-                                               L"only, into " + disc.data + L"."
-                              : disc.release + L" is installed as " + install::version_name(disc.version) + L", into " +
-                                    disc.data + L".";
+    std::wstring q = dataOnly ? trf(L"%s is not a version the game plays: its files are extracted as data "
+                                    L"only, into %s.",
+                                    disc.release.c_str(), disc.data.c_str())
+                              : trf(L"%s is installed as %s, into %s.", disc.release.c_str(),
+                                    install::version_name(disc.version), disc.data.c_str());
     if (install::install_state(g.folder, disc.data) == install::InstallState::ok)
-        q += L"\n\nThe files of " + install::installed_release(g.folder, disc.data) + L" there are replaced.";
-    q += dataOnly ? L"\n\nExtract them?" : L"\n\nInstall?";
+        q += L"\n\n" + trf(L"The files of %s there are replaced.",
+                           install::installed_release(g.folder, disc.data).c_str());
+    q += L"\n\n";
+    q += dataOnly ? tr(L"Extract them?") : tr(L"Install?");
     if (MessageBoxW(g.wnd, q.c_str(), kAppName, MB_YESNO | MB_ICONQUESTION) != IDYES)
         return;
     start_install(file, false);
@@ -2677,12 +2848,12 @@ void rebuild_disc_rows()
         r.path = CreateWindowExW(0, WC_STATICW, d.path.c_str(),
                                  WS_CHILD | shown | SS_LEFTNOWORDWRAP | SS_PATHELLIPSIS | SS_NOPREFIX, 0, 0, 10, 10, p,
                                  (HMENU)(INT_PTR)(IDC_DISC_PATH0 + (int)i), g.inst, nullptr);
-        r.play = CreateWindowExW(0, WC_BUTTONW, L"&Play", WS_CHILD | shown | WS_TABSTOP | BS_PUSHBUTTON, 0, 0, 10, 10, p,
+        r.play = CreateWindowExW(0, WC_BUTTONW, tr(L"&Play"), WS_CHILD | shown | WS_TABSTOP | BS_PUSHBUTTON, 0, 0, 10, 10, p,
                                  (HMENU)(INT_PTR)(IDC_DISC_PLAY0 + (int)i), g.inst, nullptr);
         r.remove = CreateWindowExW(0, WC_BUTTONW, L"X", WS_CHILD | shown | WS_TABSTOP | BS_PUSHBUTTON, 0, 0, 10, 10, p,
                                    (HMENU)(INT_PTR)(IDC_DISC_REMOVE0 + (int)i), g.inst, nullptr);
         ti.uId = (UINT_PTR)r.remove;
-        ti.lpszText = const_cast<wchar_t *>(kDiscRemoveTip);
+        ti.lpszText = const_cast<wchar_t *>(tr(kDiscRemoveTip));
         SendMessageW(g.tip, TTM_ADDTOOLW, 0, (LPARAM)&ti);
         SendMessageW(r.name, WM_SETFONT, (WPARAM)(g.tabFont ? g.tabFont : g.font), FALSE);
         for (HWND c : {r.path, r.play, r.remove})
@@ -2703,7 +2874,7 @@ void play_disc(const std::wstring &path)
         return;
     const std::wstring exe = g.folder + kGameExe;
     if (GetFileAttributesW(exe.c_str()) == INVALID_FILE_ATTRIBUTES) {
-        message(L"The game (" + std::wstring(kGameExe) + L") was not found in " + g.folder + L".", MB_ICONERROR);
+        message(trf(L"The game (%s) was not found in %s.", kGameExe, g.folder.c_str()), MB_ICONERROR);
         return;
     }
     install::DiscFolder disc;
@@ -2728,7 +2899,7 @@ void play_disc(const std::wstring &path)
     si.cb = sizeof(si);
     PROCESS_INFORMATION pi = {};
     if (!CreateProcessW(exe.c_str(), &cmd[0], nullptr, nullptr, FALSE, 0, nullptr, g.folder.c_str(), &si, &pi)) {
-        message(L"The game could not be started: " + util::system_error_text(GetLastError()) + L".", MB_ICONERROR);
+        message(trf(L"The game could not be started: %s.", util::system_error_text(GetLastError()).c_str()), MB_ICONERROR);
         controls::show(g.tab == TAB_CONTROLS);
         rebuild_disc_rows();
         refresh();
@@ -2749,14 +2920,15 @@ void choose_and_add_disc()
     if (g.installing)
         return;
     std::wstring file(32768, L'\0');
+    const std::wstring filter = disc_image_filter();
     OPENFILENAMEW ofn = {};
     ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = g.wnd;
-    ofn.lpstrFilter = L"PlayStation 2 disc image (*.iso)\0*.iso\0All files (*.*)\0*.*\0";
+    ofn.lpstrFilter = filter.c_str();
     ofn.nFilterIndex = 1;
     ofn.lpstrFile = &file[0];
     ofn.nMaxFile = (DWORD)file.size();
-    ofn.lpstrTitle = L"Choose a Gran Turismo 3 disc image to add (USA, Europe, Japan)";
+    ofn.lpstrTitle = tr(L"Choose a Gran Turismo 3 disc image to add (USA, Europe, Japan)");
     ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY | OFN_NOCHANGEDIR | OFN_DONTADDTORECENT;
     if (!GetOpenFileNameW(&ofn))
         return;
@@ -2773,7 +2945,7 @@ void choose_and_add_disc()
     }
     disc_list::remember(engine_ini_path(), file, disc.release, disc.name);
     rebuild_disc_rows();
-    refresh(disc.release + L" added: its Play starts it.");
+    refresh(trf(L"%s added: its Play starts it.", disc.release.c_str()));
     layout();                               /* (the Songs page counts it) */
     if (!g.discRows.empty())
         SetFocus(g.discRows[0].play);
@@ -2805,7 +2977,7 @@ void request_cancel()
 {
     g.cancel_requested = true;
     EnableWindow(g.cancel, FALSE);
-    g.phase = L"Cancelling...";
+    g.phase = tr(L"Cancelling...");
     g.copying = false;
     show_progress_text();
 }
@@ -2814,8 +2986,8 @@ void cancel_clicked()
 {
     /* (the install may finish while the question is up) */
     if (g.installing && !g.cancel_requested &&
-        ask(g.converting ? L"Stop converting the music? (It carries on the next time the launcher starts.)"
-                         : L"Stop installing the game files?") &&
+        ask(g.converting ? tr(L"Stop converting the music? (It carries on the next time the launcher starts.)")
+                         : tr(L"Stop installing the game files?")) &&
         g.installing)
         request_cancel();
 }
@@ -2831,7 +3003,7 @@ HWND make_button(const wchar_t *text, int id)
 
 HWND make_tab(int i)
 {
-    return CreateWindowExW(0, WC_BUTTONW, kTabNames[i], WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 0, 0, 10, 10,
+    return CreateWindowExW(0, WC_BUTTONW, tr(kTabNames[i]), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 0, 0, 10, 10,
                            g.wnd, (HMENU)(INT_PTR)(IDC_TAB0 + i), g.inst, nullptr);
 }
 
@@ -2889,7 +3061,7 @@ void add_cap_row()
     r.tab = TAB_DISPLAY;
     r.button = true;                        /* (the second field as tall as the first) */
     r.cap = true;
-    r.label = make_label(p, L"Frame rate cap", IDC_LABEL0 + (int)g.rows.size());
+    r.label = make_label(p, tr(L"Frame rate cap"), IDC_LABEL0 + (int)g.rows.size());
     r.combo = make_edit(p, IDC_CAP_FPS);
     r.value = make_edit(p, IDC_CAP_MS);
     r.extra = {make_label(p, L"FPS", IDC_CAP_FPS_LABEL), make_updown(p, IDC_CAP_FPS_UD),
@@ -3029,7 +3201,7 @@ void add_options(int tab, size_t &next, int count = 1000)
             r.label = make_label(g.pages[tab], o.label, IDC_LABEL0 + (int)g.rows.size());
             r.combo = CreateWindowExW(0, WC_BUTTONW, o.label, WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 0, 0, 10,
                                       10, g.pages[tab], (HMENU)(INT_PTR)(IDC_OPTION0 + (int)next), g.inst, nullptr);
-            r.value = CreateWindowExW(0, WC_BUTTONW, L"Default", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 0, 0,
+            r.value = CreateWindowExW(0, WC_BUTTONW, tr(L"Default"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 0, 0,
                                       10, 10, g.pages[tab], (HMENU)(INT_PTR)(IDC_VALUE0 + (int)next), g.inst, nullptr);
             g.rows.push_back(r);
             o.combo = r.combo;
@@ -3063,7 +3235,7 @@ void add_options(int tab, size_t &next, int count = 1000)
         r.combo = make_slider(g.pages[tab], IDC_OPTION0 + (int)next);
         r.value = make_label(g.pages[tab], L"", IDC_VALUE0 + (int)next);
         if (o.resettable)
-            r.reset = CreateWindowExW(0, WC_BUTTONW, L"Default", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 0, 0,
+            r.reset = CreateWindowExW(0, WC_BUTTONW, tr(L"Default"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 0, 0,
                                       10, 10, g.pages[tab], (HMENU)(INT_PTR)(IDC_DEFAULT0 + (int)next), g.inst, nullptr);
         g.rows.push_back(r);
         o.combo = r.combo;
@@ -3087,13 +3259,13 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         /* PC (2026-11-14): the Play tab's sub-tabs, then each one's own
          * button on their line */
         for (int s = 0; s < 2; s++)
-            g.playSubTab[s] = CreateWindowExW(0, WC_BUTTONW, kPlaySubNames[s],
+            g.playSubTab[s] = CreateWindowExW(0, WC_BUTTONW, tr(kPlaySubNames[s]),
                                               WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 0, 0, 10, 10,
                                               g.pages[TAB_PLAY], (HMENU)(INT_PTR)(IDC_PLAY_SUB0 + s), g.inst, nullptr);
-        g.install = CreateWindowExW(0, WC_BUTTONW, L"&Install game files...",
+        g.install = CreateWindowExW(0, WC_BUTTONW, tr(L"&Install game files..."),
                                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 0, 0, 10, 10, g.pages[TAB_PLAY],
                                     (HMENU)(INT_PTR)IDC_INSTALL, g.inst, nullptr);
-        g.discOpen = CreateWindowExW(0, WC_BUTTONW, L"Add &disc...", WS_CHILD | WS_TABSTOP | BS_PUSHBUTTON, 0, 0,
+        g.discOpen = CreateWindowExW(0, WC_BUTTONW, tr(L"Add &disc..."), WS_CHILD | WS_TABSTOP | BS_PUSHBUTTON, 0, 0,
                                      10, 10, g.pages[TAB_PLAY], (HMENU)(INT_PTR)IDC_DISC_OPEN, g.inst, nullptr);
         for (int v = 0; v < install::kVersions; v++) {
             HWND p = g.pages[TAB_PLAY];
@@ -3101,41 +3273,41 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
             g.versionState[v] = CreateWindowExW(0, WC_STATICW, L"",
                                                 WS_CHILD | WS_VISIBLE | SS_LEFTNOWORDWRAP | SS_ENDELLIPSIS | SS_NOPREFIX,
                                                 0, 0, 10, 10, p, (HMENU)(INT_PTR)(IDC_VERSION_STATE0 + v), g.inst, nullptr);
-            g.versionPlay[v] = CreateWindowExW(0, WC_BUTTONW, L"&Play", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
+            g.versionPlay[v] = CreateWindowExW(0, WC_BUTTONW, tr(L"&Play"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
                                                0, 0, 10, 10, p, (HMENU)(INT_PTR)(IDC_VERSION_PLAY0 + v), g.inst, nullptr);
         }
         g.extractionsLabel = make_label(g.pages[TAB_PLAY], L"", IDC_EXTRACTIONS);
         /* PC (2026-11-14): the Disc sub-tab's text with no disc image (its
          * rows: rebuild_disc_rows) */
-        g.discNone = CreateWindowExW(0, WC_STATICW, kDiscNoneText, WS_CHILD | SS_LEFT | SS_NOPREFIX, 0, 0, 10, 10,
+        g.discNone = CreateWindowExW(0, WC_STATICW, tr(kDiscNoneText), WS_CHILD | SS_LEFT | SS_NOPREFIX, 0, 0, 10, 10,
                                      g.pages[TAB_PLAY], (HMENU)(INT_PTR)IDC_DISC_NONE, g.inst, nullptr);
         g.tip = CreateWindowExW(WS_EX_TOPMOST, TOOLTIPS_CLASSW, nullptr, WS_POPUP | TTS_ALWAYSTIP | TTS_NOPREFIX,
                                 CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, hwnd, nullptr, g.inst,
                                 nullptr);
-        g.mode = add_row(TAB_DISPLAY, L"Display mode", IDC_MODE);
-        g.res = add_row(TAB_DISPLAY, L"Resolution", IDC_RES);
-        g.rate = add_row(TAB_DISPLAY, L"Refresh rate", IDC_RATE);
+        g.mode = add_row(TAB_DISPLAY, tr(L"Display mode"), IDC_MODE);
+        g.res = add_row(TAB_DISPLAY, tr(L"Resolution"), IDC_RES);
+        g.rate = add_row(TAB_DISPLAY, tr(L"Refresh rate"), IDC_RATE);
         add_options(TAB_DISPLAY, next, 1);              /* vertical sync */
         add_cap_row();                                  /* the frame cap's two fields */
         add_options(TAB_DISPLAY, next);                 /* the menu and movie aspects */
-        g.span = add_row(TAB_DISPLAY, L"Multi-Monitor", IDC_SPAN);
+        g.span = add_row(TAB_DISPLAY, tr(L"Multi-Monitor"), IDC_SPAN);
         add_options(TAB_GRAPHICS, next);
         for (int s = 0; s < 2; s++)         /* the Audio tab's sub-tabs, its Songs page */
-            g.audioSubTab[s] = CreateWindowExW(0, WC_BUTTONW, kAudioSubNames[s],
+            g.audioSubTab[s] = CreateWindowExW(0, WC_BUTTONW, tr(kAudioSubNames[s]),
                                                WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 0, 0, 10, 10,
                                                g.pages[TAB_AUDIO], (HMENU)(INT_PTR)(IDC_AUDIO_SUB0 + s), g.inst, nullptr);
         add_options(TAB_AUDIO, next);
         g.songsText = CreateWindowExW(0, WC_STATICW, L"", WS_CHILD | SS_LEFT | SS_NOPREFIX, 0, 0, 10, 10,
                                       g.pages[TAB_AUDIO], (HMENU)(INT_PTR)IDC_SONGS_TEXT, g.inst, nullptr);
-        g.songsOpen = CreateWindowExW(0, WC_BUTTONW, L"Song &manager...", WS_CHILD | WS_TABSTOP | BS_PUSHBUTTON, 0, 0,
+        g.songsOpen = CreateWindowExW(0, WC_BUTTONW, tr(L"Song &manager..."), WS_CHILD | WS_TABSTOP | BS_PUSHBUTTON, 0, 0,
                                       10, 10, g.pages[TAB_AUDIO], (HMENU)(INT_PTR)IDC_SONGS_OPEN, g.inst, nullptr);
         for (int s = 0; s < kGameSubs; s++) /* the Game tab's sub-tabs */
-            g.gameSubTab[s] = CreateWindowExW(0, WC_BUTTONW, kGameSubNames[s],
+            g.gameSubTab[s] = CreateWindowExW(0, WC_BUTTONW, tr(kGameSubNames[s]),
                                               WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 0, 0, 10, 10,
                                               g.pages[TAB_GAME], (HMENU)(INT_PTR)(IDC_GAME_SUB0 + s), g.inst, nullptr);
         add_options(TAB_GAME, next, 7);                 /* language, the units, starting credits and their
                                                            custom amount, split screen */
-        g.split = add_row(TAB_GAME, L"Split screen 2nd monitor", IDC_SPLIT);
+        g.split = add_row(TAB_GAME, tr(L"Split screen 2nd monitor"), IDC_SPLIT);
         add_options(TAB_GAME, next);                    /* HUD; Cameras; Extras: the course scale; Surfaces;
                                                            Challenges */
         show_game_rows();
@@ -3145,19 +3317,19 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
          * texture manager's (PC 2026-11-13) right of the panel, the window's
          * own controls (were the Play tab's page's), what each has on under
          * its button, wrapped */
-        g.modsOpen = make_button(L"M&ods...", IDC_MODS_OPEN);
+        g.modsOpen = make_button(tr(L"M&ods..."), IDC_MODS_OPEN);
         g.modsText = CreateWindowExW(0, WC_STATICW, L"", WS_CHILD | WS_VISIBLE | SS_CENTER | SS_NOPREFIX, 0, 0, 10, 10,
                                      hwnd, (HMENU)(INT_PTR)IDC_MODS_TEXT, g.inst, nullptr);
-        g.texturesOpen = make_button(L"&Textures...", IDC_TEXTURES_OPEN);
+        g.texturesOpen = make_button(tr(L"&Textures..."), IDC_TEXTURES_OPEN);
         g.texturesText = CreateWindowExW(0, WC_STATICW, L"", WS_CHILD | WS_VISIBLE | SS_CENTER | SS_NOPREFIX, 0, 0, 10,
                                          10, hwnd, (HMENU)(INT_PTR)IDC_TEXTURES_TEXT, g.inst, nullptr);
         /* PC (2026-11-15, user request: "Save manager, under the Textures
          * manager button in the launcher") */
-        g.savesOpen = make_button(L"&Saves...", IDC_SAVES_OPEN);
+        g.savesOpen = make_button(tr(L"&Saves..."), IDC_SAVES_OPEN);
         g.savesText = CreateWindowExW(0, WC_STATICW, L"", WS_CHILD | WS_VISIBLE | SS_CENTER | SS_NOPREFIX, 0, 0, 10, 10,
                                       hwnd, (HMENU)(INT_PTR)IDC_SAVES_TEXT, g.inst, nullptr);
-        g.cancel = make_button(L"&Cancel", IDC_CANCEL);
-        g.exit = make_button(L"E&xit", IDC_EXIT);
+        g.cancel = make_button(tr(L"&Cancel"), IDC_CANCEL);
+        g.exit = make_button(tr(L"E&xit"), IDC_EXIT);
         g.playTime = CreateWindowExW(0, WC_STATICW, L"", WS_CHILD | WS_VISIBLE | SS_CENTER | SS_NOPREFIX, 0, 0, 10, 10,
                                      hwnd, (HMENU)(INT_PTR)IDC_PLAY_TIME, g.inst, nullptr);
         g.status =CreateWindowExW(0, WC_STATICW, L"", WS_CHILD | WS_VISIBLE | SS_LEFT | SS_NOPREFIX, 0, 0, 10, 10, hwnd,
@@ -3240,17 +3412,17 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         }
         if (d->CtlID == IDC_AUDIO_SUB0 || d->CtlID == IDC_AUDIO_SUB0 + 1) {
             const int s = (int)d->CtlID - IDC_AUDIO_SUB0;
-            draw_header(d, kAudioSubNames[s], s == g.audioSub, s == 1 && g.musicUnread);
+            draw_header(d, tr(kAudioSubNames[s]), s == g.audioSub, s == 1 && g.musicUnread);
             return TRUE;
         }
         if (d->CtlID >= IDC_GAME_SUB0 && d->CtlID < IDC_GAME_SUB0 + kGameSubs) {
             const int s = (int)d->CtlID - IDC_GAME_SUB0;
-            draw_header(d, kGameSubNames[s], s == g.gameSub, false);
+            draw_header(d, tr(kGameSubNames[s]), s == g.gameSub, false);
             return TRUE;
         }
         if (d->CtlID == IDC_PLAY_SUB0 || d->CtlID == IDC_PLAY_SUB0 + 1) {   /* PC (2026-11-14) */
             const int s = (int)d->CtlID - IDC_PLAY_SUB0;
-            draw_header(d, kPlaySubNames[s], s == g.playSub, false);
+            draw_header(d, tr(kPlaySubNames[s]), s == g.playSub, false);
             return TRUE;
         }
         if (d->CtlID >= IDC_OPTION0 && d->CtlID < IDC_OPTION0 + (UINT)g.options.size() &&
@@ -3457,9 +3629,9 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     case WM_CLOSE:
         if (g.installing) {
             if (!g.cancel_requested &&
-                !ask(g.converting ? L"The music is being converted.\n\nStop the conversion and exit? (It carries on "
-                                    L"the next time the launcher starts.)"
-                                  : L"The game files are being installed.\n\nStop the installation and exit?"))
+                !ask(g.converting ? tr(L"The music is being converted.\n\nStop the conversion and exit? (It carries on "
+                                       L"the next time the launcher starts.)")
+                                  : tr(L"The game files are being installed.\n\nStop the installation and exit?")))
                 return 0;
             if (g.installing) {
                 /* Exit once the worker has removed its temporary folder. */
@@ -3506,16 +3678,16 @@ int run(int show_command, const std::wstring &shared)
     wc.lpszClassName = kClassName;
     RegisterClassExW(&wc);
 
-    HWND hwnd = CreateWindowExW(0, kClassName, kTitle, kStyle, CW_USEDEFAULT, CW_USEDEFAULT, 100, 100, nullptr, nullptr,
-                                g.inst, nullptr);
+    HWND hwnd = CreateWindowExW(0, kClassName, tr(kTitle), kStyle, CW_USEDEFAULT, CW_USEDEFAULT, 100, 100, nullptr,
+                                nullptr, g.inst, nullptr);
     if (!hwnd) {
-        MessageBoxW(nullptr, L"The launcher window could not be created.", kAppName, MB_OK | MB_ICONERROR);
+        MessageBoxW(nullptr, tr(L"The launcher window could not be created."), kAppName, MB_OK | MB_ICONERROR);
         return 1;
     }
     apply_dpi(GetDpiForWindow(hwnd), nullptr);
     /* PC (2026-11-14): an engine's window says whose it is */
     if (!shared_arg().empty())
-        SetWindowTextW(hwnd, (std::wstring(kTitle) + L" - " + engines::name_of(g.folder)).c_str());
+        SetWindowTextW(hwnd, (std::wstring(tr(kTitle)) + L" - " + engines::name_of(g.folder)).c_str());
     /* an earlier launcher's data\ into its version's folder; the last
      * played version (Enter's) */
     const std::wstring moved = install::migrate_earlier_install(g.folder);
@@ -3526,7 +3698,7 @@ int run(int show_command, const std::wstring &shared)
             g.lastVersion = v;
     if (!moved.empty())
         for (Option &o : g.options)
-            if (o.step <= 0 && wcscmp(o.key, L"Language") == 0) {
+            if (o.step <= 0 && wcscmp(o.key, L"Language") == 0 && wcscmp(o.section, L"Game") == 0) {
                 o.choices = language_choices();
                 fill_option(o);
             }

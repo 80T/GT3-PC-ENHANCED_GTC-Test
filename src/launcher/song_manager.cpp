@@ -7,6 +7,7 @@
 #include "util.h"
 
 #include "engine/sound/native/bgm_files.h"
+#include "platform/ui_text.h"  /* PC (2026-11-16): the interface's languages */
 
 #include <commctrl.h>
 #include <commdlg.h>
@@ -181,13 +182,14 @@ std::wstring shown_artist(const AdsListTrack &k, const music::MusicFile *f)
 std::wstring describe(const music::MusicFile *f)
 {
     if (f != nullptr && f->pending)
-        return L"checking...";
+        return tr(L"checking...");
     if (f == nullptr || !f->found)
-        return L"missing";
+        return tr(L"missing");
     if (!f->playable)
-        return L"not a format the game plays";
+        return tr(L"not a format the game plays");
     /* (PC 2026-11-15: a song the game plays from the disc image) */
-    return util::widen(bgm_describe(f->info)) + (f->disc ? L", on the disc" : L"");
+    const std::wstring format = util::widen(bgm_describe(f->info));
+    return f->disc ? trf(L"%s, on the disc", format.c_str()) : format;
 }
 
 std::wstring text_of(HWND c)
@@ -227,10 +229,10 @@ void save()
     std::wstring msg;
     if (music::write_list(g.data, ads_list_text(g.list, music::prober(g.data)), &msg)) {
         g.stamp = list_stamp();
-        set_status(L"Saved to bgm\\ads.txt. The game reads it when it starts.");
+        set_status(tr(L"Saved to bgm\\ads.txt. The game reads it when it starts."));
     } else {
         set_status(msg);
-        MessageBoxW(g.wnd, msg.c_str(), L"Songs", MB_OK | MB_ICONWARNING);
+        MessageBoxW(g.wnd, msg.c_str(), tr(L"Songs"), MB_OK | MB_ICONWARNING);
     }
 }
 
@@ -313,19 +315,19 @@ std::wstring bpm_text(double bpm)
 std::wstring markers_text(const AdsListTrack &k)
 {
     if (g.making.count(lower8(k.file)))
-        return L"making...";
+        return tr(L"making...");
     if (disc_markers(k))
-        return L"the disc's";
+        return tr(L"the disc's");
     if (!has_markers(k))
-        return L"none";
-    return k.bpm > 0 ? bpm_text(k.bpm) + L" BPM" : L"set";
+        return tr(L"none");
+    return k.bpm > 0 ? trf(L"%s BPM", bpm_text(k.bpm).c_str()) : tr(L"set");
 }
 
 void song_row(int i)
 {
     const AdsListTrack &k = g.list.group[ADS_GROUP_RACE_SONGS][(size_t)i];
     const music::MusicFile *f = find_file(k.file);
-    set_cell(g.songs, i, 0, f != nullptr && is_new(f->name) ? L"new" : L"");
+    set_cell(g.songs, i, 0, f != nullptr && is_new(f->name) ? tr(L"new") : L"");
     set_cell(g.songs, i, 1, shown_title(k, f));
     set_cell(g.songs, i, 2, shown_artist(k, f));
     set_cell(g.songs, i, 3, markers_text(k));
@@ -376,10 +378,10 @@ void slot_row(int row)
 {
     const int grp = g.slotGroups[(size_t)row];
     const auto &v = g.list.group[grp];
-    set_cell(g.slots, row, 0, util::widen(ads_group_event(grp)));
-    std::wstring file = v.empty() ? L"(silence)" : music::shown_file(v[0].file);
+    set_cell(g.slots, row, 0, util::widen(tr(ads_group_event(grp))));
+    std::wstring file = v.empty() ? tr(L"(silence)") : music::shown_file(v[0].file);
     if (v.size() > 1)
-        file += L" (+" + std::to_wstring(v.size() - 1) + L" more)";
+        file = trf(L"%s (+%d more)", file.c_str(), (int)(v.size() - 1));
     set_cell(g.slots, row, 1, file);
     set_cell(g.slots, row, 2, v.empty() ? L"" : shown_title(v[0], find_file(v[0].file)));
     std::wstring source = L"";
@@ -388,7 +390,7 @@ void slot_row(int row)
         const bool same = d.size() == v.size() &&
                           (v.empty() || (!bgm_system_path(v[0].file) &&
                                          lower8(bgm_base_name(d[0].file)) == lower8(bgm_base_name(v[0].file))));
-        source = same ? L"the disc's" : L"changed";
+        source = same ? tr(L"the disc's") : tr(L"changed");
     }
     set_cell(g.slots, row, 3, source);
 }
@@ -404,10 +406,10 @@ void slot_fields()
         const auto &v = g.list.group[g.slotGroups[(size_t)row]];
         const music::MusicFile *cur = v.empty() ? nullptr : find_file(v[0].file);
         int sel = 0;
-        SendMessageW(g.file, CB_ADDSTRING, 0, (LPARAM)L"(silence)");
+        SendMessageW(g.file, CB_ADDSTRING, 0, (LPARAM)tr(L"(silence)"));
         g.fileChoices.push_back(std::string());
         if (!v.empty() && (cur == nullptr || (!cur->found && !cur->pending))) {
-            SendMessageW(g.file, CB_ADDSTRING, 0, (LPARAM)(music::shown_file(v[0].file) + L" (missing)").c_str());
+            SendMessageW(g.file, CB_ADDSTRING, 0, (LPARAM)trf(L"%s (missing)", music::shown_file(v[0].file).c_str()).c_str());
             g.fileChoices.push_back(v[0].file);
             sel = 1;
         }
@@ -527,28 +529,40 @@ void load(int v)
         g.files.push_back(std::move(m));
     check_external();
     g.stamp = list_stamp();
-    SetWindowTextW(g.wnd, (L"Songs - " + g.versions[(size_t)v].name).c_str());
+    SetWindowTextW(g.wnd, trf(L"Songs - %s", g.versions[(size_t)v].name.c_str()).c_str());
     SendMessageW(g.version, CB_SETCURSEL, (WPARAM)v, 0);
     TCITEMW ti = {};
     ti.mask = TCIF_TEXT;
-    std::wstring t0 = L"Race songs (" + std::to_wstring(g.list.group[ADS_GROUP_RACE_SONGS].size()) + L")";
+    std::wstring t0 = trf(L"Race songs (%d)", (int)g.list.group[ADS_GROUP_RACE_SONGS].size());
     ti.pszText = &t0[0];
     SendMessageW(g.tabs, TCM_SETITEMW, 0, (LPARAM)&ti);
     fill_songs(selected(g.songs));
     fill_slots(selected(g.slots));
-    set_status(warnings.empty() ? L"Changes are saved to bgm\\ads.txt as they are made."
-                                : L"bgm\\ads.txt has lines the game skips (" + std::to_wstring(warnings.size()) +
-                                      L"); saving writes the list anew without them.");
+    set_status(warnings.empty() ? tr(L"Changes are saved to bgm\\ads.txt as they are made.")
+                                : trf(L"bgm\\ads.txt has lines the game skips (%d); saving writes the list anew "
+                                      L"without them.", (int)warnings.size()));
 }
 
 /* The files chosen in an Open dialog (one or several): full paths. */
 std::vector<std::wstring> choose_files(bool many, const wchar_t *title)
 {
     std::wstring buf(65536, L'\0');
+    /* "Music (*.wav, *.mp3)\0*.wav;*.mp3\0All files (*.*)\0*.*\0" with its
+     * descriptions in the interface's language */
+    std::wstring filter = tr(L"Music");
+    filter += L" (*.wav, *.mp3)";
+    filter.push_back(L'\0');
+    filter += L"*.wav;*.mp3";
+    filter.push_back(L'\0');
+    filter += tr(L"All files");
+    filter += L" (*.*)";
+    filter.push_back(L'\0');
+    filter += L"*.*";
+    filter.push_back(L'\0');
     OPENFILENAMEW ofn = {};
     ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = g.wnd;
-    ofn.lpstrFilter = L"Music (*.wav, *.mp3)\0*.wav;*.mp3\0All files (*.*)\0*.*\0";
+    ofn.lpstrFilter = filter.c_str();
     ofn.lpstrFile = &buf[0];
     ofn.nMaxFile = (DWORD)buf.size();
     ofn.lpstrTitle = title;
@@ -602,7 +616,7 @@ void start_add(std::vector<std::wstring> paths, const std::wstring &folder)
     job->folder = folder;
     job->paths = std::move(paths);
     set_adding(true);
-    set_status(L"Looking at the songs...");
+    set_status(tr(L"Looking at the songs..."));
     const HWND wnd = g.wnd;
     std::thread([job, wnd] {
         if (!job->folder.empty())
@@ -641,7 +655,8 @@ void add_done(AddJob *job)
         if (!job->folder.empty() && !system && key.compare(0, 2, "i_") == 0)
             continue;                   /* (the bgm folder itself: an intro is no song) */
         if (!m.playable) {
-            problems.push_back(m.name + L": not a format the game plays (a .wav of PCM or float samples, an .mp3)");
+            problems.push_back(
+                trf(L"%s: not a format the game plays (a .wav of PCM or float samples, an .mp3)", m.name.c_str()));
             continue;
         }
         if (!have.insert(key).second) {
@@ -665,26 +680,27 @@ void add_done(AddJob *job)
         select_row(g.songs, (int)v.size() - 1);
         song_fields();
     }
-    std::wstring status = job->songs.empty() ? L"No .wav or .mp3 files there."
-                          : added == 0       ? L"No songs added."
-                                             : std::to_wstring(added) + (added == 1 ? L" song added." : L" songs added.") +
-                                             L" They play from where they are: nothing was copied.";
+    std::wstring status = job->songs.empty() ? tr(L"No .wav or .mp3 files there.")
+                          : added == 0       ? tr(L"No songs added.")
+                          : added == 1       ? tr(L"1 song added. They play from where they are: nothing was copied.")
+                                             : trf(L"%d songs added. They play from where they are: nothing was copied.",
+                                                   added);
     if (there != 0)
-        status += L" " + std::to_wstring(there) + L" already on the list.";
+        status += L" " + trf(L"%d already on the list.", there);
     set_status(status);
     if (!problems.empty()) {
-        std::wstring m = L"Not added:";
+        std::wstring m = tr(L"Not added:");
         for (size_t i = 0; i < problems.size() && i < 12; i++)
             m += L"\n  " + problems[i];
         if (problems.size() > 12)
-            m += L"\n  (" + std::to_wstring(problems.size() - 12) + L" more)";
-        MessageBoxW(g.wnd, m.c_str(), L"Songs", MB_OK | MB_ICONWARNING);
+            m += L"\n  " + trf(L"(%d more)", (int)(problems.size() - 12));
+        MessageBoxW(g.wnd, m.c_str(), tr(L"Songs"), MB_OK | MB_ICONWARNING);
     }
 }
 
 void add_songs()
 {
-    std::vector<std::wstring> chosen = choose_files(true, L"Add songs to the race music (.wav, .mp3)");
+    std::vector<std::wstring> chosen = choose_files(true, tr(L"Add songs to the race music (.wav, .mp3)"));
     if (!chosen.empty())
         start_add(std::move(chosen), std::wstring());
 }
@@ -692,7 +708,7 @@ void add_songs()
 void add_folder()
 {
     const std::wstring folder =
-        util::choose_folder(g.wnd, L"Add a folder of songs to the race music (with the folders under it)", L"Add");
+        util::choose_folder(g.wnd, tr(L"Add a folder of songs to the race music (with the folders under it)"), tr(L"Add"));
     if (!folder.empty())
         start_add(std::vector<std::wstring>(), folder);
 }
@@ -714,7 +730,7 @@ void remove_song()
     load(g.cur);
     select_row(g.songs, i);
     song_fields();
-    set_status(L"\"" + title + L"\" is off the race songs. Its file was not touched.");
+    set_status(trf(L"\"%s\" is off the race songs. Its file was not touched.", title.c_str()));
 }
 
 /* The slot of the event list's row `row' given file `bytes' ("" silence). */
@@ -757,14 +773,15 @@ void add_slot_file()
     const int row = selected(g.slots);
     if (row < 0)
         return;
-    std::vector<std::wstring> chosen = choose_files(false, L"Choose the music for this event (.wav, .mp3)");
+    std::vector<std::wstring> chosen = choose_files(false, tr(L"Choose the music for this event (.wav, .mp3)"));
     if (chosen.empty())
         return;
     music::MusicFile m = music::probe_song(chosen[0]);
     m.bytes = music::track_file(g.data, chosen[0]);
     if (!m.playable) {
-        const std::wstring why = m.name + L": not a format the game plays (a .wav of PCM or float samples, an .mp3)";
-        MessageBoxW(g.wnd, why.c_str(), L"Songs", MB_OK | MB_ICONWARNING);
+        const std::wstring why =
+            trf(L"%s: not a format the game plays (a .wav of PCM or float samples, an .mp3)", m.name.c_str());
+        MessageBoxW(g.wnd, why.c_str(), tr(L"Songs"), MB_OK | MB_ICONWARNING);
         return;
     }
     if (bgm_system_path(m.bytes))
@@ -792,16 +809,16 @@ void columns()
         const wchar_t *name;
         int width;
     };
-    const Col cols[] = {{g.songs, L"", 40},      {g.songs, L"Title", 210}, {g.songs, L"Artist", 130},
-                        {g.songs, L"Markers", 80}, {g.songs, L"File", 240}, {g.songs, L"Format", 230},
-                        {g.slots, L"Event", 210}, {g.slots, L"Music file", 170}, {g.slots, L"Title", 200},
-                        {g.slots, L"Source", 80}};
+    const Col cols[] = {{g.songs, L"", 40},      {g.songs, N_(L"Title"), 210}, {g.songs, N_(L"Artist"), 130},
+                        {g.songs, N_(L"Markers"), 80}, {g.songs, N_(L"File"), 240}, {g.songs, N_(L"Format"), 230},
+                        {g.slots, N_(L"Event"), 210}, {g.slots, N_(L"Music file"), 170},
+                        {g.slots, N_(L"Title"), 200}, {g.slots, N_(L"Source"), 80}};
     int index[2] = {0, 0};
     for (const Col &c : cols) {
         const int k = c.lv == g.songs ? 0 : 1;
         LVCOLUMNW col = {};
         col.mask = LVCF_TEXT | LVCF_WIDTH;
-        col.pszText = const_cast<wchar_t *>(c.name);
+        col.pszText = const_cast<wchar_t *>(tr(c.name));
         col.cx = px(c.width);
         if (SendMessageW(c.lv, LVM_SETCOLUMNWIDTH, (WPARAM)index[k], (LPARAM)col.cx) == FALSE)
             SendMessageW(c.lv, LVM_INSERTCOLUMNW, (WPARAM)index[k], (LPARAM)&col);
@@ -823,16 +840,44 @@ void make_font()
     g.font = f;
 }
 
+/* PC (2026-11-16): a control's text's width / wrapped height in its font
+ * (the interface's languages run longer: layout sizes the labels, buttons
+ * and the hint from them) */
+SIZE text_size(HWND c, int wrapWidth = 0)
+{
+    wchar_t t[1024] = L"";
+    GetWindowTextW(c, t, 1024);
+    HDC dc = GetDC(c);
+    HFONT f = (HFONT)SendMessageW(c, WM_GETFONT, 0, 0);
+    HGDIOBJ old = SelectObject(dc, f != nullptr ? (HGDIOBJ)f : GetStockObject(DEFAULT_GUI_FONT));
+    RECT r = {0, 0, wrapWidth, 0};
+    DrawTextW(dc, t, -1, &r, DT_CALCRECT | (wrapWidth > 0 ? DT_WORDBREAK : DT_SINGLELINE));
+    SelectObject(dc, old);
+    ReleaseDC(c, dc);
+    return {r.right, r.bottom};
+}
+
 void layout()
 {
     RECT rc;
     GetClientRect(g.wnd, &rc);
     const int W = rc.right, H = rc.bottom, m = px(kM);
     auto put = [](HWND c, int x, int y, int w, int h) { SetWindowPos(c, nullptr, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE); };
-    put(g.versionLabel, m, m + px(4), px(kLabelW), px(20));
-    put(g.version, m + px(kLabelW), m, px(280), px(200));
-    put(g.hint, m + px(kLabelW) + px(280) + px(16), m, W - (m + px(kLabelW) + px(296)) - m, px(36));
-    const int tabY = m + px(40), bottom = H - m - px(kBtnH);
+    /* PC (2026-11-16): the labels' column, the buttons and the hint as their
+     * texts need (kLabelW, kBtnW, two lines at least) */
+    int labelW = px(kLabelW);
+    for (HWND l : {g.versionLabel, g.titleLabel, g.artistLabel, g.bpmLabel})
+        labelW = std::max(labelW, (int)text_size(l).cx + px(6));
+    int btnW = px(kBtnW);
+    for (HWND b : {g.addSongs, g.addFolder, g.remove, g.addFile, g.original})
+        btnW = std::max(btnW, (int)text_size(b).cx + px(16));
+    const int fileLabelW = std::max(px(80), (int)text_size(g.fileLabel).cx + px(6));
+    put(g.versionLabel, m, m + px(4), labelW, px(20));
+    put(g.version, m + labelW, m, px(280), px(200));
+    const int hintW = W - (m + labelW + px(296)) - m;
+    const int hintH = std::max(px(36), (int)text_size(g.hint, hintW).cy + px(2));
+    put(g.hint, m + labelW + px(280) + px(16), m, hintW, hintH);
+    const int tabY = m + std::max(px(40), hintH + px(4)), bottom = H - m - px(kBtnH);
     put(g.tabs, m, tabY, W - 2 * m, bottom - px(kGap) - tabY);
     RECT in = {m, tabY, W - m, bottom - px(kGap)};
     SendMessageW(g.tabs, TCM_ADJUSTRECT, FALSE, (LPARAM)&in);
@@ -841,23 +886,23 @@ void layout()
     const int listH = fieldsY - px(kGap) - (in.top + px(4));
     /* race songs */
     put(g.songs, x, in.top + px(4), w, listH);
-    const int half = (w - 3 * px(kLabelW) - px(kBpmW) - 2 * px(16)) / 2;
-    put(g.titleLabel, x, fieldsY + px(3), px(kLabelW), px(20));
-    put(g.title, x + px(kLabelW), fieldsY, half, px(kEditH));
-    put(g.artistLabel, x + px(kLabelW) + half + px(16), fieldsY + px(3), px(kLabelW), px(20));
-    put(g.artist, x + 2 * px(kLabelW) + half + px(16), fieldsY, half, px(kEditH));
-    put(g.bpmLabel, x + 2 * px(kLabelW) + 2 * half + 2 * px(16), fieldsY + px(3), px(kLabelW), px(20));
-    put(g.bpm, x + 3 * px(kLabelW) + 2 * half + 2 * px(16), fieldsY, px(kBpmW), px(kEditH));
+    const int half = (w - 3 * labelW - px(kBpmW) - 2 * px(16)) / 2;
+    put(g.titleLabel, x, fieldsY + px(3), labelW, px(20));
+    put(g.title, x + labelW, fieldsY, half, px(kEditH));
+    put(g.artistLabel, x + labelW + half + px(16), fieldsY + px(3), labelW, px(20));
+    put(g.artist, x + 2 * labelW + half + px(16), fieldsY, half, px(kEditH));
+    put(g.bpmLabel, x + 2 * labelW + 2 * half + 2 * px(16), fieldsY + px(3), labelW, px(20));
+    put(g.bpm, x + 3 * labelW + 2 * half + 2 * px(16), fieldsY, px(kBpmW), px(kEditH));
     const int by = in.bottom - px(4) - px(kBtnH);
-    put(g.addSongs, x, by, px(kBtnW), px(kBtnH));
-    put(g.addFolder, x + px(kBtnW) + px(kGap), by, px(kBtnW), px(kBtnH));
-    put(g.remove, x + 2 * (px(kBtnW) + px(kGap)), by, px(kBtnW), px(kBtnH));
+    put(g.addSongs, x, by, btnW, px(kBtnH));
+    put(g.addFolder, x + btnW + px(kGap), by, btnW, px(kBtnH));
+    put(g.remove, x + 2 * (btnW + px(kGap)), by, btnW, px(kBtnH));
     /* event music */
     put(g.slots, x, in.top + px(4), w, listH);
-    put(g.fileLabel, x, fieldsY + px(3), px(80), px(20));
-    put(g.file, x + px(80), fieldsY, px(300), px(240));
-    put(g.addFile, x + px(80) + px(300) + px(kGap), fieldsY - px(2), px(kBtnW), px(kBtnH));
-    put(g.original, x + px(80) + px(300) + px(kGap) + px(kBtnW) + px(kGap), fieldsY - px(2), px(kBtnW), px(kBtnH));
+    put(g.fileLabel, x, fieldsY + px(3), fileLabelW, px(20));
+    put(g.file, x + fileLabelW, fieldsY, px(300), px(240));
+    put(g.addFile, x + fileLabelW + px(300) + px(kGap), fieldsY - px(2), btnW, px(kBtnH));
+    put(g.original, x + fileLabelW + px(300) + px(kGap) + btnW + px(kGap), fieldsY - px(2), btnW, px(kBtnH));
     put(g.slotHint, x, by + px(4), w, px(20));
     /* the bottom */
     put(g.status, m, bottom + px(6), W - 3 * m - px(kBtnW), px(20));
@@ -873,43 +918,42 @@ HWND make(const wchar_t *cls, const wchar_t *text, DWORD style, int id, DWORD ex
 
 void create_controls()
 {
-    g.versionLabel = make(WC_STATICW, L"Version", SS_LEFT, IDC_VERSION_LABEL);
+    g.versionLabel = make(WC_STATICW, tr(L"Version"), SS_LEFT, IDC_VERSION_LABEL);
     g.version = make(WC_COMBOBOXW, L"", WS_TABSTOP | WS_VSCROLL | CBS_DROPDOWNLIST, IDC_VERSION);
     for (const Version &v : g.versions)
         SendMessageW(g.version, CB_ADDSTRING, 0, (LPARAM)v.name.c_str());
     g.hint = make(WC_STATICW,
-                  L"Tip: Music files are in the bgm folder."
-                  L"Optional: Add the beats per minute to get replay markers for a song",
+                  tr(L"Tip: Music files are in the bgm folder. "
+                     L"Optional: Add the beats per minute to get replay markers for a song"),
                   SS_LEFT | SS_NOPREFIX, IDC_HINT);
     g.tabs = make(WC_TABCONTROLW, L"", WS_TABSTOP | WS_CLIPSIBLINGS, IDC_TABS);
     TCITEMW ti = {};
     ti.mask = TCIF_TEXT;
-    wchar_t t0[] = L"Race songs", t1[] = L"Event music";
-    ti.pszText = t0;
+    ti.pszText = const_cast<wchar_t *>(tr(L"Race songs"));
     SendMessageW(g.tabs, TCM_INSERTITEMW, 0, (LPARAM)&ti);
-    ti.pszText = t1;
+    ti.pszText = const_cast<wchar_t *>(tr(L"Event music"));
     SendMessageW(g.tabs, TCM_INSERTITEMW, 1, (LPARAM)&ti);
     const DWORD lvStyle = WS_TABSTOP | LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER;
     g.songs = make(WC_LISTVIEWW, L"", lvStyle, IDC_SONGS, WS_EX_CLIENTEDGE);
-    g.titleLabel = make(WC_STATICW, L"Title", SS_LEFT, IDC_TITLE_LABEL);
+    g.titleLabel = make(WC_STATICW, tr(L"Title"), SS_LEFT, IDC_TITLE_LABEL);
     g.title = make(WC_EDITW, L"", WS_TABSTOP | ES_AUTOHSCROLL, IDC_TITLE, WS_EX_CLIENTEDGE);
-    g.artistLabel = make(WC_STATICW, L"Artist", SS_LEFT, IDC_ARTIST_LABEL);
+    g.artistLabel = make(WC_STATICW, tr(L"Artist"), SS_LEFT, IDC_ARTIST_LABEL);
     g.artist = make(WC_EDITW, L"", WS_TABSTOP | ES_AUTOHSCROLL, IDC_ARTIST, WS_EX_CLIENTEDGE);
-    g.bpmLabel = make(WC_STATICW, L"BPM", SS_RIGHT, IDC_BPM_LABEL);
+    g.bpmLabel = make(WC_STATICW, tr(L"BPM"), SS_RIGHT, IDC_BPM_LABEL);
     g.bpm = make(WC_EDITW, L"", WS_TABSTOP | ES_AUTOHSCROLL, IDC_BPM, WS_EX_CLIENTEDGE);
-    g.addSongs = make(WC_BUTTONW, L"&Add files...", WS_TABSTOP | BS_PUSHBUTTON, IDC_ADD_SONGS);
-    g.addFolder = make(WC_BUTTONW, L"Add a &folder...", WS_TABSTOP | BS_PUSHBUTTON, IDC_ADD_FOLDER);
-    g.remove = make(WC_BUTTONW, L"&Remove", WS_TABSTOP | BS_PUSHBUTTON, IDC_REMOVE);
+    g.addSongs = make(WC_BUTTONW, tr(L"&Add files..."), WS_TABSTOP | BS_PUSHBUTTON, IDC_ADD_SONGS);
+    g.addFolder = make(WC_BUTTONW, tr(L"Add a &folder..."), WS_TABSTOP | BS_PUSHBUTTON, IDC_ADD_FOLDER);
+    g.remove = make(WC_BUTTONW, tr(L"&Remove"), WS_TABSTOP | BS_PUSHBUTTON, IDC_REMOVE);
     g.slots = make(WC_LISTVIEWW, L"", lvStyle, IDC_SLOTS, WS_EX_CLIENTEDGE);
-    g.fileLabel = make(WC_STATICW, L"Music file", SS_LEFT, IDC_FILE_LABEL);
+    g.fileLabel = make(WC_STATICW, tr(L"Music file"), SS_LEFT, IDC_FILE_LABEL);
     g.file = make(WC_COMBOBOXW, L"", WS_TABSTOP | WS_VSCROLL | CBS_DROPDOWNLIST, IDC_FILE);
-    g.addFile = make(WC_BUTTONW, L"A&dd a file...", WS_TABSTOP | BS_PUSHBUTTON, IDC_ADD_FILE);
-    g.original = make(WC_BUTTONW, L"&Original", WS_TABSTOP | BS_PUSHBUTTON, IDC_ORIGINAL);
+    g.addFile = make(WC_BUTTONW, tr(L"A&dd a file..."), WS_TABSTOP | BS_PUSHBUTTON, IDC_ADD_FILE);
+    g.original = make(WC_BUTTONW, tr(L"&Original"), WS_TABSTOP | BS_PUSHBUTTON, IDC_ORIGINAL);
     g.slotHint = make(WC_STATICW,
-                      L"Each event plays one music file. Original: the disc's. Silence: no music for the event.",
+                      tr(L"Each event plays one music file. Original: the disc's. Silence: no music for the event."),
                       SS_LEFT | SS_NOPREFIX, IDC_SLOT_HINT);
     g.status = make(WC_STATICW, L"", SS_LEFT | SS_NOPREFIX | SS_ENDELLIPSIS, IDC_STATUS);
-    g.close = make(WC_BUTTONW, L"Close", WS_TABSTOP | BS_PUSHBUTTON, IDCANCEL);
+    g.close = make(WC_BUTTONW, tr(L"Close"), WS_TABSTOP | BS_PUSHBUTTON, IDCANCEL);
     for (HWND lv : {g.songs, g.slots})
         SendMessageW(lv, LVM_SETEXTENDEDLISTVIEWSTYLE, 0, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
     /* (the tab control under the pages' controls it frames) */
@@ -917,7 +961,7 @@ void create_controls()
     SendMessageW(g.title, EM_SETLIMITTEXT, 120, 0);
     SendMessageW(g.artist, EM_SETLIMITTEXT, 120, 0);
     SendMessageW(g.bpm, EM_SETLIMITTEXT, 8, 0);
-    SendMessageW(g.bpm, EM_SETCUEBANNER, FALSE, (LPARAM)L"tempo");
+    SendMessageW(g.bpm, EM_SETCUEBANNER, FALSE, (LPARAM)tr(L"tempo"));
 }
 
 /* A title / artist edited: into the list, written a moment later. */
@@ -975,7 +1019,7 @@ void commit_bpm()
         g.making.erase(lower8(k.file));
         save();
         song_row(i);
-        set_status(L"\"" + title + L"\": no tempo, no beat markers (the replay cameras cut by time).");
+        set_status(trf(L"\"%s\": no tempo, no beat markers (the replay cameras cut by time).", title.c_str()));
         return;
     }
     wchar_t *end = nullptr;
@@ -983,8 +1027,8 @@ void commit_bpm()
     while (end != nullptr && (*end == L' ' || *end == L'\t'))
         end++;
     if (end == nullptr || *end != 0 || !(bpm >= beats::kMinBpm && bpm <= beats::kMaxBpm)) {
-        set_status(L"BPM: the song's beats a minute, a number from " + bpm_text(beats::kMinBpm) + L" to " +
-                   bpm_text(beats::kMaxBpm) + L".");
+        set_status(trf(L"BPM: the song's beats a minute, a number from %s to %s.", bpm_text(beats::kMinBpm).c_str(),
+                       bpm_text(beats::kMaxBpm).c_str()));
         return;
     }
     if (std::fabs(bpm - k.bpm) < 1e-9 && has_markers(k))
@@ -998,7 +1042,7 @@ void commit_bpm()
     job->bpm = bpm;
     g.making[lower8(k.file)] = job->serial;
     song_row(i);
-    set_status(L"Making the beat markers of \"" + title + L"\" at " + bpm_text(bpm) + L" BPM...");
+    set_status(trf(L"Making the beat markers of \"%s\" at %s BPM...", title.c_str(), bpm_text(bpm).c_str()));
     const HWND wnd = g.wnd;
     std::thread([job, wnd] {
         std::vector<float> mono;
@@ -1008,7 +1052,7 @@ void commit_bpm()
         job->rate = rate;
         job->frames = mono.size();
         if (!job->ok && job->why.empty())
-            job->why = L"no beats found in its sound";
+            job->why = tr(L"no beats found in its sound");
         if (!PostMessageW(wnd, WM_APP_MARKERS, 0, (LPARAM)job))
             delete job;                 /* (the window closed meanwhile) */
     }).detach();
@@ -1044,11 +1088,10 @@ void markers_done(MarkerJob *job)
                 k.length = (int64_t)job->frames;
             }
             save();
-            set_status(L"\"" + title + L"\": " + std::to_wstring(r.beats.size()) + L" beats, " +
-                       std::to_wstring(r.bars.size()) + L" bars, " + std::to_wstring(r.cuts.size()) +
-                       L" camera cuts. The replays' cameras follow them.");
+            set_status(trf(L"\"%s\": %d beats, %d bars, %d camera cuts. The replays' cameras follow them.",
+                           title.c_str(), (int)r.beats.size(), (int)r.bars.size(), (int)r.cuts.size()));
         } else if (!job->ok) {
-            set_status(L"The beat markers of \"" + title + L"\" were not made: " + job->why + L".");
+            set_status(trf(L"The beat markers of \"%s\" were not made: %s.", title.c_str(), job->why.c_str()));
         }
         song_row((int)i);
         break;
@@ -1071,7 +1114,7 @@ LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         song_checked((unsigned)wp, reinterpret_cast<music::MusicFile *>(lp));
         return 0;
     case WM_APP_ADD_STEP:
-        set_status(L"Looking at the songs... " + std::to_wstring((size_t)wp) + L" of " + std::to_wstring((size_t)lp));
+        set_status(trf(L"Looking at the songs... %d of %d", (int)wp, (int)lp));
         return 0;
     case WM_APP_ADDED:
         add_done(reinterpret_cast<AddJob *>(lp));
@@ -1226,7 +1269,7 @@ void open(HWND owner, const std::vector<Version> &versions, int version)
     RECT o = {};
     GetWindowRect(owner, &o);
     const int ww = r.right - r.left, wh = r.bottom - r.top;
-    g.wnd = CreateWindowExW(ex, kClass, L"Songs", style, o.left + ((o.right - o.left) - ww) / 2,
+    g.wnd = CreateWindowExW(ex, kClass, tr(L"Songs"), style, o.left + ((o.right - o.left) - ww) / 2,
                             o.top + ((o.bottom - o.top) - wh) / 2, ww, wh, owner, nullptr, inst, nullptr);
     if (g.wnd == nullptr)
         return;

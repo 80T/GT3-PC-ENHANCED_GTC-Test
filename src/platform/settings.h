@@ -139,6 +139,14 @@
  *   MenuSe=100, RaceSe=100, ReplaySe=100    the sound effects' (100: the
  *                           game's own level)
  *
+ *   [Interface]             (PC 2026-11-16; the settings menu writes it too)
+ *   Language=auto           GT3 PC's own text - the launcher, the settings
+ *                           menu and the panels over the picture, not the
+ *                           game: auto (Windows' display language when it is
+ *                           one of these, else English), english, french,
+ *                           german, italian, spanish, japanese, russian,
+ *                           portuguese_br, polish (platform/ui_text.h)
+ *
  *   [Game]                  (the settings menu writes it too)
  *   Language=auto           the game's language from the next start: auto
  *                           (the installed disc's own), japanese, english_us,
@@ -704,6 +712,11 @@ constexpr int kLanguageAuto = -1;
 int language();
 void set_language(int lang);
 const char *language_name(int lang);    /* the ini value ("auto", "english_uk"...) */
+/* PC (2026-11-16): [Interface] Language - ui_text::kAuto or a language of
+ * platform/ui_text.h; the settings menu's text changes at once (the
+ * launcher's at its next start). */
+int interface_language();
+void set_interface_language(int lang);
 /* [Game] SpeedUnit / PowerUnit / TorqueUnit: kUnitAuto (the language's
  * preset) or the game's UnitSettings value (speed: 0 metric, 1 imperial;
  * power: 0 PS, 1 HP, 2 BHP, 3 CV, 4 kW; torque: 0 kgf.m, 1 ft.lb, 2 Nm).

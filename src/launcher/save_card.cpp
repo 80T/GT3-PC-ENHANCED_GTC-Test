@@ -2,6 +2,7 @@
 #include "save_card.h"
 
 #include "util.h"
+#include "platform/ui_text.h"  /* PC (2026-11-16): the interface's languages */
 
 #include <algorithm>
 #include <cstring>
@@ -251,7 +252,8 @@ Card read(const std::wstring &folderIn)
             }
         }
         if (s.dir.size() >= 2 && s.dir[0] == L'B')
-            s.region = s.dir[1] == L'A' ? L"USA" : s.dir[1] == L'E' ? L"Europe" : s.dir[1] == L'I' ? L"Japan" : L"";
+            s.region = s.dir[1] == L'A' ? N_(L"USA") : s.dir[1] == L'E' ? N_(L"Europe") :
+                       s.dir[1] == L'I' ? N_(L"Japan") : L"";      /* (translated where shown) */
         card.saves.push_back(s);
     } while (FindNextFileW(f, &fd));
     FindClose(f);
@@ -273,12 +275,12 @@ std::wstring title(const Save &s)
 std::wstring kind_name(Kind k, bool plural)
 {
     switch (k) {
-    case Kind::game: return L"Game data";
-    case Kind::setting: return plural ? L"Car settings" : L"Car setting";
-    case Kind::replay: return plural ? L"Replays" : L"Replay";
-    case Kind::bestLap: return plural ? L"Best lap replays" : L"Best lap replay";
-    case Kind::licence: return plural ? L"License replays" : L"License replay";
-    default: return plural ? L"Other saves" : L"Other save";
+    case Kind::game: return tr(L"Game data");
+    case Kind::setting: return plural ? tr(L"Car settings") : tr(L"Car setting");
+    case Kind::replay: return plural ? tr(L"Replays") : tr(L"Replay");
+    case Kind::bestLap: return plural ? tr(L"Best lap replays") : tr(L"Best lap replay");
+    case Kind::licence: return plural ? tr(L"License replays") : tr(L"License replay");
+    default: return plural ? tr(L"Other saves") : tr(L"Other save");
     }
 }
 
@@ -288,11 +290,11 @@ std::wstring game_summary(const Save &s)
         return std::wstring();
     static const wchar_t *const licences[] = {L"B", L"A", L"IB", L"IA", L"S", L"D"};   /* T069 g_002A4E08 */
     const uint32_t licence = field<uint32_t>(s.thumb, 0x14);
-    std::wstring t = L"Day " + number(field<int32_t>(s.thumb, 0x18)) + L", Cr. " +
-                     number(field<int64_t>(s.thumb, 0x08)) + L", " + number(field<int32_t>(s.thumb, 0x10)) +
-                     L" cars";
-    if (licence < 6)
-        t += std::wstring(L", license ") + licences[licence];
+    const std::wstring day = number(field<int32_t>(s.thumb, 0x18)), money = number(field<int64_t>(s.thumb, 0x08)),
+                       cars = number(field<int32_t>(s.thumb, 0x10));
+    std::wstring t = licence < 6 ? trf(L"Day %s, Cr. %s, %s cars, license %s", day.c_str(), money.c_str(), cars.c_str(),
+                                       licences[licence])
+                                 : trf(L"Day %s, Cr. %s, %s cars", day.c_str(), money.c_str(), cars.c_str());
     const int tenths = (int)(field<float>(s.thumb, 0x1C) * 10.0f);
     t += L", " + std::to_wstring(tenths / 10) + L"." + std::to_wstring(tenths % 10) + L" %";
     return t;
@@ -301,8 +303,10 @@ std::wstring game_summary(const Save &s)
 std::wstring details(const Save &s)
 {
     std::wstring t = title(s);
-    t += L"\r\n" + kind_name(s.kind) + (s.region.empty() ? L"" : L" (" + s.region + L")") + L", " + number(s.kb) +
-         L" KB, saved " + date_text(s.saved);
+    t += L"\r\n" + (s.region.empty() ? trf(L"%s, %s KB, saved %s", kind_name(s.kind).c_str(), number(s.kb).c_str(),
+                                           date_text(s.saved).c_str())
+                                     : trf(L"%s (%s), %s KB, saved %s", kind_name(s.kind).c_str(), tr(s.region.c_str()),
+                                           number(s.kb).c_str(), date_text(s.saved).c_str()));
     const std::vector<uint8_t> &th = s.thumb;
     if (!th.empty()) {
         const std::wstring comment = ascii_field(th, 0x28, 0x10), mode = ascii_field(th, 0x39, 0x18);
@@ -313,7 +317,7 @@ std::wstring details(const Save &s)
         case Kind::setting: {
             const float power = field<float>(th, 0x18);
             if (power > 0.0f)
-                t += L"\r\nPower " + number((long long)power) + L" PS";
+                t += L"\r\n" + trf(L"Power %s PS", number((long long)power).c_str());
             break;
         }
         case Kind::replay: {
@@ -321,11 +325,12 @@ std::wstring details(const Save &s)
             const int32_t time = field<int32_t>(th, 0x08), laps = field<int32_t>(th, 0x20);
             const float power = field<float>(th, 0x24);
             if (time > 0)
-                line += L"Time " + race_time((uint32_t)time);
+                line += trf(L"Time %s", race_time((uint32_t)time).c_str());
             if (laps > 0)
-                line += (line.empty() ? L"" : L", ") + number(laps) + (laps < 2 ? L" lap" : L" laps");
+                line += (line.empty() ? L"" : L", ") +
+                        (laps < 2 ? std::wstring(tr(L"1 lap")) : trf(L"%s laps", number(laps).c_str()));
             if (power > 0.0f)
-                line += (line.empty() ? L"" : L", ") + number((long long)power) + L" PS";
+                line += (line.empty() ? L"" : L", ") + trf(L"%s PS", number((long long)power).c_str());
             if (!line.empty())
                 t += L"\r\n" + line;
             break;
@@ -336,15 +341,15 @@ std::wstring details(const Save &s)
             if (field<int32_t>(th, 0x54) == 0x11) {     /* MC_CATEGORY_MAX_SPEED: a top speed (m/s) */
                 const float mps = field<float>(th, 0x08);
                 if (mps > 0.0f)
-                    line += L"Top speed " + fixed1(mps * 3.6) + L" km/h";
+                    line += trf(L"Top speed %s km/h", fixed1(mps * 3.6).c_str());
             } else if (field<int32_t>(th, 0x08) > 0) {
-                line += L"Time " + race_time((uint32_t)field<int32_t>(th, 0x08));
+                line += trf(L"Time %s", race_time((uint32_t)field<int32_t>(th, 0x08)).c_str());
             }
             const float power = field<float>(th, 0x20), mass = field<float>(th, 0x24);
             if (power > 0.0f)
-                line += (line.empty() ? L"" : L", ") + number((long long)power) + L" PS";
+                line += (line.empty() ? L"" : L", ") + trf(L"%s PS", number((long long)power).c_str());
             if (mass > 0.0f)
-                line += (line.empty() ? L"" : L", ") + number((long long)mass) + L" kg";
+                line += (line.empty() ? L"" : L", ") + trf(L"%s kg", number((long long)mass).c_str());
             if (!line.empty())
                 t += L"\r\n" + line;
             break;
@@ -353,11 +358,11 @@ std::wstring details(const Save &s)
             break;
         }
         if (!mode.empty())
-            t += L"\r\nMode: " + mode;
+            t += L"\r\n" + trf(L"Mode: %s", mode.c_str());
         if (!comment.empty())
-            t += L"\r\nComment: " + comment;
+            t += L"\r\n" + trf(L"Comment: %s", comment.c_str());
     }
-    t += L"\r\nFolder: " + s.dir;
+    t += L"\r\n" + trf(L"Folder: %s", s.dir.c_str());
     return t;
 }
 

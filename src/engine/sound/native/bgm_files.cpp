@@ -1,5 +1,6 @@
 /* bgm_files.cpp - the streamed music's files (see bgm_files.h). */
 #include "engine/sound/native/bgm_files.h"
+#include "platform/ui_text.h"                  /* PC (2026-11-16): N_ - the launcher's song manager shows the events */
 
 #include <algorithm>
 #include <cmath>
@@ -572,24 +573,26 @@ const char *ads_group_event(int g)
      * ("replay_theater": 0x1A), the license examination (0x1D..0x20; 0x20
      * also the time trial's disqualification), the demo (0x22); 0x1C has no
      * caller */
+    /* (PC 2026-11-16: marked for the interface's languages; the song manager
+     * shows them through tr) */
     static const char *const kEvents[ADS_GROUPS] = {
-        "Race start (10-second countdown)",
-        "Race finish",
-        "Race songs",
-        "Pre-race menu",
-        "Race results",
-        "Prize fanfare",
-        "Trophy won",
-        "Car won",
-        "Replay Theater",
-        "Race start (4-second countdown)",
-        "Not used by the game",
-        "License gold",
-        "License silver",
-        "License bronze",
-        "License failed / disqualified",
-        "License earned",
-        "Demo race",
+        N_("Race start (10-second countdown)"),
+        N_("Race finish"),
+        N_("Race songs"),
+        N_("Pre-race menu"),
+        N_("Race results"),
+        N_("Prize fanfare"),
+        N_("Trophy won"),
+        N_("Car won"),
+        N_("Replay Theater"),
+        N_("Race start (4-second countdown)"),
+        N_("Not used by the game"),
+        N_("License gold"),
+        N_("License silver"),
+        N_("License bronze"),
+        N_("License failed / disqualified"),
+        N_("License earned"),
+        N_("Demo race"),
     };
     return g >= 0 && g < ADS_GROUPS ? kEvents[g] : "";
 }

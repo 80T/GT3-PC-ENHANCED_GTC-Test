@@ -1,5 +1,6 @@
 /* input_map.cpp - the control mappings of GT3 PC (input_map.h). */
 #include "platform/input_map.h"
+#include "platform/ui_text.h"                  /* PC (2026-11-16): the interface's languages */
 
 #include <windows.h>
 
@@ -16,108 +17,111 @@ namespace {
 
 const char *const kSections[kProfileCount] = {"Controller1", "Controller2", "Wheel1",   "Wheel2",
                                               "DebugCamera", "HShifter1",   "HShifter2"};
-const char *const kNames[kProfileCount] = {"Controller 1", "Controller 2", "Wheel 1",   "Wheel 2",
-                                           "Debug camera", "H-Shifter 1",  "H-Shifter 2"};
+/* (PC 2026-11-16: the labels shown - not the ini names - marked N_, the
+ * interface's languages: translated where shown, describe's here, the
+ * launcher's and the settings menu's there) */
+const char *const kNames[kProfileCount] = {N_("Controller 1"), N_("Controller 2"), N_("Wheel 1"),   N_("Wheel 2"),
+                                           N_("Debug camera"), N_("H-Shifter 1"),  N_("H-Shifter 2")};
 
 const ControlInfo kPadControls[kPadControlCount] = {
-    {"Up", "D-pad up", ControlKind::button},
-    {"Down", "D-pad down", ControlKind::button},
-    {"Left", "D-pad left", ControlKind::button},
-    {"Right", "D-pad right", ControlKind::button},
-    {"Cross", "Cross", ControlKind::button},
-    {"Circle", "Circle", ControlKind::button},
-    {"Square", "Square", ControlKind::button},
-    {"Triangle", "Triangle", ControlKind::button},
+    {"Up", N_("D-pad up"), ControlKind::button},
+    {"Down", N_("D-pad down"), ControlKind::button},
+    {"Left", N_("D-pad left"), ControlKind::button},
+    {"Right", N_("D-pad right"), ControlKind::button},
+    {"Cross", N_("Cross"), ControlKind::button},
+    {"Circle", N_("Circle"), ControlKind::button},
+    {"Square", N_("Square"), ControlKind::button},
+    {"Triangle", N_("Triangle"), ControlKind::button},
     {"L1", "L1", ControlKind::button},
     {"R1", "R1", ControlKind::button},
     {"L2", "L2", ControlKind::button},
     {"R2", "R2", ControlKind::button},
-    {"L3", "L3 (left stick click)", ControlKind::button},
-    {"R3", "R3 (right stick click)", ControlKind::button},
-    {"Select", "Select", ControlKind::button},
-    {"Start", "Start", ControlKind::button},
-    {"LeftStickUp", "Left stick up", ControlKind::direction},
-    {"LeftStickDown", "Left stick down", ControlKind::direction},
-    {"LeftStickLeft", "Left stick left", ControlKind::direction},
-    {"LeftStickRight", "Left stick right", ControlKind::direction},
-    {"RightStickUp", "Right stick up", ControlKind::direction},
-    {"RightStickDown", "Right stick down", ControlKind::direction},
-    {"RightStickLeft", "Right stick left", ControlKind::direction},
-    {"RightStickRight", "Right stick right", ControlKind::direction},
-    {"Clutch", "Clutch", ControlKind::pedal},          /* PC (2026-11-09) */
-    {"CameraLeft", "Chase cam left", ControlKind::direction},
-    {"CameraRight", "Chase cam right", ControlKind::direction},
-    {"CameraUp", "Chase cam up", ControlKind::direction},
-    {"CameraDown", "Chase cam down", ControlKind::direction},
+    {"L3", N_("L3 (left stick click)"), ControlKind::button},
+    {"R3", N_("R3 (right stick click)"), ControlKind::button},
+    {"Select", N_("Select"), ControlKind::button},
+    {"Start", N_("Start"), ControlKind::button},
+    {"LeftStickUp", N_("Left stick up"), ControlKind::direction},
+    {"LeftStickDown", N_("Left stick down"), ControlKind::direction},
+    {"LeftStickLeft", N_("Left stick left"), ControlKind::direction},
+    {"LeftStickRight", N_("Left stick right"), ControlKind::direction},
+    {"RightStickUp", N_("Right stick up"), ControlKind::direction},
+    {"RightStickDown", N_("Right stick down"), ControlKind::direction},
+    {"RightStickLeft", N_("Right stick left"), ControlKind::direction},
+    {"RightStickRight", N_("Right stick right"), ControlKind::direction},
+    {"Clutch", N_("Clutch"), ControlKind::pedal},          /* PC (2026-11-09) */
+    {"CameraLeft", N_("Chase cam left"), ControlKind::direction},
+    {"CameraRight", N_("Chase cam right"), ControlKind::direction},
+    {"CameraUp", N_("Chase cam up"), ControlKind::direction},
+    {"CameraDown", N_("Chase cam down"), ControlKind::direction},
 };
 
 /* PC (2026-11-09): an H-Shifter's gates */
 const ControlInfo kHShifterControls[kHShifterControlCount] = {
-    {"Neutral", "Neutral", ControlKind::button}, {"Gear1", "1st", ControlKind::button},
-    {"Gear2", "2nd", ControlKind::button},       {"Gear3", "3rd", ControlKind::button},
-    {"Gear4", "4th", ControlKind::button},       {"Gear5", "5th", ControlKind::button},
-    {"Gear6", "6th", ControlKind::button},       {"Gear7", "7th", ControlKind::button},
-    {"Gear8", "8th", ControlKind::button},       {"Gear9", "9th", ControlKind::button},
-    {"Reverse", "Reverse", ControlKind::button},
+    {"Neutral", N_("Neutral"), ControlKind::button}, {"Gear1", N_("1st"), ControlKind::button},
+    {"Gear2", N_("2nd"), ControlKind::button},       {"Gear3", N_("3rd"), ControlKind::button},
+    {"Gear4", N_("4th"), ControlKind::button},       {"Gear5", N_("5th"), ControlKind::button},
+    {"Gear6", N_("6th"), ControlKind::button},       {"Gear7", N_("7th"), ControlKind::button},
+    {"Gear8", N_("8th"), ControlKind::button},       {"Gear9", N_("9th"), ControlKind::button},
+    {"Reverse", N_("Reverse"), ControlKind::button},
 };
 
 const ControlInfo kWheelControls[kWheelControlCount] = {
-    {"SteerLeft", "Steer left", ControlKind::direction},
-    {"SteerRight", "Steer right", ControlKind::direction},
-    {"Gas", "Gas pedal", ControlKind::pedal},
-    {"Brake", "Brake pedal", ControlKind::pedal},
-    {"Cross", "Cross", ControlKind::button},
-    {"Square", "Square", ControlKind::button},
-    {"Circle", "Circle", ControlKind::button},
-    {"Triangle", "Triangle", ControlKind::button},
+    {"SteerLeft", N_("Steer left"), ControlKind::direction},
+    {"SteerRight", N_("Steer right"), ControlKind::direction},
+    {"Gas", N_("Gas pedal"), ControlKind::pedal},
+    {"Brake", N_("Brake pedal"), ControlKind::pedal},
+    {"Cross", N_("Cross"), ControlKind::button},
+    {"Square", N_("Square"), ControlKind::button},
+    {"Circle", N_("Circle"), ControlKind::button},
+    {"Triangle", N_("Triangle"), ControlKind::button},
     {"R1", "R1", ControlKind::button},
     {"L1", "L1", ControlKind::button},
     {"R2", "R2", ControlKind::button},
     {"L2", "L2", ControlKind::button},
-    {"Select", "Select", ControlKind::button},
-    {"Start", "Start", ControlKind::button},
+    {"Select", N_("Select"), ControlKind::button},
+    {"Start", N_("Start"), ControlKind::button},
     {"R3", "R3", ControlKind::button},
     {"L3", "L3", ControlKind::button},
-    {"Up", "D-pad up", ControlKind::button},
-    {"Down", "D-pad down", ControlKind::button},
-    {"Left", "D-pad left", ControlKind::button},
-    {"Right", "D-pad right", ControlKind::button},
-    {"Clutch", "Clutch pedal", ControlKind::pedal},    /* PC (2026-11-09) */
-    {"CameraLeft", "Chase cam left", ControlKind::direction},
-    {"CameraRight", "Chase cam right", ControlKind::direction},
-    {"CameraUp", "Chase cam up", ControlKind::direction},
-    {"CameraDown", "Chase cam down", ControlKind::direction},
+    {"Up", N_("D-pad up"), ControlKind::button},
+    {"Down", N_("D-pad down"), ControlKind::button},
+    {"Left", N_("D-pad left"), ControlKind::button},
+    {"Right", N_("D-pad right"), ControlKind::button},
+    {"Clutch", N_("Clutch pedal"), ControlKind::pedal},    /* PC (2026-11-09) */
+    {"CameraLeft", N_("Chase cam left"), ControlKind::direction},
+    {"CameraRight", N_("Chase cam right"), ControlKind::direction},
+    {"CameraUp", N_("Chase cam up"), ControlKind::direction},
+    {"CameraDown", N_("Chase cam down"), ControlKind::direction},
 };
 
 const ControlInfo kDebugControls[kDebugControlCount] = {
-    {"Forward", "Move forward", ControlKind::direction},
-    {"Back", "Move back", ControlKind::direction},
-    {"Left", "Move left", ControlKind::direction},
-    {"Right", "Move right", ControlKind::direction},
-    {"Up", "Move up", ControlKind::direction},
-    {"Down", "Move down", ControlKind::direction},
-    {"LookUp", "Look up", ControlKind::direction},
-    {"LookDown", "Look down", ControlKind::direction},
-    {"LookLeft", "Look left", ControlKind::direction},
-    {"LookRight", "Look right", ControlKind::direction},
-    {"Faster", "Move speed up", ControlKind::button},
-    {"Slower", "Move speed down", ControlKind::button},
-    {"FovUp", "Field of view up", ControlKind::button},
-    {"FovDown", "Field of view down", ControlKind::button},
-    {"Lock", "Lock camera (drive)", ControlKind::button},
-    {"YAxisLook", "Y-axis look", ControlKind::button},
-    {"GroundCollision", "Ground collision", ControlKind::button},
+    {"Forward", N_("Move forward"), ControlKind::direction},
+    {"Back", N_("Move back"), ControlKind::direction},
+    {"Left", N_("Move left"), ControlKind::direction},
+    {"Right", N_("Move right"), ControlKind::direction},
+    {"Up", N_("Move up"), ControlKind::direction},
+    {"Down", N_("Move down"), ControlKind::direction},
+    {"LookUp", N_("Look up"), ControlKind::direction},
+    {"LookDown", N_("Look down"), ControlKind::direction},
+    {"LookLeft", N_("Look left"), ControlKind::direction},
+    {"LookRight", N_("Look right"), ControlKind::direction},
+    {"Faster", N_("Move speed up"), ControlKind::button},
+    {"Slower", N_("Move speed down"), ControlKind::button},
+    {"FovUp", N_("Field of view up"), ControlKind::button},
+    {"FovDown", N_("Field of view down"), ControlKind::button},
+    {"Lock", N_("Lock camera (drive)"), ControlKind::button},
+    {"YAxisLook", N_("Y-axis look"), ControlKind::button},
+    {"GroundCollision", N_("Ground collision"), ControlKind::button},
 };
 
 /* (a controller's fourth not used: deadzone_count) */
 const char *const kPadDeadzoneKeys[kDeadzones] = {"LeftStickDeadzone", "RightStickDeadzone", "TriggerDeadzone", ""};
-const char *const kPadDeadzoneNames[kDeadzones] = {"Left stick dead zone", "Right stick dead zone",
-                                                   "Trigger dead zone", ""};
+const char *const kPadDeadzoneNames[kDeadzones] = {N_("Left stick dead zone"), N_("Right stick dead zone"),
+                                                   N_("Trigger dead zone"), ""};
 /* PC (2026-11-10, user: "Add a clutch pedal deadzone for the wheels") */
 const char *const kWheelDeadzoneKeys[kDeadzones] = {"SteeringDeadzone", "GasDeadzone", "BrakeDeadzone",
                                                     "ClutchDeadzone"};
-const char *const kWheelDeadzoneNames[kDeadzones] = {"Steering dead zone", "Gas pedal dead zone",
-                                                     "Brake pedal dead zone", "Clutch pedal dead zone"};
+const char *const kWheelDeadzoneNames[kDeadzones] = {N_("Steering dead zone"), N_("Gas pedal dead zone"),
+                                                     N_("Brake pedal dead zone"), N_("Clutch pedal dead zone")};
 
 /* SDL3's gamepad buttons and axes: the ini names (SDL_GetGamepadStringForButton's)
  * and the labels. */
@@ -126,19 +130,22 @@ const char *const kPadButtonNames[kPadButtons] = {
     "rightshoulder", "dpup", "dpdown", "dpleft", "dpright", "misc1", "paddle1", "paddle2", "paddle3", "paddle4",
     "touchpad", "misc2", "misc3", "misc4", "misc5", "misc6"};
 const char *const kPadButtonLabels[kPadButtons] = {
-    "South (A / Cross)", "East (B / Circle)", "West (X / Square)", "North (Y / Triangle)", "Back / Share",
-    "Guide", "Start / Options", "Left stick click", "Right stick click", "Left shoulder (LB / L1)",
-    "Right shoulder (RB / R1)", "D-pad up", "D-pad down", "D-pad left", "D-pad right", "Misc (Share / Mic)",
-    "Right paddle 1", "Left paddle 1", "Right paddle 2", "Left paddle 2", "Touchpad", "Misc 2", "Misc 3",
-    "Misc 4", "Misc 5", "Misc 6"};
+    N_("South (A / Cross)"), N_("East (B / Circle)"), N_("West (X / Square)"), N_("North (Y / Triangle)"),
+    N_("Back / Share"), N_("Guide"), N_("Start / Options"), N_("Left stick click"), N_("Right stick click"),
+    N_("Left shoulder (LB / L1)"), N_("Right shoulder (RB / R1)"), N_("D-pad up"), N_("D-pad down"),
+    N_("D-pad left"), N_("D-pad right"), N_("Misc (Share / Mic)"), N_("Right paddle 1"), N_("Left paddle 1"),
+    N_("Right paddle 2"), N_("Left paddle 2"), N_("Touchpad"), N_("Misc 2"), N_("Misc 3"), N_("Misc 4"),
+    N_("Misc 5"), N_("Misc 6")};
 const char *const kPadAxisNames[kPadAxes] = {"leftx", "lefty", "rightx", "righty", "lefttrigger", "righttrigger"};
 /* [axis][0 the - half, 1 the + half] */
 const char *const kPadAxisLabels[kPadAxes][2] = {
-    {"Left stick left", "Left stick right"},   {"Left stick up", "Left stick down"},
-    {"Right stick left", "Right stick right"}, {"Right stick up", "Right stick down"},
-    {"Left trigger -", "Left trigger (LT / L2)"}, {"Right trigger -", "Right trigger (RT / R2)"}};
+    {N_("Left stick left"), N_("Left stick right")},   {N_("Left stick up"), N_("Left stick down")},
+    {N_("Right stick left"), N_("Right stick right")}, {N_("Right stick up"), N_("Right stick down")},
+    {N_("Left trigger -"), N_("Left trigger (LT / L2)")}, {N_("Right trigger -"), N_("Right trigger (RT / R2)")}};
 
-const char *const kHatNames[4] = {"up", "right", "down", "left"};      /* SDL_HAT_* bits 0..3 */
+const char *const kHatNames[4] = {"up", "right", "down", "left"};      /* SDL_HAT_* bits 0..3 (the ini's) */
+/* (PC 2026-11-16: describe's, one string each - the ini's names above stay) */
+const char *const kHatLabels[4] = {N_("Hat %d up"), N_("Hat %d right"), N_("Hat %d down"), N_("Hat %d left")};
 
 struct KeyName {
     uint8_t vk;
@@ -165,7 +172,8 @@ const KeyName kKeyNames[] = {
 const KeyName kMouseNames[] = {
     {VK_LBUTTON, "left"}, {VK_RBUTTON, "right"}, {VK_MBUTTON, "middle"}, {VK_XBUTTON1, "x1"}, {VK_XBUTTON2, "x2"},
 };
-const char *const kMouseLabels[] = {"Mouse left", "Mouse right", "Mouse middle", "Mouse X1", "Mouse X2"};
+const char *const kMouseLabels[] = {N_("Mouse left"), N_("Mouse right"), N_("Mouse middle"), N_("Mouse X1"),
+                                    N_("Mouse X2")};
 
 int mouse_index(int vk)
 {
@@ -336,34 +344,34 @@ struct HotkeyInfo {
 /* (the gamepad buttons, SDL's: Select, D-pad up / down) */
 enum { kPadBack = 4, kPadUp = 11, kPadDown = 12 };
 const HotkeyInfo kHotkeys[kHotkeyCount] = {
-    {"SettingsMenu", "Settings menu", {VK_F2}, {}},
-    {"SystemMenu", "Esc menu", {VK_ESCAPE}, {}},
-    {"FrameMonitor", "Frame time monitor", {VK_F3}, {}},
-    {"Fullscreen", "Windowed / full screen", {VK_RETURN, false, true, false}, {}},
-    {"Pause", "Pause / next tick", {VK_F5}, {}},
-    {"Resume", "Resume", {VK_F6}, {}},
-    {"FlickerCapture", "Flicker capture (debug)", {VK_F8}, {}},
-    {"Trace", "Draw trace (debug)", {VK_F9}, {}},
-    {"DebugCamera", "Debug camera (in a race)", {VK_F7}, {}},
-    {"SongMenu", "Song changer (in a race)", {'M'}, pad_button(kPadBack)},
-    {"PreviousSong", "Previous song (song changer)", {VK_OEM_COMMA}, pad_button(kPadUp)},
-    {"NextSong", "Next song (song changer)", {VK_OEM_PERIOD}, pad_button(kPadDown)},
-    {"FrameCapture", "Frame capture (debug)", {VK_F11}, {}},  /* PC (2026-11-06): pgl_capture.h */
+    {"SettingsMenu", N_("Settings menu"), {VK_F2}, {}},
+    {"SystemMenu", N_("Esc menu"), {VK_ESCAPE}, {}},
+    {"FrameMonitor", N_("Frame time monitor"), {VK_F3}, {}},
+    {"Fullscreen", N_("Windowed / full screen"), {VK_RETURN, false, true, false}, {}},
+    {"Pause", N_("Pause / next tick"), {VK_F5}, {}},
+    {"Resume", N_("Resume"), {VK_F6}, {}},
+    {"FlickerCapture", N_("Flicker capture (debug)"), {VK_F8}, {}},
+    {"Trace", N_("Draw trace (debug)"), {VK_F9}, {}},
+    {"DebugCamera", N_("Debug camera (in a race)"), {VK_F7}, {}},
+    {"SongMenu", N_("Song changer (in a race)"), {'M'}, pad_button(kPadBack)},
+    {"PreviousSong", N_("Previous song (song changer)"), {VK_OEM_COMMA}, pad_button(kPadUp)},
+    {"NextSong", N_("Next song (song changer)"), {VK_OEM_PERIOD}, pad_button(kPadDown)},
+    {"FrameCapture", N_("Frame capture (debug)"), {VK_F11}, {}},  /* PC (2026-11-06): pgl_capture.h */
     /* PC (2026-11-08): the cockpit camera's calibration (cockpit_osd.h): the
      * arrows (user: "Arrow keys are good"), shared with the D-pad's keys
      * since they act only while it is on; no device by default, as the user
      * asked of the hotkeys */
-    {"CalibrationUp", "Calibration: previous axis", {VK_UP}, {}, true},
-    {"CalibrationDown", "Calibration: next axis", {VK_DOWN}, {}, true},
-    {"CalibrationLeft", "Calibration: step down", {VK_LEFT}, {}, true},
-    {"CalibrationRight", "Calibration: step up", {VK_RIGHT}, {}, true},
-    {"CalibrationSave", "Calibration: save", {VK_F4}, {}, true},
-    {"CalibrationCancel", "Calibration: cancel", {VK_DELETE}, {}, true},
-    {"CalibrationReset", "Calibration: axis to 0", {'0'}, {}, true},
-    {"TextureMenu", "Texture replacement menu", {VK_F10}, {}},     /* PC (2026-11-13): texture_menu.h */
-    {"TextureRefresh", "Refresh replacement textures", {VK_F10, true, false, false}, {}},
-    {"TextureToggle", "Replacement textures on / off", {VK_F12}, {}},
-    {"Screenshot", "Screenshot", {VK_F1}, {}},                      /* PC (2026-11-15): screenshot.h */
+    {"CalibrationUp", N_("Calibration: previous axis"), {VK_UP}, {}, true},
+    {"CalibrationDown", N_("Calibration: next axis"), {VK_DOWN}, {}, true},
+    {"CalibrationLeft", N_("Calibration: step down"), {VK_LEFT}, {}, true},
+    {"CalibrationRight", N_("Calibration: step up"), {VK_RIGHT}, {}, true},
+    {"CalibrationSave", N_("Calibration: save"), {VK_F4}, {}, true},
+    {"CalibrationCancel", N_("Calibration: cancel"), {VK_DELETE}, {}, true},
+    {"CalibrationReset", N_("Calibration: axis to 0"), {'0'}, {}, true},
+    {"TextureMenu", N_("Texture replacement menu"), {VK_F10}, {}},     /* PC (2026-11-13): texture_menu.h */
+    {"TextureRefresh", N_("Refresh replacement textures"), {VK_F10, true, false, false}, {}},
+    {"TextureToggle", N_("Replacement textures on / off"), {VK_F12}, {}},
+    {"Screenshot", N_("Screenshot"), {VK_F1}, {}},                      /* PC (2026-11-15): screenshot.h */
 };
 KeyCombo g_hotkeys[kHotkeyCount];
 Binding g_hotDevices[kHotkeyCount];         /* PC: the hotkeys' devices */
@@ -629,36 +637,37 @@ bool parse(const char *text, Binding *out)
     return true;
 }
 
-/* The binding's label without its device. */
+/* The binding's label without its device (PC 2026-11-16: in the
+ * interface's language, platform/ui_text.h - shown only, never read back). */
 static void describe_input(const Binding &b, char *out, size_t n)
 {
     switch (b.source) {
     case Source::pad_button:
-        snprintf(out, n, "%s", b.index < kPadButtons ? kPadButtonLabels[b.index] : "?");
+        snprintf(out, n, "%s", b.index < kPadButtons ? tr(kPadButtonLabels[b.index]) : "?");
         return;
     case Source::pad_axis:
-        snprintf(out, n, "%s", b.index < kPadAxes ? kPadAxisLabels[b.index][b.dir > 0 ? 1 : 0] : "?");
+        snprintf(out, n, "%s", b.index < kPadAxes ? tr(kPadAxisLabels[b.index][b.dir > 0 ? 1 : 0]) : "?");
         return;
     case Source::joy_button:
-        snprintf(out, n, "Button %d", b.index);
+        snprintf(out, n, tr("Button %d"), b.index);
         return;
     case Source::joy_axis:
         if (b.dir == 2 || b.dir == -2)
-            snprintf(out, n, "Axis %d (whole, at rest %s)", b.index, b.dir > 0 ? "-" : "+");
+            snprintf(out, n, tr("Axis %d (whole, at rest %s)"), b.index, b.dir > 0 ? "-" : "+");
         else
-            snprintf(out, n, "Axis %d %c", b.index, b.dir < 0 ? '-' : '+');
+            snprintf(out, n, tr("Axis %d %c"), b.index, b.dir < 0 ? '-' : '+');
         return;
     case Source::joy_hat:
         for (int i = 0; i < 4; i++)
             if (b.dir == (1 << i)) {
-                snprintf(out, n, "Hat %d %s", b.index, kHatNames[i]);
+                snprintf(out, n, tr(kHatLabels[i]), b.index);
                 return;
             }
         break;
     case Source::key: {
         const int m = mouse_index(b.index);
         if (m >= 0) {
-            snprintf(out, n, "%s", kMouseLabels[m]);
+            snprintf(out, n, "%s", tr(kMouseLabels[m]));
             return;
         }
         /* the key's name in the keyboard's layout (extended keys: bit 24) */
@@ -680,10 +689,12 @@ static void describe_input(const Binding &b, char *out, size_t n)
         return;
     }
     case Source::mouse_wheel:
-        snprintf(out, n, "%s", b.dir > 0 ? "Mouse wheel up" : "Mouse wheel down");
+        snprintf(out, n, "%s", b.dir > 0 ? tr("Mouse wheel up") : tr("Mouse wheel down"));
         return;
-    case Source::mouse_motion:
-        snprintf(out, n, "Mouse move %s", b.index == 0 ? (b.dir < 0 ? "left" : "right") : (b.dir < 0 ? "up" : "down"));
+    case Source::mouse_motion:                  /* (PC 2026-11-16: a whole string each way) */
+        snprintf(out, n, "%s",
+                 b.index == 0 ? (b.dir < 0 ? tr("Mouse move left") : tr("Mouse move right"))
+                              : (b.dir < 0 ? tr("Mouse move up") : tr("Mouse move down")));
         return;
     case Source::none:
         break;
@@ -695,9 +706,11 @@ static void describe_input(const Binding &b, char *out, size_t n)
 void describe(const Binding &b, char *out, size_t n)
 {
     describe_input(b, out, n);
-    const size_t len = n > 0 ? strlen(out) : 0;
-    if (b.device != 0 && len > 0 && len < n)
-        snprintf(out + len, n - len, " on %s", device_name(b.device));
+    /* (PC 2026-11-16: "<input> on <device>" one string, translated) */
+    if (b.device != 0 && n > 0 && out[0] != '\0') {
+        const std::string input = out;
+        snprintf(out, n, tr("%s on %s"), input.c_str(), device_name(b.device));
+    }
 }
 
 bool capture_axis(bool joyAxis, int axis, int rest, int now, Binding *out)

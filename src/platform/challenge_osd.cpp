@@ -3,6 +3,7 @@
 #include "platform/challenge_osd.h"
 #include "platform/overlay.h"
 #include "platform/settings.h"
+#include "platform/ui_text.h"                  /* PC (2026-11-16): the interface's languages */
 
 #include <algorithm>
 #include <atomic>
@@ -12,7 +13,7 @@
 namespace challenge_osd {
 namespace {
 
-const char *const kNames[settings::kChallengeCount] = {"MONEY DECAY", "CAR DECAY", "COURSE SHRINKAGE"};
+const char *const kNames[settings::kChallengeCount] = {N_("MONEY DECAY"), N_("CAR DECAY"), N_("COURSE SHRINKAGE")};
 
 std::mutex g_lock;
 std::string g_title;                                            /* (under g_lock) */
@@ -64,11 +65,11 @@ void present(ID3D11RenderTargetView *bb)
     int n = 0;
     {
         std::lock_guard<std::mutex> hold(g_lock);
-        lines[n++] = {g_title.empty() ? std::string("CHALLENGE MODES") : g_title, title, false};
+        lines[n++] = {g_title.empty() ? std::string(tr("CHALLENGE MODES")) : g_title, title, false};
         for (int c = 0; c < settings::kChallengeCount; c++) {
             if (!on[c])
                 continue;
-            lines[n++] = {std::string(kNames[c]) + " ACTIVE", amber, true};
+            lines[n++] = {trf("%s ACTIVE", tr(kNames[c])), amber, true};
             for (int i = 0; i < kStatusLines; i++)
                 if (!g_status[c][i].empty())
                     lines[n++] = {"  " + g_status[c][i], text, false};

@@ -10,6 +10,7 @@
 
 #include "engine/pgl/native/gs_imgs.h"
 #include "platform/png_image.h"
+#include "platform/ui_text.h"  /* PC (2026-11-16): the interface's languages */
 
 #include <windows.h>
 
@@ -205,7 +206,7 @@ bool convert_pack(png_image::Session &png, const std::wstring &data, const std::
     const std::wstring pack = util::with_slash(data) + rel;
     std::vector<uint8_t> bytes;
     if (!read_file(pack, &bytes)) {
-        *why = L"it could not be read";
+        *why = tr(L"it could not be read");
         return false;
     }
     std::vector<gstex::ImgsImage> images;
@@ -216,22 +217,22 @@ bool convert_pack(png_image::Session &png, const std::wstring &data, const std::
     }
     for (size_t i = 0; i < images.size(); i++) {
         if (!plain_name(images[i].name)) {
-            *why = L"the image name \"" + util::widen(images[i].name) + L"\" is no file's name";
+            *why = trf(L"the image name \"%s\" is no file's name", util::widen(images[i].name).c_str());
             return false;
         }
         for (size_t j = 0; j < i; j++)
             if (same_ignoring_case(images[i].name, images[j].name)) {
-                *why = L"two images are named " + util::widen(images[i].name) + L" (but for their case)";
+                *why = trf(L"two images are named %s (but for their case)", util::widen(images[i].name).c_str());
                 return false;
             }
     }
     const std::wstring folder = pack.substr(0, pack.size() - 5);
     if (is_file(folder)) {
-        *why = L"a file has the folder's name";
+        *why = tr(L"a file has the folder's name");
         return false;
     }
     if (!util::make_folders(folder)) {
-        *why = L"the folder could not be created: " + util::system_error_text(GetLastError());
+        *why = trf(L"the folder could not be created: %s", util::system_error_text(GetLastError()).c_str());
         return false;
     }
     /* each picture written and read back (kept for the pack below) */
@@ -248,13 +249,13 @@ bool convert_pack(png_image::Session &png, const std::wstring &data, const std::
         gstex::ImgsImage back;
         std::vector<uint8_t> raw;
         if (!png.encode_file(file, pixels.data(), (int)img.w, (int)img.h, 1.0, true)) {
-            *why = util::widen(img.name) + L".png could not be written";
+            *why = trf(L"%s.png could not be written", util::widen(img.name).c_str());
             return false;
         }
         if (!read_png(png, file, img.name, &back, &raw) || raw != pixels || back.w != img.w || back.h != img.h ||
             back.rgba != img.rgba) {
             DeleteFileW(file.c_str());
-            *why = util::widen(img.name) + L".png does not read back the same";
+            *why = trf(L"%s.png does not read back the same", util::widen(img.name).c_str());
             return false;
         }
         fresh[i] = true;
@@ -291,7 +292,7 @@ bool convert_pack(png_image::Session &png, const std::wstring &data, const std::
                     gstex::ImgsImage img;
                     if (!read_png(png, util::with_slash(folder) + fd.cFileName, stem, &img, nullptr)) {
                         FindClose(f);
-                        *why = std::wstring(fd.cFileName) + L" is not a PNG the game can read";
+                        *why = trf(L"%s is not a PNG the game can read", fd.cFileName);
                         return false;
                     }
                     folderImages.push_back(std::move(img));
@@ -310,7 +311,7 @@ bool convert_pack(png_image::Session &png, const std::wstring &data, const std::
     std::vector<uint8_t> built;
     std::vector<gstex::ImgsImage> back;
     if (!gstex::imgs_build(folderImages, built, &err) || !gstex::imgs_read(built.data(), built.size(), back, &err)) {
-        *why = L"the game's pack from the folder: " + util::widen(err);
+        *why = trf(L"the game's pack from the folder: %s", util::widen(err).c_str());
         return false;
     }
     for (size_t i = 0; i < images.size(); i++) {
@@ -319,26 +320,26 @@ bool convert_pack(png_image::Session &png, const std::wstring &data, const std::
             if (same_ignoring_case(x.name, images[i].name))
                 b = &x;
         if (b == nullptr) {
-            *why = util::widen(images[i].name) + L" is missing from the game's pack";
+            *why = trf(L"%s is missing from the game's pack", util::widen(images[i].name).c_str());
             return false;
         }
         if (fresh[i] && (b->w != images[i].w || b->h != images[i].h || b->rgba != images[i].rgba)) {
-            *why = util::widen(images[i].name) + L" differs in the game's pack";
+            *why = trf(L"%s differs in the game's pack", util::widen(images[i].name).c_str());
             return false;
         }
         if (b->drawW != images[i].w || b->drawH != images[i].h) {
-            *why = util::widen(images[i].name) + L"'s draw size differs in the game's pack";
+            *why = trf(L"%s's draw size differs in the game's pack", util::widen(images[i].name).c_str());
             return false;
         }
     }
     /* the pictures' draw sizes, the pack's own (one there - edited - kept) */
     const std::wstring sizes = util::with_slash(folder) + util::widen(gstex::kImgsSizesFile);
     if (!is_file(sizes) && !write_text(sizes, gstex::imgs_sizes_text(images))) {
-        *why = util::widen(gstex::kImgsSizesFile) + L" could not be written";
+        *why = trf(L"%s could not be written", util::widen(gstex::kImgsSizesFile).c_str());
         return false;
     }
     if (!DeleteFileW(pack.c_str())) {
-        *why = L"it could not be deleted: " + util::system_error_text(GetLastError());
+        *why = trf(L"it could not be deleted: %s", util::system_error_text(GetLastError()).c_str());
         return false;
     }
     return true;
@@ -451,12 +452,12 @@ bool write_sizes(const std::wstring &data, std::wstring *message)
                 }
             }
         } else {
-            sourceNote = L" (the disc image it was installed from, " + source + L", could not be read)";
+            sourceNote = L" " + trf(L"(the disc image it was installed from, %s, could not be read)", source.c_str());
         }
         if (vol != INVALID_HANDLE_VALUE)
             CloseHandle(vol);
     } else {
-        sourceNote = L" (its install does not name the disc image it came from)";
+        sourceNote = std::wstring(L" ") + tr(L"(its install does not name the disc image it came from)");
     }
     /* the rest: the pictures' sizes as they are */
     for (const std::wstring &rel : folders) {
@@ -485,14 +486,21 @@ bool write_sizes(const std::wstring &data, std::wstring *message)
             fromPictures++;
     }
     if (fromDisc != 0)
-        *message = L"The HUD pictures' sizes (<pack>\\sizes.txt: a picture of another size is drawn at it) read "
-                   L"from the disc image for " +
-                   std::to_wstring(fromDisc) + (fromDisc == 1 ? L" pack folder" : L" pack folders") + L".";
+        *message = fromDisc == 1
+                       ? trf(L"The HUD pictures' sizes (<pack>\\sizes.txt: a picture of another size is drawn at it) read "
+                             L"from the disc image for %d pack folder.", fromDisc)
+                       : trf(L"The HUD pictures' sizes (<pack>\\sizes.txt: a picture of another size is drawn at it) read "
+                             L"from the disc image for %d pack folders.", fromDisc);
+    /* (sourceNote: a note in parentheses after "now", or "") */
     if (fromPictures != 0)
-        *message += (message->empty() ? L"" : L" ") + std::wstring(L"For ") + std::to_wstring(fromPictures) +
-                    (fromPictures == 1 ? L" pack folder" : L" pack folders") +
-                    L" the sizes are the pictures' as they are now" + sourceNote +
-                    L": a picture already resized needs its line in sizes.txt set to the original's.";
+        *message += (message->empty() ? L"" : L" ") +
+                    (fromPictures == 1
+                         ? trf(L"For %d pack folder the sizes are the pictures' as they are now%s: a picture already "
+                               L"resized needs its line in sizes.txt set to the original's.",
+                               fromPictures, sourceNote.c_str())
+                         : trf(L"For %d pack folders the sizes are the pictures' as they are now%s: a picture already "
+                               L"resized needs its line in sizes.txt set to the original's.",
+                               fromPictures, sourceNote.c_str()));
     return fromPictures == 0;
 }
 
@@ -532,18 +540,25 @@ bool convert(const std::wstring &data, std::wstring *message)
         if (results[i].ok)
             done++;
         else
-            problems += L"\n        " + packs[i] + L": " + results[i].why + L"; it is kept";
+            problems += L"\n        " + trf(L"%s: %s; it is kept", packs[i].c_str(), results[i].why.c_str());
     }
     if (done != 0) {
-        *message = L"Image packs written as folders of PNG files (<pack>\\<image>.png): " + std::to_wstring(done) +
-                   (done == 1 ? L" pack, " : L" packs, ") + std::to_wstring(written) +
-                   (written == 1 ? L" picture" : L" pictures");
+        /* (the counts: "1 pack", "3 packs"; "1 picture", "120 pictures") */
+        const std::wstring packsText = done == 1 ? trf(L"%d pack", done) : trf(L"%d packs", done);
+        const std::wstring picturesText = written == 1 ? trf(L"%d picture", written) : trf(L"%d pictures", written);
         if (kept != 0)
-            *message += L", " + std::to_wstring(kept) + L" already there kept";
-        *message += L"; the .imgs files deleted.";
+            *message = trf(L"Image packs written as folders of PNG files (<pack>\\<image>.png): %s, %s, %d already there "
+                           L"kept; the .imgs files deleted.",
+                           packsText.c_str(), picturesText.c_str(), kept);
+        else
+            *message = trf(L"Image packs written as folders of PNG files (<pack>\\<image>.png): %s, %s; the .imgs files "
+                           L"deleted.",
+                           packsText.c_str(), picturesText.c_str());
     }
     if (!problems.empty())
-        *message += (message->empty() ? L"Image packs left as they were:" : L" Left as they were:") + problems;
+        *message += (message->empty() ? std::wstring(tr(L"Image packs left as they were:"))
+                                      : std::wstring(L" ") + tr(L"Left as they were:")) +
+                    problems;
     return problems.empty();
 }
 

@@ -14,6 +14,7 @@
 #include "game/app/pc_sound.h"                  /* pc_sound_tick */
 #include "game/app/pc_units.h"                  /* pc_units_sync */
 #include "platform/frame_step.h"                /* the tick step (F5 / F6) */
+#include "platform/ui_text.h"                   /* PC (2026-11-16): the interface's languages */
 
 int g_pcTickFrame = 1;
 f32 g_pcViewLag = 0.0f;
@@ -148,9 +149,7 @@ void pc_replay_speed_buttons(int port, int slower, int faster)
         printf("frame: replay speed %.3f\n", kReplaySpeeds[step]);
     }
     /* (at the end of the range too: the press is answered) */
-    char text[32];
-    snprintf(text, sizeof(text), "REPLAY SPEED %s", kReplaySpeedNames[step]);
-    osd::show(text);
+    osd::show(trf("REPLAY SPEED %s", kReplaySpeedNames[step]).c_str());   /* (PC 2026-11-16: translated) */
 }
 
 int pc_frame_interpolating(void)
@@ -548,9 +547,9 @@ static void rows_to_quat(const f32 *m, f32 *q)
         for (int j = 0; j < 3; j++)
             r[i][j] = len > 0.0f ? m[4 * i + j] / len : 0.0f;
     }
-    f32 tr = r[0][0] + r[1][1] + r[2][2];
-    if (tr > 0.0f) {
-        f32 s = sqrtf(tr + 1.0f) * 2.0f;
+    f32 trace = r[0][0] + r[1][1] + r[2][2];   /* (PC 2026-11-16: `tr' before - ui_text.h's function) */
+    if (trace > 0.0f) {
+        f32 s = sqrtf(trace + 1.0f) * 2.0f;
         q[3] = 0.25f * s;
         q[0] = (r[2][1] - r[1][2]) / s;
         q[1] = (r[0][2] - r[2][0]) / s;

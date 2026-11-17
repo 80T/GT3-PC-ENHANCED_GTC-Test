@@ -1,5 +1,6 @@
 /* util.cpp - small helpers shared by the launcher's files (util.h). */
 #include "util.h"
+#include "platform/ui_text.h"                   /* PC (2026-11-16): the interface's languages */
 
 #include <windows.h>
 #include <shobjidl.h>
@@ -29,19 +30,18 @@ std::wstring system_error_text(unsigned long code)
     return s;
 }
 
+/* (PC 2026-11-16: the units in the interface's language - French Go / Mo / Ko;
+ * the command line mode sets none: English) */
 std::wstring format_size(uint64_t bytes)
 {
-    wchar_t buf[64];
     const double kb = 1024.0, mb = kb * 1024.0, gb = mb * 1024.0;
     if (bytes >= (uint64_t)gb)
-        swprintf(buf, 64, L"%.2f GB", bytes / gb);
-    else if (bytes >= (uint64_t)mb)
-        swprintf(buf, 64, L"%.0f MB", bytes / mb);
-    else if (bytes >= (uint64_t)kb)
-        swprintf(buf, 64, L"%.0f KB", bytes / kb);
-    else
-        swprintf(buf, 64, L"%u bytes", (unsigned)bytes);
-    return buf;
+        return trf(L"%.2f GB", bytes / gb);
+    if (bytes >= (uint64_t)mb)
+        return trf(L"%.0f MB", bytes / mb);
+    if (bytes >= (uint64_t)kb)
+        return trf(L"%.0f KB", bytes / kb);
+    return trf(L"%u bytes", (unsigned)bytes);
 }
 
 std::wstring exe_folder()

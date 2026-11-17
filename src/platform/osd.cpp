@@ -16,7 +16,7 @@ using Clock = std::chrono::steady_clock;
 constexpr auto kShownFor = std::chrono::seconds(2);
 
 std::mutex g_lock;
-char g_text[64];                        /* (under g_lock) */
+char g_text[256];                       /* (under g_lock; PC 2026-11-16: 64 before - UTF-8 translations) */
 /* It shows until then (Clock's ticks). */
 std::atomic<long long> g_shownUntil{0};
 

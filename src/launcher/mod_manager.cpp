@@ -3,6 +3,7 @@
 
 #include "mod_card.h"
 #include "util.h"
+#include "platform/ui_text.h"  /* PC (2026-11-16): the interface's languages */
 
 #include <commctrl.h>
 #include <shellapi.h>
@@ -198,9 +199,9 @@ std::wstring summary()
 {
     const long on = (long)std::count_if(g.mods.begin(), g.mods.end(), [](const Mod &m) { return m.on; });
     if (g.mods.empty())
-        return L"No mods installed. Select `Add folder` to add a mod";
-    return std::to_wstring(g.mods.size()) + (g.mods.size() == 1 ? L" folder, " : L" folders, ") + std::to_wstring(on) +
-           L" enabled.";
+        return tr(L"No mods installed. Select `Add folder` to add a mod");
+    return g.mods.size() == 1 ? trf(L"1 folder, %d enabled.", (int)on)
+                              : trf(L"%d folders, %d enabled.", (int)g.mods.size(), (int)on);
 }
 
 /* ---- the list ---- */
@@ -257,7 +258,7 @@ void show_details()
             load_image(L"", box, &g.pixels, &g.imageW, &g.imageH);
     }
     SetWindowTextW(g.title, in.title.c_str());
-    SetWindowTextW(g.authors, in.authors.empty() ? L"" : (L"By " + in.authors).c_str());
+    SetWindowTextW(g.authors, in.authors.empty() ? L"" : trf(L"By %s", in.authors.c_str()).c_str());
     SetWindowTextW(g.description, in.description.c_str());
     InvalidateRect(g.image, nullptr, FALSE);
 }
@@ -280,10 +281,10 @@ void fill(int keep)
         it.iItem = (int)i;
         it.pszText = const_cast<wchar_t *>(title.c_str());
         SendMessageW(g.list, LVM_INSERTITEMW, 0, (LPARAM)&it);
-        std::wstring files = L"not there";
+        std::wstring files = tr(L"not there");
         if (is_folder(m.folder)) {
             const long n = count_files(m.folder, 0);
-            files = n == 0 ? L"empty" : std::to_wstring(n) + (n == 1 ? L" file" : L" files");
+            files = n == 0 ? tr(L"empty") : n == 1 ? tr(L"1 file") : trf(L"%d files", (int)n);
         }
         set_cell((int)i, 1, m.folder);
         set_cell((int)i, 2, files);
@@ -324,17 +325,19 @@ bool usable(const std::wstring &folder)
 {
     if (!ini_can_keep(folder)) {
         MessageBoxW(g.wnd,
-                    (folder + L"\n\nThe folder's path has characters gt3pc.ini cannot keep. Rename it, or move it to "
-                              L"a folder with a plainer path.").c_str(),
-                    L"Mods", MB_OK | MB_ICONWARNING);
+                    (folder + L"\n\n" +
+                     tr(L"The folder's path has characters gt3pc.ini cannot keep. Rename it, or move it to "
+                        L"a folder with a plainer path.")).c_str(),
+                    tr(L"Mods"), MB_OK | MB_ICONWARNING);
         return false;
     }
     for (const std::wstring &d : g.data)
         if (within(folder, d) || within(d, folder)) {
             MessageBoxW(g.wnd,
-                        (folder + L"\n\nThis is the game's data folder, or holds or is inside one. Choose a folder of "
-                                  L"its own for the mod.").c_str(),
-                        L"Mods", MB_OK | MB_ICONWARNING);
+                        (folder + L"\n\n" +
+                         tr(L"This is the game's data folder, or holds or is inside one. Choose a folder of "
+                            L"its own for the mod.")).c_str(),
+                        tr(L"Mods"), MB_OK | MB_ICONWARNING);
             return false;
         }
     return true;
@@ -342,11 +345,12 @@ bool usable(const std::wstring &folder)
 
 void add_folder()
 {
-    const std::wstring folder = util::choose_folder(g.wnd, L"Choose a mod folder (laid out as the game's data folder)", L"Add");
+    const std::wstring folder =
+        util::choose_folder(g.wnd, tr(L"Choose a mod folder (laid out as the game's data folder)"), tr(L"Add"));
     if (folder.empty() || !usable(folder))
         return;
     put_first(folder);
-    set_status(L"Added at the top: its files win over the folders below it. " + summary());
+    set_status(std::wstring(tr(L"Added at the top: its files win over the folders below it.")) + L" " + summary());
 }
 
 void remove_folder()
@@ -357,7 +361,7 @@ void remove_folder()
     g.mods.erase(g.mods.begin() + i);
     save();
     fill(i);
-    set_status(L"Removed from the list (the folder and its files are kept). " + summary());
+    set_status(std::wstring(tr(L"Removed from the list (the folder and its files are kept).")) + L" " + summary());
 }
 
 void move(int delta)
@@ -379,7 +383,7 @@ void open_folder()
         return;
     const std::wstring &f = g.mods[(size_t)i].folder;
     if (!is_folder(f)) {
-        set_status(f + L" is not there.");
+        set_status(trf(L"%s is not there.", f.c_str()));
         return;
     }
     ShellExecuteW(g.wnd, L"open", f.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
@@ -391,12 +395,13 @@ void open_folder()
 void create_template()
 {
     if (g.data.empty()) {
-        MessageBoxW(g.wnd, L"No version is installed: install one first (Play tab).", L"Mods",
+        MessageBoxW(g.wnd, tr(L"No version is installed: install one first (Play tab)."), tr(L"Mods"),
                     MB_OK | MB_ICONINFORMATION);
         return;
     }
-    const std::wstring folder = util::choose_folder(g.wnd, L"Choose (or make, with New folder) the folder for the template",
-                                                    L"Create template", util::exe_folder());
+    const std::wstring folder =
+        util::choose_folder(g.wnd, tr(L"Choose (or make, with New folder) the folder for the template"),
+                            tr(L"Create template"), util::exe_folder());
     if (folder.empty() || !usable(folder))
         return;
     WIN32_FIND_DATAW fd;
@@ -411,9 +416,10 @@ void create_template()
     }
     if (!empty &&
         MessageBoxW(g.wnd,
-                    (folder + L"\n\nThis folder is not empty. Make the data folder's folders in it anyway? Nothing in "
-                              L"it is changed or deleted.").c_str(),
-                    L"Mods", MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) != IDYES)
+                    (folder + L"\n\n" +
+                     tr(L"This folder is not empty. Make the data folder's folders in it anyway? Nothing in "
+                        L"it is changed or deleted.")).c_str(),
+                    tr(L"Mods"), MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) != IDYES)
         return;
     SetCursor(LoadCursorW(nullptr, IDC_WAIT));
     int made = 0;
@@ -429,19 +435,21 @@ void create_template()
           write_new(util::with_slash(folder) + kImageFile, image, imageSize, &why));
     SetCursor(LoadCursorW(nullptr, IDC_ARROW));
     if (!ok) {
-        MessageBoxW(g.wnd, (L"The template could not be made: " + why + L".").c_str(), L"Mods",
+        MessageBoxW(g.wnd, trf(L"The template could not be made: %s.", why.c_str()).c_str(), tr(L"Mods"),
                     MB_OK | MB_ICONWARNING);
         if (made == 0)
             return;
     }
     put_first(folder);
-    set_status(L"Template made: " + std::to_wstring(made) + L" folders. Edit mod.txt and mod.png; add files where the "
-               L"game has its own.");
+    set_status(trf(L"Template made: %d folders. Edit mod.txt and mod.png; add files where the "
+                   L"game has its own.", made));
     if (ok)
         MessageBoxW(g.wnd,
-                    (L"Template made. Edit these two files to set the mod's title, author, description and picture:\n\n" +
-                     util::with_slash(folder) + kInfoFile + L"\n" + util::with_slash(folder) + kImageFile).c_str(),
-                    L"Mods", MB_OK | MB_ICONINFORMATION);
+                    (std::wstring(tr(L"Template made. Edit these two files to set the mod's title, author, description "
+                                     L"and picture:")) +
+                     L"\n\n" + util::with_slash(folder) + kInfoFile + L"\n" + util::with_slash(folder) + kImageFile)
+                        .c_str(),
+                    tr(L"Mods"), MB_OK | MB_ICONINFORMATION);
 }
 
 /* ---- the window ---- */
@@ -455,11 +463,11 @@ void columns()
     const struct {
         const wchar_t *name;
         int width;
-    } cols[] = {{L"Mod", title}, {L"Folder", folder}, {L"Files", files}};
+    } cols[] = {{N_(L"Mod"), title}, {N_(L"Folder"), folder}, {N_(L"Files"), files}};
     for (int i = 0; i < 3; i++) {
         LVCOLUMNW col = {};
         col.mask = LVCF_TEXT | LVCF_WIDTH;
-        col.pszText = const_cast<wchar_t *>(cols[i].name);
+        col.pszText = const_cast<wchar_t *>(tr(cols[i].name));
         col.cx = cols[i].width;
         if (SendMessageW(g.list, LVM_SETCOLUMNWIDTH, (WPARAM)i, (LPARAM)col.cx) == FALSE)
             SendMessageW(g.list, LVM_INSERTCOLUMNW, (WPARAM)i, (LPARAM)&col);
@@ -523,26 +531,26 @@ HWND make(const wchar_t *cls, const wchar_t *text, DWORD style, int id, DWORD ex
 void create_controls()
 {
     g.hint = make(WC_STATICW,
-                  L"Tip: A mod folder is laid out the same as the game's data folder and overrides the original files.\n"
-                  L"Top = 1st Priority",
+                  tr(L"Tip: A mod folder is laid out the same as the game's data folder and overrides the original files.\n"
+                     L"Top = 1st Priority"),
                   SS_LEFT | SS_NOPREFIX, IDC_HINT);
     g.list = make(WC_LISTVIEWW, L"", WS_TABSTOP | LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER,
                   IDC_LIST, WS_EX_CLIENTEDGE);
     SendMessageW(g.list, LVM_SETEXTENDEDLISTVIEWSTYLE, 0,
                  LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_CHECKBOXES);
-    g.add = make(WC_BUTTONW, L"&Add folder...", WS_TABSTOP | BS_PUSHBUTTON, IDC_ADD);
-    g.remove = make(WC_BUTTONW, L"&Remove", WS_TABSTOP | BS_PUSHBUTTON, IDC_REMOVE);
-    g.up = make(WC_BUTTONW, L"Move &up", WS_TABSTOP | BS_PUSHBUTTON, IDC_UP);
-    g.down = make(WC_BUTTONW, L"Move &down", WS_TABSTOP | BS_PUSHBUTTON, IDC_DOWN);
-    g.openFolder = make(WC_BUTTONW, L"&Open folder", WS_TABSTOP | BS_PUSHBUTTON, IDC_OPEN);
-    g.tmpl = make(WC_BUTTONW, L"Create &template...", WS_TABSTOP | BS_PUSHBUTTON, IDC_TEMPLATE);
+    g.add = make(WC_BUTTONW, tr(L"&Add folder..."), WS_TABSTOP | BS_PUSHBUTTON, IDC_ADD);
+    g.remove = make(WC_BUTTONW, tr(L"&Remove"), WS_TABSTOP | BS_PUSHBUTTON, IDC_REMOVE);
+    g.up = make(WC_BUTTONW, tr(L"Move &up"), WS_TABSTOP | BS_PUSHBUTTON, IDC_UP);
+    g.down = make(WC_BUTTONW, tr(L"Move &down"), WS_TABSTOP | BS_PUSHBUTTON, IDC_DOWN);
+    g.openFolder = make(WC_BUTTONW, tr(L"&Open folder"), WS_TABSTOP | BS_PUSHBUTTON, IDC_OPEN);
+    g.tmpl = make(WC_BUTTONW, tr(L"Create &template..."), WS_TABSTOP | BS_PUSHBUTTON, IDC_TEMPLATE);
     g.image = make(WC_STATICW, L"", SS_OWNERDRAW, IDC_IMAGE);
     g.title = make(WC_STATICW, L"", SS_LEFT | SS_NOPREFIX | SS_ENDELLIPSIS, IDC_TITLE);
     g.authors = make(WC_STATICW, L"", SS_LEFT | SS_NOPREFIX | SS_ENDELLIPSIS, IDC_AUTHORS);
     g.description = make(WC_EDITW, L"", WS_TABSTOP | WS_VSCROLL | ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL,
                          IDC_DESCRIPTION, WS_EX_CLIENTEDGE);
     g.status = make(WC_STATICW, L"", SS_LEFT | SS_NOPREFIX | SS_ENDELLIPSIS, IDC_STATUS);
-    g.close = make(WC_BUTTONW, L"Close", WS_TABSTOP | BS_PUSHBUTTON, IDCANCEL);
+    g.close = make(WC_BUTTONW, tr(L"Close"), WS_TABSTOP | BS_PUSHBUTTON, IDCANCEL);
 }
 
 LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
@@ -690,7 +698,7 @@ void open(HWND owner, const std::wstring &ini, const std::vector<std::wstring> &
     RECT o = {};
     GetWindowRect(owner, &o);
     const int ww = r.right - r.left, wh = r.bottom - r.top;
-    g.wnd = CreateWindowExW(ex, kClass, L"Mods", style, o.left + ((o.right - o.left) - ww) / 2,
+    g.wnd = CreateWindowExW(ex, kClass, tr(L"Mods"), style, o.left + ((o.right - o.left) - ww) / 2,
                             o.top + ((o.bottom - o.top) - wh) / 2, ww, wh, owner, nullptr, inst, nullptr);
     if (g.wnd == nullptr)
         return;

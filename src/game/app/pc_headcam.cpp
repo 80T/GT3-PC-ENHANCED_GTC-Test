@@ -13,6 +13,7 @@
 #include "engine/pgl/G001_flare.h"                  /* vifmodel_pc_hide */
 #include "platform/cockpit_osd.h"                   /* PC (2026-11-08): the calibration mode and its panel */
 #include "platform/settings.h"
+#include "platform/ui_text.h"                       /* PC (2026-11-16): the interface's languages */
 
 #include <math.h>
 #include <string.h>
@@ -327,27 +328,30 @@ int pc_headcam_calibrating(void)
 /* PC (2026-11-14): the panel's texts are the race's side's (cockpit_osd.h):
  * the title, the car and the cockpit, the four axes with their values - or,
  * out of the cockpit view, what to do. */
-static const char kCalibTitle[] = "COCKPIT CAMERA CALIBRATION";
+/* (PC 2026-11-16: the texts in the interface's language, platform/ui_text.h:
+ * translated at each frame - the F2 menu changes it at once) */
+static const char kCalibTitle[] = N_("COCKPIT CAMERA CALIBRATION");
 
 static int calibration_frame(const char *name, int slot, const f32 *values, const char *menuText)
 {
     if (name == NULL)
-        return cockpit_osd::race_frame(kCalibTitle, "SWITCH TO THE COCKPIT VIEW", NULL, 0);
-    static const char *const kNames[cockpit_osd::kAxisCount] = {"SIDE", "HEIGHT", "FORWARD", "TILT", "MENU MODEL"};
+        return cockpit_osd::race_frame(tr(kCalibTitle), tr("SWITCH TO THE COCKPIT VIEW"), NULL, 0);
+    static const char *const kNames[cockpit_osd::kAxisCount] = {N_("SIDE"), N_("HEIGHT"), N_("FORWARD"), N_("TILT"),
+                                                                N_("MENU MODEL")};
     cockpit_osd::Row rows[cockpit_osd::kAxisCount];
     memset(rows, 0, sizeof(rows));
     for (int a = 0; a < cockpit_osd::kAxisCount; a++) {
-        snprintf(rows[a].name, sizeof(rows[a].name), "%s", kNames[a]);
+        snprintf(rows[a].name, sizeof(rows[a].name), "%s", tr(kNames[a]));
         if (a == cockpit_osd::kAxisMenuModel)
-            snprintf(rows[a].value, sizeof(rows[a].value), "%7s", menuText);    /* PC (2026-11-15) */
+            snprintf(rows[a].value, sizeof(rows[a].value), "%7s", tr(menuText));    /* PC (2026-11-15) */
         else if (a == cockpit_osd::kAxisTilt)
-            snprintf(rows[a].value, sizeof(rows[a].value), "%+7.1f DEG", values[a]);
+            snprintf(rows[a].value, sizeof(rows[a].value), "%s", trf("%+7.1f DEG", values[a]).c_str());
         else
-            snprintf(rows[a].value, sizeof(rows[a].value), "%+7.3f M", values[a]);
+            snprintf(rows[a].value, sizeof(rows[a].value), "%s", trf("%+7.3f M", values[a]).c_str());
     }
-    char head[96];
-    snprintf(head, sizeof(head), "%s   COCKPIT%s", name, slot == 2 ? " 2" : "");
-    return cockpit_osd::race_frame(kCalibTitle, head, rows, cockpit_osd::kAxisCount);
+    char head[256];
+    snprintf(head, sizeof(head), "%s", trf("%s   COCKPIT%s", name, slot == 2 ? " 2" : "").c_str());
+    return cockpit_osd::race_frame(tr(kCalibTitle), head, rows, cockpit_osd::kAxisCount);
 }
 
 int pc_headcam_calibrate(const RaceEntryCar *car, int slot, int port, f32 stickX, f32 stickY)
@@ -416,7 +420,7 @@ int pc_headcam_calibrate(const RaceEntryCar *car, int slot, int port, f32 stickX
     const f32 values[cockpit_osd::kAxisCount] = {off[0], off[1], -off[2] + 0.0f, off[3], 0.0f};   /* (+ 0: no "-0.000") */
     /* (on, but the car has no menu model to draw: its file missing or without
      * a body - the race model stays) */
-    const char *menuText = *menu == 0 ? "OFF" : car->model.pcMenuState == 2 ? "ON (NOT FOUND)" : "ON";
+    const char *menuText = *menu == 0 ? N_("OFF") : car->model.pcMenuState == 2 ? N_("ON (NOT FOUND)") : N_("ON");
     switch (calibration_frame(s_calib.name, slot, values, menuText)) {
     case cockpit_osd::kSave:
         calibration_save();

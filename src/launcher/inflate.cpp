@@ -9,6 +9,8 @@
  * away. */
 #include "inflate.h"
 
+#include "platform/ui_text.h"  /* PC (2026-11-16): the interface's languages */
+
 #include <string.h>
 
 namespace inflate {
@@ -338,13 +340,13 @@ bool gunzip(const uint8_t *in, size_t size, std::vector<uint8_t> *out, std::wstr
     out->clear();
     /* the member header (RFC 1952 2.3) */
     if (size < 18 || in[0] != 0x1F || in[1] != 0x8B || in[2] != 8) {
-        *error = L"not a gzip member";
+        *error = tr(L"not a gzip member");
         return false;
     }
     const uint8_t flags = in[3];
     size_t pos = 10;
     if (flags & 4) {                        /* FEXTRA */
-        if (pos + 2 > size) { *error = L"truncated gzip header"; return false; }
+        if (pos + 2 > size) { *error = tr(L"truncated gzip header"); return false; }
         pos += 2 + (in[pos] | (in[pos + 1] << 8));
     }
     if (flags & 8)                          /* FNAME */
@@ -354,25 +356,25 @@ bool gunzip(const uint8_t *in, size_t size, std::vector<uint8_t> *out, std::wstr
     if (flags & 2)                          /* FHCRC */
         pos += 2;
     if (pos + 8 > size) {
-        *error = L"truncated gzip header";
+        *error = tr(L"truncated gzip header");
         return false;
     }
     const uint8_t *trailer = in + size - 8;
     const uint32_t wantCrc = trailer[0] | (trailer[1] << 8) | (trailer[2] << 16) | ((uint32_t)trailer[3] << 24);
     const uint32_t wantSize = trailer[4] | (trailer[5] << 8) | (trailer[6] << 16) | ((uint32_t)trailer[7] << 24);
     if (wantSize > kMaxSize) {
-        *error = L"the gzip member is too large";
+        *error = tr(L"the gzip member is too large");
         return false;
     }
     out->resize(wantSize);
     size_t n = 0;
     if (!blocks(in + pos, size - 8 - pos, out, &n)) {
-        *error = L"damaged deflate data";
+        *error = tr(L"damaged deflate data");
         out->clear();
         return false;
     }
     if (n != wantSize || crc32(0, out->data(), out->size()) != wantCrc) {
-        *error = L"the unpacked data does not match its gzip check";
+        *error = tr(L"the unpacked data does not match its gzip check");
         out->clear();
         return false;
     }

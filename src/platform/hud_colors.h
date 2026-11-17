@@ -5,6 +5,13 @@
 
 #include <stdint.h>
 
+/* PC (2026-11-16): the labels marked for the interface's languages
+ * (platform/ui_text.h's N_, the same definition: this header stays light
+ * for the game's HUD code) */
+#ifndef N_
+#define N_(s) s
+#endif
+
 enum HudColor {
     kHudText,
     kHudMessages,
@@ -40,25 +47,25 @@ struct HudColorInfo {
 };
 
 constexpr HudColorInfo kHudColors[kHudColorCount] = {
-    {"ColorText", L"ColorText", L"Text color", 0xD08018},
-    {"ColorMessages", L"ColorMessages", L"Messages color", 0xC0C0C0},
-    {"ColorWarnings", L"ColorWarnings", L"Warnings color", 0xF00000},
-    {"ColorEvents", L"ColorEvents", L"Event board color", 0x49CC2B},
-    {"ColorGapAhead", L"ColorGapAhead", L"Gap ahead color", 0x8080FF},
-    {"ColorGapBehind", L"ColorGapBehind", L"Gap behind color", 0xF00000},
-    {"ColorOdometer", L"ColorOdometer", L"Odometer color", 0x62C0C0},
-    {"ColorMeterDial", L"ColorMeterDial", L"Meter dial color", 0x88A0A0},
-    {"ColorMeterMarks", L"ColorMeterMarks", L"Meter marks color", 0x688080},
-    {"ColorMeterRed", L"ColorMeterRed", L"Red zone color", 0xF00000},
-    {"ColorNeedle", L"ColorNeedle", L"Needle color", 0xC00000},
-    {"ColorRevBar", L"ColorRevBar", L"Rev bar color", 0xFFFFFF},
-    {"ColorShiftLamp", L"ColorShiftLamp", L"Shift lamp color", 0xFF0000},
-    {"ColorVscLamp", L"ColorVscLamp", L"VSC lamp color", 0x49CC2B},
-    {"ColorTcsLamp", L"ColorTcsLamp", L"TCS lamp color", 0xFFB814},
-    {"ColorBrakeLamps", L"ColorBrakeLamps", L"Brake lamps color", 0xF00000},
-    {"ColorThrottleBar", L"ColorThrottleBar", L"Throttle bar color", 0x49CC2B},
-    {"ColorBrakeBar", L"ColorBrakeBar", L"Brake bar color", 0xF00000},
-    {"ColorMapShown", L"ColorMapShown", L"Map car color", 0x90FF00},
-    {"ColorMapOthers", L"ColorMapOthers", L"Map others color", 0xFFF800},
-    {"ColorPanels", L"ColorPanels", L"Back panels color", 0x000000},
+    {"ColorText", L"ColorText", N_(L"Text color"), 0xD08018},
+    {"ColorMessages", L"ColorMessages", N_(L"Messages color"), 0xC0C0C0},
+    {"ColorWarnings", L"ColorWarnings", N_(L"Warnings color"), 0xF00000},
+    {"ColorEvents", L"ColorEvents", N_(L"Event board color"), 0x49CC2B},
+    {"ColorGapAhead", L"ColorGapAhead", N_(L"Gap ahead color"), 0x8080FF},
+    {"ColorGapBehind", L"ColorGapBehind", N_(L"Gap behind color"), 0xF00000},
+    {"ColorOdometer", L"ColorOdometer", N_(L"Odometer color"), 0x62C0C0},
+    {"ColorMeterDial", L"ColorMeterDial", N_(L"Meter dial color"), 0x88A0A0},
+    {"ColorMeterMarks", L"ColorMeterMarks", N_(L"Meter marks color"), 0x688080},
+    {"ColorMeterRed", L"ColorMeterRed", N_(L"Red zone color"), 0xF00000},
+    {"ColorNeedle", L"ColorNeedle", N_(L"Needle color"), 0xC00000},
+    {"ColorRevBar", L"ColorRevBar", N_(L"Rev bar color"), 0xFFFFFF},
+    {"ColorShiftLamp", L"ColorShiftLamp", N_(L"Shift lamp color"), 0xFF0000},
+    {"ColorVscLamp", L"ColorVscLamp", N_(L"VSC lamp color"), 0x49CC2B},
+    {"ColorTcsLamp", L"ColorTcsLamp", N_(L"TCS lamp color"), 0xFFB814},
+    {"ColorBrakeLamps", L"ColorBrakeLamps", N_(L"Brake lamps color"), 0xF00000},
+    {"ColorThrottleBar", L"ColorThrottleBar", N_(L"Throttle bar color"), 0x49CC2B},
+    {"ColorBrakeBar", L"ColorBrakeBar", N_(L"Brake bar color"), 0xF00000},
+    {"ColorMapShown", L"ColorMapShown", N_(L"Map car color"), 0x90FF00},
+    {"ColorMapOthers", L"ColorMapOthers", N_(L"Map others color"), 0xFFF800},
+    {"ColorPanels", L"ColorPanels", N_(L"Back panels color"), 0x000000},
 };

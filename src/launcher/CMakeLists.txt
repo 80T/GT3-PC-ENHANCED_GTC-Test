@@ -79,6 +79,7 @@ add_executable(gt3launcher WIN32
     ${GT3PC_ROOT}/src/platform/gcf_tables.cpp
     ${GT3PC_ROOT}/src/platform/param_db.cpp
     ${GT3PC_ROOT}/src/platform/param_schema.cpp
+    ${GT3PC_ROOT}/src/platform/ui_text.cpp
     gt3launcher.rc
     gt3launcher.manifest
 )
@@ -108,6 +109,12 @@ if(GT3PC_DEMOS)
     target_sources(gt3launcher PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/demos.rc)
     set_property(SOURCE ${CMAKE_CURRENT_BINARY_DIR}/demos.rc APPEND PROPERTY OBJECT_DEPENDS ${GT3PC_DEMOS})
 endif()
+# PC (2026-11-16): the interface's languages, lang/*.po (src/platform/ui_text.h:
+# the launcher's and the game's panels' text)
+if(NOT COMMAND gt3pc_languages)
+    include(${GT3PC_ROOT}/cmake/languages.cmake)
+endif()
+gt3pc_languages(gt3launcher)
 # Small: no incremental-link padding, unreferenced code dropped (the .pdb
 # keeps the debug information).
 target_link_options(gt3launcher PRIVATE /INCREMENTAL:NO /OPT:REF /OPT:ICF)

@@ -4,6 +4,7 @@
 #include "platform/osd.h"
 #include "platform/overlay.h"
 #include "platform/settings.h"
+#include "platform/ui_text.h"                  /* PC (2026-11-16): the interface's languages */
 
 #include <windows.h>
 
@@ -58,10 +59,10 @@ const char *ask_refresh()
 {
     const Backend *b = g_backend.load();
     if (b == nullptr)
-        return "TEXTURES: NOT READY";
+        return tr("TEXTURES: NOT READY");
     if (!b->refresh())
-        return "TEXTURE REFRESH: TURN THE PRE-CACHE OFF FIRST";
-    return "TEXTURES: LOOKING FOR CHANGED FILES";
+        return tr("TEXTURE REFRESH: TURN THE PRE-CACHE OFF FIRST");
+    return tr("TEXTURES: LOOKING FOR CHANGED FILES");
 }
 
 /* The line's next (dir 1, 0) or previous (-1) value. */
@@ -89,7 +90,7 @@ void change(int line, int dir)
     case kCompress:
         settings::set_texture_compress(!settings::texture_compress());
         changed();
-        note("COMPRESSION: FOR THE FILES LOADED FROM NOW ON");
+        note(tr("COMPRESSION: FOR THE FILES LOADED FROM NOW ON"));
         break;
     case kRefresh:
         if (dir >= 0)
@@ -99,8 +100,8 @@ void change(int line, int dir)
         if (b == nullptr)
             break;
         if (dir == 0)
-            note(b->dump_selected() ? "WRITTEN TO TEX_REPLACEMENTS/DUMPS_SELECTED"
-                                    : "NO TEXTURE CHOSEN, OR NOT DRAWN YET");
+            note(b->dump_selected() ? tr("WRITTEN TO TEX_REPLACEMENTS/DUMPS_SELECTED")
+                                    : tr("NO TEXTURE CHOSEN, OR NOT DRAWN YET"));
         else
             b->select_step(dir);
         break;
@@ -136,7 +137,7 @@ void replace_key()
     const bool on = !settings::texture_replace();
     settings::set_texture_replace(on);
     changed();
-    osd::show(on ? "REPLACEMENT TEXTURES: ON" : "REPLACEMENT TEXTURES: OFF");
+    osd::show(on ? tr("REPLACEMENT TEXTURES: ON") : tr("REPLACEMENT TEXTURES: OFF"));
 }
 
 void refresh_key()
@@ -208,11 +209,11 @@ void present(ID3D11RenderTargetView *bb)
         refreshSeen = b->refresh_serial();
         Status done;
         b->status(&done);
-        char said[96];
+        char said[256];                     /* PC (2026-11-16): 96 before (UTF-8 translations) */
         if (done.refChanged + done.refNew + done.refGone == 0)
-            snprintf(said, sizeof(said), "TEXTURES: NO FILE CHANGED");
+            snprintf(said, sizeof(said), "%s", tr("TEXTURES: NO FILE CHANGED"));
         else
-            snprintf(said, sizeof(said), "TEXTURES: %u CHANGED, %u NEW, %u GONE", done.refChanged, done.refNew,
+            snprintf(said, sizeof(said), tr("TEXTURES: %u CHANGED, %u NEW, %u GONE"), done.refChanged, done.refNew,
                      done.refGone);
         osd::show(said);
     }
@@ -223,30 +224,33 @@ void present(ID3D11RenderTargetView *bb)
         b->status(&st);
     const int line = g_line.load();
     const bool select = select_mode();
-    static const char *const kDumpNames[settings::kTextureDumpCount] = {"OFF", "SELECT", "ALL"};
+    static const char *const kDumpNames[settings::kTextureDumpCount] = {N_("OFF"), N_("SELECT"), N_("ALL")};
 
-    /* the lines: name, value */
+    /* the lines: name, value (PC 2026-11-16: in the interface's language,
+     * platform/ui_text.h) */
     std::string names[kLines], values[kLines];
-    names[kReplace] = "REPLACEMENTS";
-    values[kReplace] = settings::texture_replace() ? "ON" : "OFF";
-    names[kDump] = "DUMPING";
-    values[kDump] = kDumpNames[(int)settings::texture_dump()];
-    names[kPrecache] = "PRE-CACHE";
-    values[kPrecache] = settings::texture_precache() ? "ON" : "OFF";
-    names[kCompress] = "COMPRESSION";
-    values[kCompress] = settings::texture_compress() ? "ON" : "OFF";
-    names[kRefresh] = "REFRESH";
-    values[kRefresh] = settings::texture_precache() ? "PRE-CACHE IS ON" : st.refreshing ? "LOOKING..." : "ENTER";
-    names[kTexture] = "TEXTURE";
-    char text[160];
+    names[kReplace] = tr("REPLACEMENTS");
+    values[kReplace] = settings::texture_replace() ? tr("ON") : tr("OFF");
+    names[kDump] = tr("DUMPING");
+    values[kDump] = tr(kDumpNames[(int)settings::texture_dump()]);
+    names[kPrecache] = tr("PRE-CACHE");
+    values[kPrecache] = settings::texture_precache() ? tr("ON") : tr("OFF");
+    names[kCompress] = tr("COMPRESSION");
+    values[kCompress] = settings::texture_compress() ? tr("ON") : tr("OFF");
+    names[kRefresh] = tr("REFRESH");
+    values[kRefresh] = settings::texture_precache() ? tr("PRE-CACHE IS ON")
+                       : st.refreshing             ? tr("LOOKING...")
+                                                   : tr("ENTER");
+    names[kTexture] = tr("TEXTURE");
+    char text[512];                         /* PC (2026-11-16): 160 before (UTF-8 translations) */
     if (st.seen == 0)
-        snprintf(text, sizeof(text), "NONE DRAWN");
+        snprintf(text, sizeof(text), "%s", tr("NONE DRAWN"));
     else if (st.selHash == 0)
         snprintf(text, sizeof(text), "- / %u", st.seen);
     else if (st.selIndex >= 0)
         snprintf(text, sizeof(text), "%d / %u", st.selIndex + 1, st.seen);
     else
-        snprintf(text, sizeof(text), "(NOT DRAWN NOW) / %u", st.seen);
+        snprintf(text, sizeof(text), tr("(NOT DRAWN NOW) / %u"), st.seen);
     values[kTexture] = text;
 
     /* under them: the chosen texture, what the replacements are doing, the keys */
@@ -261,34 +265,41 @@ void present(ID3D11RenderTargetView *bb)
                 s += text;
             }
             if (st.selReplaced)
-                s += "  REPLACED";
+                (s += "  ") += tr("REPLACED");
             if (st.selDumped)
-                s += "  DUMPED";
+                (s += "  ") += tr("DUMPED");
             info[nInfo++] = s;
         } else {
-            info[nInfo++] = "LEFT / RIGHT ON TEXTURE: CHOOSE ONE (DRAWN GREEN)";
+            info[nInfo++] = tr("LEFT / RIGHT ON TEXTURE: CHOOSE ONE (DRAWN GREEN)");
         }
     }
+    /* (PC 2026-11-16: the four plurals whole, one string each) */
+    static const char *const kListed[4] = {
+        N_("%u FOLDERS, %u FILES: %u LOADED, %u WAITING, %u REFUSED"),
+        N_("%u FOLDERS, %u FILE: %u LOADED, %u WAITING, %u REFUSED"),
+        N_("%u FOLDER, %u FILES: %u LOADED, %u WAITING, %u REFUSED"),
+        N_("%u FOLDER, %u FILE: %u LOADED, %u WAITING, %u REFUSED")};
     if (!st.listed)
-        snprintf(text, sizeof(text), "FOLDERS: BEING LISTED");
+        snprintf(text, sizeof(text), "%s", tr("FOLDERS: BEING LISTED"));
     else
-        snprintf(text, sizeof(text), "%u FOLDER%s, %u FILE%s: %u LOADED, %u WAITING, %u REFUSED", st.folders,
-                 st.folders == 1 ? "" : "S", st.files, st.files == 1 ? "" : "S", st.loaded, st.waiting, st.failed);
+        snprintf(text, sizeof(text), tr(kListed[(st.folders == 1 ? 2 : 0) + (st.files == 1 ? 1 : 0)]), st.folders,
+                 st.files, st.loaded, st.waiting, st.failed);
     info[nInfo++] = text;
     if (st.dumpsWaiting != 0)
-        snprintf(text, sizeof(text), "DUMPS: %u WRITTEN, %u WAITING", st.dumped, st.dumpsWaiting);
+        snprintf(text, sizeof(text), tr("DUMPS: %u WRITTEN, %u WAITING"), st.dumped, st.dumpsWaiting);
     else
-        snprintf(text, sizeof(text), "DUMPS: %u WRITTEN", st.dumped);
+        snprintf(text, sizeof(text), tr("DUMPS: %u WRITTEN"), st.dumped);
     info[nInfo++] = text;
     if (settings::texture_precache()) {
         if (st.cacheTodo != 0)
-            snprintf(text, sizeof(text), "PRE-CACHE: %u MADE, %u TO LOOK AT", st.cacheMade, st.cacheTodo);
+            snprintf(text, sizeof(text), tr("PRE-CACHE: %u MADE, %u TO LOOK AT"), st.cacheMade, st.cacheTodo);
         else
-            snprintf(text, sizeof(text), "PRE-CACHE: UP TO DATE (%u MADE)", st.cacheMade);
+            snprintf(text, sizeof(text), tr("PRE-CACHE: UP TO DATE (%u MADE)"), st.cacheMade);
         info[nInfo++] = text;
     }
     if (st.refreshes != 0) {
-        snprintf(text, sizeof(text), "LAST REFRESH: %u CHANGED, %u NEW, %u GONE", st.refChanged, st.refNew, st.refGone);
+        snprintf(text, sizeof(text), tr("LAST REFRESH: %u CHANGED, %u NEW, %u GONE"), st.refChanged, st.refNew,
+                 st.refGone);
         info[nInfo++] = text;
     }
     {
@@ -298,8 +309,12 @@ void present(ID3D11RenderTargetView *bb)
     }
     char hot[32];
     input_map::hotkey_text(input_map::kHotTextureMenu, hot, sizeof(hot));
-    snprintf(text, sizeof(text), "UP / DOWN  LEFT / RIGHT  %s%s%sESC CLOSE",
-             select ? "ENTER DUMP  PAGE UP / DOWN 10  " : "", hot, hot[0] != '\0' ? " / " : "");
+    /* (PC 2026-11-16: the select mode's keys one string with the rest) */
+    if (select)
+        snprintf(text, sizeof(text), tr("UP / DOWN  LEFT / RIGHT  ENTER DUMP  PAGE UP / DOWN 10  %s%sESC CLOSE"), hot,
+                 hot[0] != '\0' ? " / " : "");
+    else
+        snprintf(text, sizeof(text), tr("UP / DOWN  LEFT / RIGHT  %s%sESC CLOSE"), hot, hot[0] != '\0' ? " / " : "");
     const std::string keys = text;
 
     int bw, bh;
@@ -314,7 +329,8 @@ void present(ID3D11RenderTargetView *bb)
     }
     for (int i = 0; i < nInfo; i++)
         infoW = std::max(infoW, overlay::text_width(info[i].c_str(), s));
-    const float title = overlay::text_width("TEXTURES", s);
+    const char *const titleText = tr("TEXTURES");
+    const float title = overlay::text_width(titleText, s);
     const float cols = 12.0f * fs + nameW + 18.0f * fs + valueW + 12.0f * fs;
     const float w = std::max(std::max(cols, infoW), title) + 2.0f * pad;
     const float h = 2.0f * pad + row + gap + (float)nLines * row + gap + (float)(nInfo + 1) * row;
@@ -323,7 +339,7 @@ void present(ID3D11RenderTargetView *bb)
     overlay::rect(x, y, w, h, rgba(0, 0, 0, 200));
     overlay::rect(x, y, 2.0f * fs, h, amber);
     float ty = y + pad;
-    overlay::text(x + pad, ty, s, "TEXTURES", rgba(255, 200, 80, 200));
+    overlay::text(x + pad, ty, s, titleText, rgba(255, 200, 80, 200));
     ty += row + gap;
     for (int i = 0; i < nLines; i++) {
         const bool cur = i == line;

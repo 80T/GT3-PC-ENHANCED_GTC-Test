@@ -6,6 +6,7 @@
 #include "engines.h"
 #include "resource.h"
 #include "util.h"
+#include "platform/ui_text.h"  /* PC (2026-11-16): the interface's languages */
 
 #include <commctrl.h>
 
@@ -17,7 +18,7 @@ namespace {
 const wchar_t kSection[] = L"Engines";
 const wchar_t kIni[] = L"gt3pc.ini";
 const wchar_t kClassName[] = L"GT3EngineSelector";
-const wchar_t kTitle[] = L"Gran Turismo 3 PC Enhanced - Engine Selector";
+const wchar_t kTitle[] = N_(L"Gran Turismo 3 PC Enhanced - Engine Selector");
 const wchar_t kAppName[] = L"Gran Turismo 3 A-Spec";
 const wchar_t kOwnName[] = L"Gran Turismo 3 A-Spec";
 
@@ -215,7 +216,7 @@ void draw_item(const DRAWITEMSTRUCT *d)
     SelectObject(d->hDC, g.font);
     SetTextColor(d->hDC, GetSysColor(sel ? COLOR_HIGHLIGHTTEXT : COLOR_GRAYTEXT));
     const std::wstring line = it.there ? it.folder
-                                       : L"Not found (" + std::wstring(kLauncherExe) + L", " + kGameExe + L"): " + it.folder;
+                                       : trf(L"Not found (%s, %s): %s", kLauncherExe, kGameExe, it.folder.c_str());
     DrawTextW(d->hDC, line.c_str(), -1, &path, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_PATH_ELLIPSIS | DT_NOPREFIX);
     SelectObject(d->hDC, old);
     if ((d->itemState & ODS_FOCUS) && !(d->itemState & ODS_NOFOCUSRECT))
@@ -238,13 +239,13 @@ void start_selected()
 void add_engine()
 {
     const std::wstring picked = no_slash(util::choose_folder(
-        g.wnd, L"Choose an engine's folder (it holds gt3launcher.exe and gt3pc.exe)", L"Add engine"));
+        g.wnd, tr(L"Choose an engine's folder (it holds gt3launcher.exe and gt3pc.exe)"), tr(L"Add engine")));
     if (picked.empty())
         return;
     if (!engine_there(picked)) {
         MessageBoxW(g.wnd,
-                    (picked + L" is not an engine: it has no " + kLauncherExe + L" and " + kGameExe +
-                     L".\n\nAn engine is the folder \"Build Mod Plugin.cmd\" makes.")
+                    trf(L"%s is not an engine: it has no %s and %s.\n\nAn engine is the folder \"Build Mod Plugin.cmd\" makes.",
+                        picked.c_str(), kLauncherExe, kGameExe)
                         .c_str(),
                     kAppName, MB_OK | MB_ICONWARNING);
         return;
@@ -252,21 +253,22 @@ void add_engine()
     for (size_t i = 0; i < g.items.size(); i++)
         if (_wcsicmp(g.items[i].folder.c_str(), picked.c_str()) == 0) {
             MessageBoxW(g.wnd,
-                        g.items[i].own ? L"That is this launcher's own folder: it is the first engine of the list."
-                                       : L"That engine is in the list already.",
+                        g.items[i].own ? tr(L"That is this launcher's own folder: it is the first engine of the list.")
+                                       : tr(L"That engine is in the list already."),
                         kAppName, MB_OK | MB_ICONINFORMATION);
             SendMessageW(g.list, LB_SETCURSEL, i, 0);
             update_buttons();
             return;
         }
     if ((int)g.items.size() > kMaxEngines) {
-        MessageBoxW(g.wnd, L"The list is full: remove an engine first.", kAppName, MB_OK | MB_ICONINFORMATION);
+        MessageBoxW(g.wnd, tr(L"The list is full: remove an engine first."), kAppName, MB_OK | MB_ICONINFORMATION);
         return;
     }
     const std::wstring warning =
-        L"Make sure this engine is from a source you trust.\n\n" + name_of(picked) + L"\n" + picked +
-        L"\n\nAn engine is a program: its launcher and its game run on this PC as any program you start, with "
-        L"your files and your settings in reach. Nothing checks what it does.\n\nAdd it to the list?";
+        trf(L"Make sure this engine is from a source you trust.\n\n%s\n%s"
+            L"\n\nAn engine is a program: its launcher and its game run on this PC as any program you start, with "
+            L"your files and your settings in reach. Nothing checks what it does.\n\nAdd it to the list?",
+            name_of(picked).c_str(), picked.c_str());
     if (MessageBoxW(g.wnd, warning.c_str(), kAppName, MB_OKCANCEL | MB_ICONWARNING | MB_DEFBUTTON2) != IDOK)
         return;
     std::vector<std::wstring> folders = load(g.ini);
@@ -304,16 +306,16 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
             return CreateWindowExW(0, WC_BUTTONW, text, WS_CHILD | WS_VISIBLE | WS_TABSTOP | style, 0, 0, 10, 10, hwnd,
                                    (HMENU)(INT_PTR)id, g.inst, nullptr);
         };
-        g.head = CreateWindowExW(0, WC_STATICW, L"Choose the engine to start:", WS_CHILD | WS_VISIBLE | SS_LEFT | SS_NOPREFIX,
+        g.head = CreateWindowExW(0, WC_STATICW, tr(L"Choose the engine to start:"), WS_CHILD | WS_VISIBLE | SS_LEFT | SS_NOPREFIX,
                                  0, 0, 10, 10, hwnd, (HMENU)(INT_PTR)IDC_HEAD, g.inst, nullptr);
         g.list = CreateWindowExW(WS_EX_CLIENTEDGE, WC_LISTBOXW, L"",
                                  WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL | LBS_NOTIFY | LBS_OWNERDRAWFIXED |
                                      LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT,
                                  0, 0, 10, 10, hwnd, (HMENU)(INT_PTR)IDC_LIST, g.inst, nullptr);
-        g.start = button(L"&Start", IDC_START, BS_DEFPUSHBUTTON);
-        g.add = button(L"&Add engine...", IDC_ADD, BS_PUSHBUTTON);
-        g.remove = button(L"&Remove", IDC_REMOVE, BS_PUSHBUTTON);
-        g.exit = button(L"E&xit", IDC_EXIT, BS_PUSHBUTTON);
+        g.start = button(tr(L"&Start"), IDC_START, BS_DEFPUSHBUTTON);
+        g.add = button(tr(L"&Add engine..."), IDC_ADD, BS_PUSHBUTTON);
+        g.remove = button(tr(L"&Remove"), IDC_REMOVE, BS_PUSHBUTTON);
+        g.exit = button(tr(L"E&xit"), IDC_EXIT, BS_PUSHBUTTON);
         return 0;
     }
     case DM_GETDEFID:
@@ -498,7 +500,7 @@ Choice select(HINSTANCE inst, const std::wstring &folder, int show, std::wstring
     wc.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
     wc.lpszClassName = kClassName;
     RegisterClassExW(&wc);
-    HWND hwnd = CreateWindowExW(0, kClassName, kTitle, kStyle, CW_USEDEFAULT, CW_USEDEFAULT, 100, 100, nullptr, nullptr,
+    HWND hwnd = CreateWindowExW(0, kClassName, tr(kTitle), kStyle, CW_USEDEFAULT, CW_USEDEFAULT, 100, 100, nullptr, nullptr,
                                 inst, nullptr);
     if (!hwnd)
         return Choice::own;                 /* (no selector: the launcher itself) */

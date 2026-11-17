@@ -8,6 +8,7 @@
 
 #include "mod_card.h"
 #include "util.h"
+#include "platform/ui_text.h"  /* PC (2026-11-16): the interface's languages */
 
 #include <commctrl.h>
 #include <shellapi.h>
@@ -139,9 +140,9 @@ std::wstring summary()
 {
     const long on = (long)std::count_if(g.packs.begin(), g.packs.end(), [](const Pack &p) { return p.on; });
     if (g.packs.empty())
-        return L"No texture folders installed. Select `Add folder` to add one";
-    return std::to_wstring(g.packs.size()) + (g.packs.size() == 1 ? L" folder, " : L" folders, ") +
-           std::to_wstring(on) + L" enabled.";
+        return tr(L"No texture folders installed. Select `Add folder` to add one");
+    return g.packs.size() == 1 ? trf(L"1 folder, %d enabled.", (int)on)
+                               : trf(L"%d folders, %d enabled.", (int)g.packs.size(), (int)on);
 }
 
 /* ---- the list ---- */
@@ -221,7 +222,7 @@ void show_details()
             load_image(L"", box, &g.pixels, &g.imageW, &g.imageH);
     }
     SetWindowTextW(g.title, in.title.c_str());
-    SetWindowTextW(g.authors, in.authors.empty() ? L"" : (L"By " + in.authors).c_str());
+    SetWindowTextW(g.authors, in.authors.empty() ? L"" : trf(L"By %s", in.authors.c_str()).c_str());
     SetWindowTextW(g.description, in.description.c_str());
     InvalidateRect(g.image, nullptr, FALSE);
 }
@@ -238,10 +239,10 @@ void fill(int keep)
         it.iItem = (int)i;
         it.pszText = const_cast<wchar_t *>(title.c_str());
         SendMessageW(g.list, LVM_INSERTITEMW, 0, (LPARAM)&it);
-        std::wstring textures = L"not there";
+        std::wstring textures = tr(L"not there");
         if (is_folder(p.folder)) {
             const long n = count_textures(p.folder, 0);
-            textures = n == 0 ? L"none" : std::to_wstring(n) + (n == 1 ? L" texture" : L" textures");
+            textures = n == 0 ? tr(L"none") : n == 1 ? tr(L"1 texture") : trf(L"%d textures", (int)n);
         }
         set_cell((int)i, 1, p.folder);
         set_cell((int)i, 2, textures);
@@ -283,9 +284,10 @@ bool usable(const std::wstring &folder)
 {
     if (!ini_can_keep(folder)) {
         MessageBoxW(g.wnd,
-                    (folder + L"\n\nThe folder's path has characters gt3pc.ini cannot keep. Rename it, or move it to "
-                              L"a folder with a plainer path.").c_str(),
-                    L"Textures", MB_OK | MB_ICONWARNING);
+                    (folder + L"\n\n" +
+                     tr(L"The folder's path has characters gt3pc.ini cannot keep. Rename it, or move it to "
+                        L"a folder with a plainer path.")).c_str(),
+                    tr(L"Textures"), MB_OK | MB_ICONWARNING);
         return false;
     }
     return true;
@@ -293,14 +295,15 @@ bool usable(const std::wstring &folder)
 
 void add_folder()
 {
-    const std::wstring folder = util::choose_folder(g.wnd, L"Choose a texture folder (replacement textures named by their hashes)",
-                                                    L"Add");
+    const std::wstring folder = util::choose_folder(
+        g.wnd, tr(L"Choose a texture folder (replacement textures named by their hashes)"), tr(L"Add"));
     if (folder.empty() || !usable(folder))
         return;
     if (put_first(folder))
-        set_status(L"Added at the top: its textures win over the folders below it. " + summary());
+        set_status(std::wstring(tr(L"Added at the top: its textures win over the folders below it.")) + L" " +
+                   summary());
     else
-        set_status(L"This folder is in the list already: ticked where it is. " + summary());
+        set_status(std::wstring(tr(L"This folder is in the list already: ticked where it is.")) + L" " + summary());
 }
 
 void remove_folder()
@@ -313,7 +316,8 @@ void remove_folder()
     fill(i);
     /* (the last one gone: the summary alone, as long as the line is) */
     set_status(g.packs.empty() ? summary()
-                               : L"Removed from the list (the folder and its files are kept). " + summary());
+                               : std::wstring(tr(L"Removed from the list (the folder and its files are kept).")) +
+                                     L" " + summary());
 }
 
 void move(int delta)
@@ -335,7 +339,7 @@ void open_folder()
         return;
     const std::wstring &f = g.packs[(size_t)i].folder;
     if (!is_folder(f)) {
-        set_status(f + L" is not there.");
+        set_status(trf(L"%s is not there.", f.c_str()));
         return;
     }
     ShellExecuteW(g.wnd, L"open", f.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
@@ -349,7 +353,7 @@ void open_dumps()
     const std::wstring dumps = util::exe_folder() + kDumps;
     util::make_folders(util::exe_folder() + kDumpsSelected);
     if (!util::make_folders(dumps)) {
-        set_status(dumps + L" could not be made.");
+        set_status(trf(L"%s could not be made.", dumps.c_str()));
         return;
     }
     ShellExecuteW(g.wnd, L"open", dumps.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
@@ -366,11 +370,11 @@ void columns()
     const struct {
         const wchar_t *name;
         int width;
-    } cols[] = {{L"Pack", title}, {L"Folder", folder}, {L"Textures", count}};
+    } cols[] = {{N_(L"Pack"), title}, {N_(L"Folder"), folder}, {N_(L"Textures"), count}};
     for (int i = 0; i < 3; i++) {
         LVCOLUMNW col = {};
         col.mask = LVCF_TEXT | LVCF_WIDTH;
-        col.pszText = const_cast<wchar_t *>(cols[i].name);
+        col.pszText = const_cast<wchar_t *>(tr(cols[i].name));
         col.cx = cols[i].width;
         if (SendMessageW(g.list, LVM_SETCOLUMNWIDTH, (WPARAM)i, (LPARAM)col.cx) == FALSE)
             SendMessageW(g.list, LVM_INSERTCOLUMNW, (WPARAM)i, (LPARAM)&col);
@@ -434,27 +438,27 @@ HWND make(const wchar_t *cls, const wchar_t *text, DWORD style, int id, DWORD ex
 void create_controls()
 {
     g.hint = make(WC_STATICW,
-                  L"Tip: A texture folder holds replacement textures (.png, .jpg, .dds) named by their hashes, as the "
-                  L"game dumps them.\n"
-                  L"Top = 1st Priority",
+                  tr(L"Tip: A texture folder holds replacement textures (.png, .jpg, .dds) named by their hashes, as the "
+                     L"game dumps them.\n"
+                     L"Top = 1st Priority"),
                   SS_LEFT | SS_NOPREFIX, IDC_HINT);
     g.list = make(WC_LISTVIEWW, L"", WS_TABSTOP | LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER,
                   IDC_LIST, WS_EX_CLIENTEDGE);
     SendMessageW(g.list, LVM_SETEXTENDEDLISTVIEWSTYLE, 0,
                  LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_CHECKBOXES);
-    g.add = make(WC_BUTTONW, L"&Add folder...", WS_TABSTOP | BS_PUSHBUTTON, IDC_ADD);
-    g.remove = make(WC_BUTTONW, L"&Remove", WS_TABSTOP | BS_PUSHBUTTON, IDC_REMOVE);
-    g.up = make(WC_BUTTONW, L"Move &up", WS_TABSTOP | BS_PUSHBUTTON, IDC_UP);
-    g.down = make(WC_BUTTONW, L"Move &down", WS_TABSTOP | BS_PUSHBUTTON, IDC_DOWN);
-    g.openFolder = make(WC_BUTTONW, L"&Open folder", WS_TABSTOP | BS_PUSHBUTTON, IDC_OPEN);
-    g.dumps = make(WC_BUTTONW, L"Open dum&ps folder", WS_TABSTOP | BS_PUSHBUTTON, IDC_DUMPS);
+    g.add = make(WC_BUTTONW, tr(L"&Add folder..."), WS_TABSTOP | BS_PUSHBUTTON, IDC_ADD);
+    g.remove = make(WC_BUTTONW, tr(L"&Remove"), WS_TABSTOP | BS_PUSHBUTTON, IDC_REMOVE);
+    g.up = make(WC_BUTTONW, tr(L"Move &up"), WS_TABSTOP | BS_PUSHBUTTON, IDC_UP);
+    g.down = make(WC_BUTTONW, tr(L"Move &down"), WS_TABSTOP | BS_PUSHBUTTON, IDC_DOWN);
+    g.openFolder = make(WC_BUTTONW, tr(L"&Open folder"), WS_TABSTOP | BS_PUSHBUTTON, IDC_OPEN);
+    g.dumps = make(WC_BUTTONW, tr(L"Open dum&ps folder"), WS_TABSTOP | BS_PUSHBUTTON, IDC_DUMPS);
     g.image = make(WC_STATICW, L"", SS_OWNERDRAW, IDC_IMAGE);
     g.title = make(WC_STATICW, L"", SS_LEFT | SS_NOPREFIX | SS_ENDELLIPSIS, IDC_TITLE);
     g.authors = make(WC_STATICW, L"", SS_LEFT | SS_NOPREFIX | SS_ENDELLIPSIS, IDC_AUTHORS);
     g.description = make(WC_EDITW, L"", WS_TABSTOP | WS_VSCROLL | ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL,
                          IDC_DESCRIPTION, WS_EX_CLIENTEDGE);
     g.status = make(WC_STATICW, L"", SS_LEFT | SS_NOPREFIX | SS_ENDELLIPSIS, IDC_STATUS);
-    g.close = make(WC_BUTTONW, L"Close", WS_TABSTOP | BS_PUSHBUTTON, IDCANCEL);
+    g.close = make(WC_BUTTONW, tr(L"Close"), WS_TABSTOP | BS_PUSHBUTTON, IDCANCEL);
 }
 
 LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
@@ -600,7 +604,7 @@ void open(HWND owner, const std::wstring &ini, void (*changed)())
     RECT o = {};
     GetWindowRect(owner, &o);
     const int ww = r.right - r.left, wh = r.bottom - r.top;
-    g.wnd = CreateWindowExW(ex, kClass, L"Textures", style, o.left + ((o.right - o.left) - ww) / 2,
+    g.wnd = CreateWindowExW(ex, kClass, tr(L"Textures"), style, o.left + ((o.right - o.left) - ww) / 2,
                             o.top + ((o.bottom - o.top) - wh) / 2, ww, wh, owner, nullptr, inst, nullptr);
     if (g.wnd == nullptr)
         return;

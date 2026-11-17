@@ -38,6 +38,7 @@
 
 #include "platform/fpu.h"
 #include "platform/frame_monitor.h"
+#include "platform/ui_text.h"                  /* PC (2026-11-16): N_ - the screenshot's reasons, shown through tr */
 #include "platform/frame_step.h"
 #include "platform/osd.h"
 #include "platform/song_osd.h"                  /* PC: the race's song changer */
@@ -1548,7 +1549,7 @@ static void screenshot_take(Target *t, ID3D11ShaderResourceView *picture, const 
         return;
     ID3D11Texture2D *src = t != nullptr && picture != nullptr ? target_tex1(*t) : nullptr;
     if (src == nullptr) {
-        screenshot::failed("NO PICTURE SHOWN");
+        screenshot::failed(N_("NO PICTURE SHOWN"));
         return;
     }
     D3D11_TEXTURE2D_DESC d;
@@ -1560,7 +1561,7 @@ static void screenshot_take(Target *t, ID3D11ShaderResourceView *picture, const 
     if (x1 <= x0 || y1 <= y0 || d.Format != DXGI_FORMAT_R8G8B8A8_UNORM || d.SampleDesc.Count != 1) {
         pclog::write("pgl: screenshot: the picture is %ux%u (format %u, %u samples), its shown part %u..%u x %u..%u",
                      d.Width, d.Height, (unsigned)d.Format, d.SampleDesc.Count, x0, x1, y0, y1);
-        screenshot::failed("THE PICTURE CANNOT BE READ");
+        screenshot::failed(N_("THE PICTURE CANNOT BE READ"));
         return;
     }
     D3D11_TEXTURE2D_DESC s = {};
@@ -1575,7 +1576,7 @@ static void screenshot_take(Target *t, ID3D11ShaderResourceView *picture, const 
     Com<ID3D11Texture2D> staging;
     if (FAILED(dev()->CreateTexture2D(&s, nullptr, staging.put()))) {
         pclog::write("pgl: screenshot: no %ux%u staging texture", s.Width, s.Height);
-        screenshot::failed("NOT ENOUGH VIDEO MEMORY");
+        screenshot::failed(N_("NOT ENOUGH VIDEO MEMORY"));
         return;
     }
     const D3D11_BOX box = {x0, y0, 0, x1, y1, 1};
@@ -1599,7 +1600,7 @@ static void screenshot_read()
     if (FAILED(hr)) {
         g_shot.staging.reset();
         pclog::write("pgl: screenshot: the %dx%d copy could not be read (0x%08X)", w, h, (unsigned)hr);
-        screenshot::failed("THE PICTURE COULD NOT BE READ");
+        screenshot::failed(N_("THE PICTURE COULD NOT BE READ"));
         return;
     }
     std::vector<uint8_t> px;
@@ -1618,7 +1619,7 @@ static void screenshot_read()
                  wait ? " (waited for)" : "");
     if (!ok) {
         pclog::write("pgl: screenshot: no memory for the %dx%d picture", w, h);
-        screenshot::failed("NOT ENOUGH MEMORY");
+        screenshot::failed(N_("NOT ENOUGH MEMORY"));
         return;
     }
     screenshot::save(std::move(px), w, h);

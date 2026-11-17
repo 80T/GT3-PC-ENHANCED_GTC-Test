@@ -1,12 +1,15 @@
 /* overlay.cpp - drawing over the picture for GT3 PC's own panels
  * (overlay.h).  The frame time monitor's drawing, shared. */
 #include "platform/overlay.h"
+#include "platform/overlay_font.h"                /* PC (2026-11-16): the font's tables */
 #include "platform/gpu.h"
 #include "platform/log.h"
 
 #include <windows.h>
 
+#include <mutex>
 #include <string.h>
+#include <unordered_map>
 
 namespace overlay {
 namespace {
@@ -95,72 +98,131 @@ bool init()
     return g_layout && g_vb && g_blend && g_raster && g_depth;
 }
 
-/* ---- a 5 x 7 font (rows top down, bit 4 the left column) */
+/* ---- the font: platform/overlay_font.h (PC 2026-11-16: its tables moved there) */
 
-const char kGlyphChars[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ.:-/%()=<>+,'!?;_&#[]\"*";
-const uint8_t kGlyphs[][7] = {
-    {0x0E, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0E},     /* 0 */
-    {0x04, 0x0C, 0x04, 0x04, 0x04, 0x04, 0x0E},     /* 1 */
-    {0x0E, 0x11, 0x01, 0x02, 0x04, 0x08, 0x1F},     /* 2 */
-    {0x1F, 0x02, 0x04, 0x02, 0x01, 0x11, 0x0E},     /* 3 */
-    {0x02, 0x06, 0x0A, 0x12, 0x1F, 0x02, 0x02},     /* 4 */
-    {0x1F, 0x10, 0x1E, 0x01, 0x01, 0x11, 0x0E},     /* 5 */
-    {0x06, 0x08, 0x10, 0x1E, 0x11, 0x11, 0x0E},     /* 6 */
-    {0x1F, 0x01, 0x02, 0x04, 0x08, 0x08, 0x08},     /* 7 */
-    {0x0E, 0x11, 0x11, 0x0E, 0x11, 0x11, 0x0E},     /* 8 */
-    {0x0E, 0x11, 0x11, 0x0F, 0x01, 0x02, 0x0C},     /* 9 */
-    {0x0E, 0x11, 0x11, 0x11, 0x1F, 0x11, 0x11},     /* A */
-    {0x1E, 0x11, 0x11, 0x1E, 0x11, 0x11, 0x1E},     /* B */
-    {0x0E, 0x11, 0x10, 0x10, 0x10, 0x11, 0x0E},     /* C */
-    {0x1C, 0x12, 0x11, 0x11, 0x11, 0x12, 0x1C},     /* D */
-    {0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x1F},     /* E */
-    {0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x10},     /* F */
-    {0x0E, 0x11, 0x10, 0x17, 0x11, 0x11, 0x0F},     /* G */
-    {0x11, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11},     /* H */
-    {0x0E, 0x04, 0x04, 0x04, 0x04, 0x04, 0x0E},     /* I */
-    {0x07, 0x02, 0x02, 0x02, 0x02, 0x12, 0x0C},     /* J */
-    {0x11, 0x12, 0x14, 0x18, 0x14, 0x12, 0x11},     /* K */
-    {0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x1F},     /* L */
-    {0x11, 0x1B, 0x15, 0x15, 0x11, 0x11, 0x11},     /* M */
-    {0x11, 0x11, 0x19, 0x15, 0x13, 0x11, 0x11},     /* N */
-    {0x0E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E},     /* O */
-    {0x1E, 0x11, 0x11, 0x1E, 0x10, 0x10, 0x10},     /* P */
-    {0x0E, 0x11, 0x11, 0x11, 0x15, 0x12, 0x0D},     /* Q */
-    {0x1E, 0x11, 0x11, 0x1E, 0x14, 0x12, 0x11},     /* R */
-    {0x0F, 0x10, 0x10, 0x0E, 0x01, 0x01, 0x1E},     /* S */
-    {0x1F, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04},     /* T */
-    {0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E},     /* U */
-    {0x11, 0x11, 0x11, 0x11, 0x11, 0x0A, 0x04},     /* V */
-    {0x11, 0x11, 0x11, 0x15, 0x15, 0x15, 0x0A},     /* W */
-    {0x11, 0x11, 0x0A, 0x04, 0x0A, 0x11, 0x11},     /* X */
-    {0x11, 0x11, 0x11, 0x0A, 0x04, 0x04, 0x04},     /* Y */
-    {0x1F, 0x01, 0x02, 0x04, 0x08, 0x10, 0x1F},     /* Z */
-    {0x00, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x0C},     /* . */
-    {0x00, 0x0C, 0x0C, 0x00, 0x0C, 0x0C, 0x00},     /* : */
-    {0x00, 0x00, 0x00, 0x1F, 0x00, 0x00, 0x00},     /* - */
-    {0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x00},     /* / */
-    {0x18, 0x19, 0x02, 0x04, 0x08, 0x13, 0x03},     /* % */
-    {0x02, 0x04, 0x08, 0x08, 0x08, 0x04, 0x02},     /* ( */
-    {0x08, 0x04, 0x02, 0x02, 0x02, 0x04, 0x08},     /* ) */
-    {0x00, 0x00, 0x1F, 0x00, 0x1F, 0x00, 0x00},     /* = */
-    {0x02, 0x04, 0x08, 0x10, 0x08, 0x04, 0x02},     /* < */
-    {0x08, 0x04, 0x02, 0x01, 0x02, 0x04, 0x08},     /* > */
-    {0x00, 0x04, 0x04, 0x1F, 0x04, 0x04, 0x00},     /* + */
-    {0x00, 0x00, 0x00, 0x00, 0x0C, 0x04, 0x08},     /* , */
-    {0x04, 0x04, 0x08, 0x00, 0x00, 0x00, 0x00},     /* ' */
-    {0x04, 0x04, 0x04, 0x04, 0x04, 0x00, 0x04},     /* ! */
-    {0x0E, 0x11, 0x01, 0x02, 0x04, 0x00, 0x04},     /* ? */
-    {0x00, 0x0C, 0x0C, 0x00, 0x0C, 0x04, 0x08},     /* ; */
-    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1F},     /* _ */
-    /* PC: the song changer's titles (platform/song_osd.h) */
-    {0x0C, 0x12, 0x14, 0x08, 0x15, 0x12, 0x0D},     /* & */
-    {0x0A, 0x0A, 0x1F, 0x0A, 0x1F, 0x0A, 0x0A},     /* # */
-    {0x0E, 0x08, 0x08, 0x08, 0x08, 0x08, 0x0E},     /* [ */
-    {0x0E, 0x02, 0x02, 0x02, 0x02, 0x02, 0x0E},     /* ] */
-    {0x0A, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00},     /* " */
-    {0x00, 0x04, 0x15, 0x0E, 0x15, 0x04, 0x00},     /* * */
+using overlay_font::Glyph;
+using overlay_font::narrow_glyph;
+using overlay_font::upper;
+
+/* A wide glyph: MS Gothic's 12 x 12 bitmap (bit 11 the left column), its
+ * advance 6 or 12 font pixels; 0: the font has none (a blank cell). */
+struct Wide {
+    uint16_t rows[12];
+    int advance;
+    bool drawn;
 };
-static_assert(sizeof(kGlyphs) / sizeof(kGlyphs[0]) == sizeof(kGlyphChars) - 1, "one glyph per character");
+std::mutex g_wideLock;
+std::unordered_map<uint32_t, Wide> g_wide;
+HDC g_wideDc;
+HBITMAP g_wideBmp;
+HFONT g_wideFont;
+uint32_t *g_wideBits;                           /* 24 x 12, top down */
+bool g_wideFailed;
+
+const Wide &wide_glyph(uint32_t c)
+{
+    std::lock_guard<std::mutex> l(g_wideLock);
+    auto it = g_wide.find(c);
+    if (it != g_wide.end())
+        return it->second;
+    Wide w = {};
+    w.advance = 6;
+    if (!g_wideFailed && g_wideDc == nullptr) {
+        g_wideDc = CreateCompatibleDC(nullptr);
+        BITMAPINFO bi = {};
+        bi.bmiHeader.biSize = sizeof(bi.bmiHeader);
+        bi.bmiHeader.biWidth = 24;
+        bi.bmiHeader.biHeight = -12;
+        bi.bmiHeader.biPlanes = 1;
+        bi.bmiHeader.biBitCount = 32;
+        bi.bmiHeader.biCompression = BI_RGB;
+        void *bits = nullptr;
+        g_wideBmp = g_wideDc ? CreateDIBSection(g_wideDc, &bi, DIB_RGB_COLORS, &bits, nullptr, 0) : nullptr;
+        g_wideBits = (uint32_t *)bits;
+        g_wideFont = CreateFontW(-12, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
+                                 CLIP_DEFAULT_PRECIS, NONANTIALIASED_QUALITY, FIXED_PITCH | FF_MODERN, L"MS Gothic");
+        if (g_wideDc == nullptr || g_wideBmp == nullptr || g_wideFont == nullptr) {
+            g_wideFailed = true;
+            pclog::write("overlay: no MS Gothic 12 px font (Japanese text in the panels is not drawn)");
+        } else {
+            SelectObject(g_wideDc, g_wideBmp);
+            SelectObject(g_wideDc, g_wideFont);
+            SetTextColor(g_wideDc, RGB(255, 255, 255));
+            SetBkColor(g_wideDc, RGB(0, 0, 0));
+            SetBkMode(g_wideDc, OPAQUE);
+            SetTextAlign(g_wideDc, TA_TOP | TA_LEFT);
+        }
+    }
+    if (!g_wideFailed && c <= 0xFFFF) {
+        const wchar_t ch = (wchar_t)c;
+        WORD index = 0xFFFF;
+        if (GetGlyphIndicesW(g_wideDc, &ch, 1, &index, GGI_MARK_NONEXISTING_GLYPHS) == 1 && index != 0xFFFF) {
+            SIZE sz = {};
+            GetTextExtentPoint32W(g_wideDc, &ch, 1, &sz);
+            w.advance = sz.cx > 6 ? 12 : 6;
+            GdiFlush();
+            memset(g_wideBits, 0, 24 * 12 * 4);
+            const RECT box = {0, 0, 24, 12};
+            ExtTextOutW(g_wideDc, 0, 0, ETO_OPAQUE, &box, &ch, 1, nullptr);
+            GdiFlush();
+            for (int y = 0; y < 12; y++)
+                for (int x = 0; x < 12; x++)
+                    if ((g_wideBits[y * 24 + x] & 0xFFFFFF) != 0)
+                        w.rows[y] |= (uint16_t)(0x800 >> x);
+            w.drawn = true;
+        }
+    }
+    return g_wide.emplace(c, w).first->second;
+}
+
+/* The next character of a UTF-8 string (a byte that starts no valid sequence:
+ * itself, as Latin-1). */
+uint32_t next_char(const char *&s)
+{
+    const unsigned char *p = (const unsigned char *)s;
+    uint32_t c = p[0];
+    int n = c < 0x80 ? 0 : (c & 0xE0) == 0xC0 ? 1 : (c & 0xF0) == 0xE0 ? 2 : (c & 0xF8) == 0xF0 ? 3 : -1;
+    if (n > 0) {
+        uint32_t v = c & (0x3F >> n);
+        int i = 1;
+        for (; i <= n && (p[i] & 0xC0) == 0x80; i++)
+            v = (v << 6) | (p[i] & 0x3F);
+        if (i > n) {
+            s += n + 1;
+            return v;
+        }
+    }
+    s += 1;
+    return c;
+}
+
+/* A character's advance in font pixels (6, or a wide one's 12). */
+int advance(uint32_t c)
+{
+    Glyph g;
+    if (c < 0x80 || narrow_glyph(c, &g))
+        return 6;
+    return wide_glyph(c).advance;
+}
+
+void draw_rows(float x, float y, int s, const uint16_t *rows, int nrows, int ncols, uint32_t c)
+{
+    for (int row = 0; row < nrows; row++) {
+        const uint16_t bits = rows[row];
+        for (int col = 0; col < ncols;) {
+            const uint16_t m = (uint16_t)(1u << (ncols - 1 - col));
+            if (!(bits & m)) {
+                col++;
+                continue;
+            }
+            int end = col;
+            while (end < ncols && (bits & (1u << (ncols - 1 - end))))
+                end++;
+            rect(x + (float)(col * s), y + (float)(row * s), (float)((end - col) * s), (float)s, c);
+            col = end;
+        }
+    }
+}
 
 } // namespace
 
@@ -223,33 +285,40 @@ void rect(float x, float y, float w, float h, uint32_t c)
 
 float text_width(const char *str, int s)
 {
-    return (float)(strlen(str) * 6 * s);
+    return (float)(text_cells(str) * 6 * s);
+}
+
+/* PC (2026-11-16): UTF-8 - a wide (Japanese) character two cells */
+int text_cells(const char *str)
+{
+    int px = 0;
+    while (*str != '\0')
+        px += advance(upper(next_char(str)));
+    return (px + 5) / 6;
 }
 
 /* each row's runs of lit pixels as one rectangle */
 float text(float x, float y, int s, const char *str, uint32_t c)
 {
-    for (; *str; str++, x += 6.0f * s) {
-        char ch = *str;
-        if (ch >= 'a' && ch <= 'z')
-            ch = (char)(ch - 'a' + 'A');
-        const char *p = strchr(kGlyphChars, ch);
-        if (ch == 0 || p == nullptr)
+    while (*str != '\0') {
+        const uint32_t ch = upper(next_char(str));
+        Glyph g;
+        if (narrow_glyph(ch, &g)) {
+            uint16_t rows[12];
+            for (int i = 0; i < 12; i++)
+                rows[i] = g.rows[i];
+            draw_rows(x, y - 3.0f * s, s, rows, 12, 5, c);
+            x += 6.0f * s;
             continue;
-        const uint8_t *g = kGlyphs[p - kGlyphChars];
-        for (int row = 0; row < 7; row++) {
-            for (int col = 0; col < 5;) {
-                if (!(g[row] & (0x10 >> col))) {
-                    col++;
-                    continue;
-                }
-                int end = col;
-                while (end < 5 && (g[row] & (0x10 >> end)))
-                    end++;
-                rect(x + (float)(col * s), y + (float)(row * s), (float)((end - col) * s), (float)s, c);
-                col = end;
-            }
         }
+        if (ch < 0x80) {
+            x += 6.0f * s;              /* a space, or a character without a glyph */
+            continue;
+        }
+        const Wide &w = wide_glyph(ch);
+        if (w.drawn)
+            draw_rows(x, y - 3.0f * s, s, w.rows, 12, 12, c);
+        x += (float)(w.advance * s);
     }
     return x;
 }

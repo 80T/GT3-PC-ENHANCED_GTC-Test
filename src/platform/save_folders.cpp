@@ -1,6 +1,7 @@
 /* save_folders.cpp - where an engine's memory cards are (save_folders.h).
  * PC (2026-11-15). */
 #include "platform/save_folders.h"
+#include "platform/ui_text.h"                  /* PC (2026-11-16): the interface's languages */
 
 #include <windows.h>
 
@@ -135,21 +136,22 @@ std::wstring saves_dir(const std::wstring &sharedFolder, const std::wstring &eng
 
 const wchar_t *name_problem(const std::wstring &name)
 {
+    /* (PC 2026-11-16: the launcher shows them, in the interface's language) */
     if (name.empty())
-        return L"A save folder needs a name.";
+        return tr(L"A save folder needs a name.");
     if ((int)name.size() > kMaxName)
-        return L"That name is too long (64 characters at most).";
+        return tr(L"That name is too long (64 characters at most).");
     for (wchar_t c : name)
         if (bad_char(c))
-            return L"A folder's name cannot have any of these characters:  < > : \" / \\ | ? *";
+            return tr(L"A folder's name cannot have any of these characters:  < > : \" / \\ | ? *");
     if (name == L"." || name == L"..")
-        return L"That name is not a folder's name.";
+        return tr(L"That name is not a folder's name.");
     if (name.back() == L'.' || name.back() == L' ' || name.front() == L' ')
-        return L"A folder's name cannot start with a space, nor end with a space or a dot.";
+        return tr(L"A folder's name cannot start with a space, nor end with a space or a dot.");
     if (device_name(name))
-        return L"That name is one Windows keeps for a device (CON, NUL, COM1 ...).";
+        return tr(L"That name is one Windows keeps for a device (CON, NUL, COM1 ...).");
     if (!ansi_keeps(name))
-        return L"That name has characters gt3pc_engine.ini cannot keep: use plainer letters.";
+        return tr(L"That name has characters gt3pc_engine.ini cannot keep: use plainer letters.");
     return nullptr;
 }
 

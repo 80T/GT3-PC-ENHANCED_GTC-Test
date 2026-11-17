@@ -26,8 +26,14 @@ bool begin_sized(int w, int h);
 /* The back buffer's size (during a panel's drawing). */
 void size(int *w, int *h);
 void rect(float x, float y, float w, float h, uint32_t color);
-/* A character cell is 6 x 9 font pixels of s screen pixels. */
+/* A character cell is 6 x 9 font pixels of s screen pixels.  PC
+ * (2026-11-16): the strings are UTF-8 (platform/ui_text.h's languages): the
+ * accented capitals and Cyrillic in the same font, an accent in rows -3 and
+ * -2 over the cell; other characters (Japanese) MS Gothic's 12 pixel bitmaps,
+ * one or two cells wide, over rows -3 .. 8. */
 float text_width(const char *str, int s);
+/* The width in cells (what strlen was for an ASCII string). */
+int text_cells(const char *str);
 /* The text at (x, y), upper case (lower case shown so, others as blanks).
  * Returns the x after it. */
 float text(float x, float y, int s, const char *str, uint32_t color);

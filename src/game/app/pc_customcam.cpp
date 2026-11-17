@@ -9,6 +9,7 @@
 #include "platform/cockpit_osd.h"                   /* the editor's mode, panel and requests */
 #include "platform/settings.h"                      /* [CustomCameras] */
 #include "platform/settings_menu.h"                 /* notice */
+#include "platform/ui_text.h"                       /* PC (2026-11-16): the interface's languages */
 
 #include <ctype.h>
 #include <math.h>
@@ -111,12 +112,15 @@ enum {
     R_FROM, R_TYPE, R_SIDE, R_HEIGHT, R_FORWARD, R_PAN, R_TILT, R_ANGLE, R_FOV, R_RIGID,
     R_COUNT = R_RIGID + PC_RIGID_COUNT
 };
-const char kTitle[] = "CUSTOM CAMERA";
-const char *const kFromNames[settings::kCustomFromCount] = {"CAR CENTER", "BUMPER CAM", "CHASE CAM", "COCKPIT CAM"};
-const char *const kTypeNames[settings::kCustomTypeCount] = {"CHASE", "ONBOARD"};
-const char *const kRowNames[R_RIGID] = {"FROM", "TYPE", "SIDE", "HEIGHT", "FORWARD", "PAN", "TILT", "ANGLE", "FOV"};
-const char *const kRigidNames[PC_RIGID_COUNT] = {"TURN",       "PITCH",      "ROLL",  "SPEED SHAKE",
-                                                 "SLIP SHAKE", "SIDE FORCE", "BUMPS", "SWAY"};
+/* (the panel's texts: translated where the panel's rows are made, edit_frame) */
+const char kTitle[] = N_("CUSTOM CAMERA");
+const char *const kFromNames[settings::kCustomFromCount] = {N_("CAR CENTER"), N_("BUMPER CAM"), N_("CHASE CAM"),
+                                                            N_("COCKPIT CAM")};
+const char *const kTypeNames[settings::kCustomTypeCount] = {N_("CHASE"), N_("ONBOARD")};
+const char *const kRowNames[R_RIGID] = {N_("FROM"), N_("TYPE"),    N_("SIDE"),  N_("HEIGHT"), N_("FORWARD"),
+                                        N_("PAN"),  N_("TILT"),    N_("ANGLE"), N_("FOV")};
+const char *const kRigidNames[PC_RIGID_COUNT] = {N_("TURN"),       N_("PITCH"),      N_("ROLL"),  N_("SPEED SHAKE"),
+                                                 N_("SLIP SHAKE"), N_("SIDE FORCE"), N_("BUMPS"), N_("SWAY")};
 
 /* A tick 1/60 s.  The keys' steps (the key's repeat: ~30 a second held, a
  * pad's 15) and the camera controls' rates at full deflection (the stick's
@@ -150,7 +154,7 @@ Edit s_edit;
 
 void note(const char *text)
 {
-    char upper[64];
+    char upper[256];                        /* PC (2026-11-16): 64 before (UTF-8 translations; toupper leaves them) */
     snprintf(upper, sizeof(upper), "%s", text);
     for (char *c = upper; *c != '\0'; c++)
         *c = (char)toupper((unsigned char)*c);
@@ -253,9 +257,7 @@ void begin_new(const void *cam, const RaceEntryCar *car, const std::string &scop
         return;
     List &l = list_of(scope.c_str());
     if (l.count >= settings::kCustomCameraMax) {
-        char text[64];
-        snprintf(text, sizeof(text), "%d cameras already: delete one", settings::kCustomCameraMax);
-        note(text);
+        note(trf("%d cameras already: delete one", settings::kCustomCameraMax).c_str());
         cockpit_osd::stop();
         return;
     }
@@ -304,11 +306,10 @@ void do_delete(const RaceEntryCar *car, int *index)
     int at = 0;
     const CustomCamera *c = find(car, *index, &scope, &at);
     if (c == NULL) {
-        note("No custom camera in view");
+        note(tr("No custom camera in view"));
         return;
     }
-    char text[64];
-    snprintf(text, sizeof(text), "Camera deleted: %s", c->name);
+    const std::string text = trf("Camera deleted: %s", c->name);
     if (s_edit.on) {
         /* (the one being edited: nothing to put back; another: its edit is
          * given up first - the cameras after the deleted one move up) */
@@ -322,7 +323,7 @@ void do_delete(const RaceEntryCar *car, int *index)
     remove_at(l, at);
     settings::set_custom_cameras(scope.c_str(), l.cam, l.count);
     *index = 0;
-    note(text);
+    note(text.c_str());
 }
 
 /* The chosen row moved: by the keys' steps and, on its natural direction, by
@@ -450,32 +451,34 @@ void upper_copy(char *out, size_t n, const char *text)
         *c = (char)toupper((unsigned char)*c);
 }
 
-/* The panel's texts for the camera edited; returns the action asked for. */
+/* The panel's texts for the camera edited; returns the action asked for.
+ * PC (2026-11-16): in the interface's language (platform/ui_text.h), made
+ * at each tick (the language may change). */
 int edit_frame(const CustomCamera &c)
 {
     cockpit_osd::Row rows[R_COUNT];
     memset(rows, 0, sizeof(rows));
     for (int r = 0; r < R_RIGID; r++)
-        snprintf(rows[r].name, sizeof(rows[r].name), "%s", kRowNames[r]);
-    snprintf(rows[R_FROM].value, sizeof(rows[R_FROM].value), "%s", kFromNames[c.from]);
-    snprintf(rows[R_TYPE].value, sizeof(rows[R_TYPE].value), "%s", kTypeNames[c.type]);
-    snprintf(rows[R_SIDE].value, sizeof(rows[R_SIDE].value), "%+8.3f M", c.pos[0]);
-    snprintf(rows[R_HEIGHT].value, sizeof(rows[R_HEIGHT].value), "%+8.3f M", c.pos[1]);
-    snprintf(rows[R_FORWARD].value, sizeof(rows[R_FORWARD].value), "%+8.3f M", -c.pos[2] + 0.0f);
-    snprintf(rows[R_PAN].value, sizeof(rows[R_PAN].value), "%+8.1f DEG", c.pan);
-    snprintf(rows[R_TILT].value, sizeof(rows[R_TILT].value), "%+8.1f DEG", c.tilt);
-    snprintf(rows[R_ANGLE].value, sizeof(rows[R_ANGLE].value), "%+8.1f DEG", c.angle);
-    snprintf(rows[R_FOV].value, sizeof(rows[R_FOV].value), "%8.1f DEG", c.fov);
-    snprintf(rows[R_RIGID].caption, sizeof(rows[R_RIGID].caption), "RIGIDITY (100: FIXED TO THE CAR)");
+        snprintf(rows[r].name, sizeof(rows[r].name), "%s", tr(kRowNames[r]));
+    snprintf(rows[R_FROM].value, sizeof(rows[R_FROM].value), "%s", tr(kFromNames[c.from]));
+    snprintf(rows[R_TYPE].value, sizeof(rows[R_TYPE].value), "%s", tr(kTypeNames[c.type]));
+    snprintf(rows[R_SIDE].value, sizeof(rows[R_SIDE].value), tr("%+8.3f M"), c.pos[0]);
+    snprintf(rows[R_HEIGHT].value, sizeof(rows[R_HEIGHT].value), tr("%+8.3f M"), c.pos[1]);
+    snprintf(rows[R_FORWARD].value, sizeof(rows[R_FORWARD].value), tr("%+8.3f M"), -c.pos[2] + 0.0f);
+    snprintf(rows[R_PAN].value, sizeof(rows[R_PAN].value), tr("%+8.1f DEG"), c.pan);
+    snprintf(rows[R_TILT].value, sizeof(rows[R_TILT].value), tr("%+8.1f DEG"), c.tilt);
+    snprintf(rows[R_ANGLE].value, sizeof(rows[R_ANGLE].value), tr("%+8.1f DEG"), c.angle);
+    snprintf(rows[R_FOV].value, sizeof(rows[R_FOV].value), tr("%8.1f DEG"), c.fov);
+    snprintf(rows[R_RIGID].caption, sizeof(rows[R_RIGID].caption), "%s", tr("RIGIDITY (100: FIXED TO THE CAR)"));
     for (int i = 0; i < PC_RIGID_COUNT; i++) {
-        snprintf(rows[R_RIGID + i].name, sizeof(rows[R_RIGID + i].name), "%s", kRigidNames[i]);
+        snprintf(rows[R_RIGID + i].name, sizeof(rows[R_RIGID + i].name), "%s", tr(kRigidNames[i]));
         snprintf(rows[R_RIGID + i].value, sizeof(rows[R_RIGID + i].value), "%8d %%", c.rigid[i]);
     }
-    char name[32], scope[64], head[128];
+    char name[32], scope[256], head[512];   /* (PC 2026-11-16: 64, 128 before - UTF-8 translations) */
     upper_copy(name, sizeof(name), c.name);
-    upper_copy(scope, sizeof(scope), s_edit.scope == kGlobal ? "every car" : s_edit.scope.c_str());
-    snprintf(head, sizeof(head), "%s   %s%s", name, scope, s_edit.isNew ? "   NEW" : "");
-    return cockpit_osd::race_frame(kTitle, head, rows, R_COUNT);
+    upper_copy(scope, sizeof(scope), s_edit.scope == kGlobal ? tr("every car") : s_edit.scope.c_str());
+    snprintf(head, sizeof(head), "%s   %s%s%s", name, scope, s_edit.isNew ? "   " : "", s_edit.isNew ? tr("NEW") : "");
+    return cockpit_osd::race_frame(tr(kTitle), head, rows, R_COUNT);
 }
 
 } // namespace
@@ -638,7 +641,7 @@ int pc_customcam_edit(const void *cam, const RaceEntryCar *car, int port, int *i
             /* not a custom camera's view: the panel says so; save / cancel
              * end the mode */
             cockpit_osd::take_steps();      /* (steps asked for out of the view go nowhere) */
-            const int action = cockpit_osd::race_frame(kTitle, "SWITCH TO A CUSTOM CAMERA", NULL, 0);
+            const int action = cockpit_osd::race_frame(tr(kTitle), tr("SWITCH TO A CUSTOM CAMERA"), NULL, 0);
             if (action == cockpit_osd::kCancel || action == cockpit_osd::kSave)
                 cockpit_osd::stop();
             return flags;
@@ -658,11 +661,10 @@ int pc_customcam_edit(const void *cam, const RaceEntryCar *car, int port, int *i
     adjust(c, car, row, cockpit_osd::take_steps(), stickX, stickY, &flags);
     switch (edit_frame(c)) {
     case cockpit_osd::kSave: {
-        char text[64];
-        snprintf(text, sizeof(text), "Camera saved: %s", c.name);
+        const std::string text = trf("Camera saved: %s", c.name);
         edit_save();
         cockpit_osd::stop();
-        note(text);
+        note(text.c_str());
         break;
     }
     case cockpit_osd::kCancel: {

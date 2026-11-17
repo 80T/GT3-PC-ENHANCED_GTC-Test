@@ -52,7 +52,9 @@ add_executable(pssgame
     ${GT3PC}/src/launcher/inflate.cpp
     ${GT3PC}/src/launcher/util.cpp
     ${GT3PC}/src/platform/paths.cpp
-    ${GT3PC}/src/platform/audio.cpp)
+    ${GT3PC}/src/platform/audio.cpp
+    # (PC 2026-11-16: the interface's languages - util.cpp, audio.cpp translate)
+    ${GT3PC}/src/platform/ui_text.cpp)
 target_include_directories(pssgame PRIVATE ${GT3PC}/include ${GT3PC}/src)
 target_compile_definitions(pssgame PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN)
 target_link_libraries(pssgame PRIVATE gt3_sound_native winmm ole32 avrt)

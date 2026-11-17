@@ -18,6 +18,7 @@
  * half too. */
 #include "iso9660.h"
 #include "util.h"
+#include "platform/ui_text.h"  /* PC (2026-11-16): the interface's languages */
 
 #include <windows.h>
 
@@ -108,13 +109,13 @@ bool Image::read_raw(uint64_t offset, void *buf, uint32_t size, std::wstring *er
         if (!ReadFile(handle_, p, size, &got, &ov)) {
             DWORD err = GetLastError();
             if (error)
-                *error = err == ERROR_HANDLE_EOF ? std::wstring(L"it ends too early (is the image complete?)")
+                *error = err == ERROR_HANDLE_EOF ? std::wstring(tr(L"it ends too early (is the image complete?)"))
                                                  : util::system_error_text(err);
             return false;
         }
         if (got == 0) {
             if (error)
-                *error = L"it ends too early (is the image complete?)";
+                *error = tr(L"it ends too early (is the image complete?)");
             return false;
         }
         p += got;
@@ -131,7 +132,7 @@ bool Image::open(const std::wstring &path, std::wstring *error)
                            FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
     if (h == INVALID_HANDLE_VALUE) {
         if (error)
-            *error = L"the file could not be opened (" + util::system_error_text(GetLastError()) + L")";
+            *error = trf(L"the file could not be opened (%s)", util::system_error_text(GetLastError()).c_str());
         return false;
     }
     handle_ = h;
@@ -139,16 +140,16 @@ bool Image::open(const std::wstring &path, std::wstring *error)
     LARGE_INTEGER sz;
     if (!GetFileSizeEx(h, &sz)) {
         if (error)
-            *error = L"the file could not be read (" + util::system_error_text(GetLastError()) + L")";
+            *error = trf(L"the file could not be read (%s)", util::system_error_text(GetLastError()).c_str());
         close();
         return false;
     }
     image_size_ = (uint64_t)sz.QuadPart;
 
-    const wchar_t *not_iso = L"this file is not a disc image (no ISO 9660 file system)";
+    const wchar_t *not_iso = N_(L"this file is not a disc image (no ISO 9660 file system)");
     if (image_size_ < (uint64_t)(kFirstDescriptor + 1) * kSectorSize) {
         if (error)
-            *error = not_iso;
+            *error = tr(not_iso);
         close();
         return false;
     }
@@ -174,13 +175,13 @@ bool Image::open(const std::wstring &path, std::wstring *error)
     }
     if (!found) {
         if (error)
-            *error = not_iso;
+            *error = tr(not_iso);
         close();
         return false;
     }
     if (le16(d + 128) != kSectorSize) {
         if (error)
-            *error = L"this disc image uses an unsupported sector size (not a DVD image)";
+            *error = tr(L"this disc image uses an unsupported sector size (not a DVD image)");
         close();
         return false;
     }
@@ -192,7 +193,7 @@ bool Image::open(const std::wstring &path, std::wstring *error)
     uint8_t flags = 0;
     if (!parse_record(d + 156, 34, &root_, &flags) || !root_.is_directory) {
         if (error)
-            *error = L"the disc image's root directory is damaged";
+            *error = tr(L"the disc image's root directory is damaged");
         close();
         return false;
     }
@@ -204,7 +205,7 @@ bool Image::read(const Entry &file, uint64_t offset, void *buf, uint32_t size, s
 {
     if (offset > file.size || size > file.size - offset) {
         if (error)
-            *error = L"read past the end of " + util::widen(file.name);
+            *error = trf(L"read past the end of %s", util::widen(file.name).c_str());
         return false;
     }
     uint8_t *p = static_cast<uint8_t *>(buf);
@@ -229,7 +230,7 @@ bool Image::read_all(const Entry &file, std::string *out, std::wstring *error) c
 {
     if (file.size > (64u << 20)) {
         if (error)
-            *error = util::widen(file.name) + L" is too large to read at once";
+            *error = trf(L"%s is too large to read at once", util::widen(file.name).c_str());
         return false;
     }
     out->assign((size_t)file.size, '\0');
@@ -249,7 +250,7 @@ bool Image::read_dir(const Entry &dir, std::vector<Entry> *out, std::wstring *er
     out->clear();
     if (!dir.is_directory || dir.size > kMaxDirectorySize) {
         if (error)
-            *error = L"the disc image's directories are damaged";
+            *error = tr(L"the disc image's directories are damaged");
         return false;
     }
     std::string data;
@@ -271,7 +272,7 @@ bool Image::read_dir(const Entry &dir, std::vector<Entry> *out, std::wstring *er
         uint8_t flags = 0;
         if (!parse_record(b + pos, sector_end - pos, &e, &flags)) {
             if (error)
-                *error = L"the disc image's directories are damaged";
+                *error = tr(L"the disc image's directories are damaged");
             return false;
         }
         uint8_t name_len = b[pos + 32];
@@ -279,7 +280,8 @@ bool Image::read_dir(const Entry &dir, std::vector<Entry> *out, std::wstring *er
         if (b[pos + 26] || b[pos + 27]) {
             /* Interleaved files (CD-XA audio / video) do not occur on PS2 DVDs. */
             if (error)
-                *error = L"the disc image has an interleaved file (" + util::widen(e.name) + L"), which is not supported";
+                *error = trf(L"the disc image has an interleaved file (%s), which is not supported",
+                             util::widen(e.name).c_str());
             return false;
         }
         if (!self_or_parent) {

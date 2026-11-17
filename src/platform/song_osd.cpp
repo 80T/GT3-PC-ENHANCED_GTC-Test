@@ -3,6 +3,7 @@
 #include "platform/hotkey_hint.h"               /* PC (2026-11-08): control_text */
 #include "platform/input_map.h"
 #include "platform/overlay.h"
+#include "platform/ui_text.h"                  /* PC (2026-11-16): the interface's languages */
 
 #include <windows.h>
 
@@ -98,13 +99,25 @@ std::string control_text(int h, const char *what)
     return hotkey_hint::control_text(h, what);
 }
 
-/* text cut to `width' pixels at scale s ("..." at its end) */
+/* text cut to `width' pixels at scale s ("..." at its end; PC 2026-11-16:
+ * whole UTF-8 characters, counted in cells - a Japanese one two) */
 std::string fit(const std::string &text, float width, int s)
 {
     if (overlay::text_width(text.c_str(), s) <= width)
         return text;
-    const int chars = (int)(width / (6.0f * (float)s)) - 3;
-    return chars > 0 ? text.substr(0, (size_t)chars) + "..." : std::string("...");
+    const int cells = (int)(width / (6.0f * (float)s)) - 3;
+    std::string out;
+    int used = 0;
+    for (size_t i = 0, n; i < text.size(); i += n) {
+        for (n = 1; i + n < text.size() && ((unsigned char)text[i + n] & 0xC0) == 0x80; n++) {
+        }
+        const std::string ch = text.substr(i, n);
+        used += overlay::text_cells(ch.c_str());
+        if (used > cells)
+            break;
+        out += ch;
+    }
+    return out + "...";
 }
 
 } // namespace
@@ -169,30 +182,30 @@ void present(ID3D11RenderTargetView *bb)
         number = g_number;
         count = g_count;
     }
-    /* (the hotkeys are read once, at the game's start) */
-    static const std::string hint = [] {
-        std::string h;
-        const std::string parts[] = {control_text(input_map::kHotPreviousSong, "PREVIOUS"),
-                                     control_text(input_map::kHotNextSong, "NEXT"),
-                                     control_text(input_map::kHotSongMenu, "CLOSE")};
+    /* (the hotkeys are read once, at the game's start; PC 2026-11-16: the
+     * text made at each frame, in the interface's language - it may change) */
+    std::string hint;
+    {
+        const std::string parts[] = {control_text(input_map::kHotPreviousSong, tr("PREVIOUS")),
+                                     control_text(input_map::kHotNextSong, tr("NEXT")),
+                                     control_text(input_map::kHotSongMenu, tr("CLOSE"))};
         for (const std::string &p : parts)
             if (!p.empty())
-                h += (h.empty() ? "" : "   ") + p;
-        return h;
-    }();
+                hint += (hint.empty() ? "" : "   ") + p;
+    }
     int bw, bh;
     overlay::size(&bw, &bh);
     /* the title half again as large as the panels' text (osd.cpp's unit) */
     const int unit = std::max(1, bh / 540), big = std::max(1, (bh * 3 + 540) / 1080), small = unit;
     const float pad = 6.0f * (float)unit, gap = 4.0f * (float)unit;
     const float maxText = (float)bw * 0.45f - 2.0f * pad;
-    char head[48];
+    char head[256];                             /* PC (2026-11-16): 48 before (UTF-8 translations) */
     if (count > 0)
-        snprintf(head, sizeof(head), "RACE SONGS  %d / %d", number, count);
+        snprintf(head, sizeof(head), tr("RACE SONGS  %d / %d"), number, count);
     else
-        snprintf(head, sizeof(head), "RACE SONGS");
+        snprintf(head, sizeof(head), "%s", tr("RACE SONGS"));
     const std::string lines[4] = {fit(head, maxText, small),
-                                  fit(title.empty() ? std::string("NO SONG PLAYING") : title, maxText, big),
+                                  fit(title.empty() ? std::string(tr("NO SONG PLAYING")) : title, maxText, big),
                                   fit(artist, maxText, small), fit(hint, maxText, small)};
     const int scale[4] = {small, big, small, small};
     float textW = 0.0f, h = 2.0f * pad;

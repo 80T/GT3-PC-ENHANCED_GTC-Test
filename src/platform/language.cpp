@@ -4,6 +4,7 @@
 #include "platform/log.h"
 #include "platform/paths.h"
 #include "platform/settings.h"
+#include "platform/ui_text.h"                  /* PC (2026-11-16): the interface's languages (N_) */
 
 #include <string.h>
 
@@ -14,8 +15,9 @@ namespace language {
 namespace {
 
 const char *const kCodes[kCount] = {"JP", "US", "BR", "FR", "GR", "IT", "SP"};
-const char *const kNames[kCount] = {"JAPANESE", "ENGLISH (US)", "ENGLISH (UK)", "FRENCH",
-                                    "GERMAN",   "ITALIAN",      "SPANISH"};
+/* (the F2 menu's names: English, the log's too; translated where shown) */
+const char *const kNames[kCount] = {N_("JAPANESE"), N_("ENGLISH (US)"), N_("ENGLISH (UK)"), N_("FRENCH"),
+                                    N_("GERMAN"),   N_("ITALIAN"),      N_("SPANISH")};
 
 bool present(const std::string &path)
 {

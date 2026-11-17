@@ -1,0 +1,6001 @@
+# GT3 PC's interface text: the English strings (tools/lang_sync; not built in).
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+
+#: src/engine/pgl/native/pgl_targets.cpp
+msgid "NO PICTURE SHOWN"
+msgstr ""
+
+#: src/engine/pgl/native/pgl_targets.cpp
+msgid "THE PICTURE CANNOT BE READ"
+msgstr ""
+
+#: src/engine/pgl/native/pgl_targets.cpp
+msgid "NOT ENOUGH VIDEO MEMORY"
+msgstr ""
+
+#: src/engine/pgl/native/pgl_targets.cpp
+msgid "THE PICTURE COULD NOT BE READ"
+msgstr ""
+
+#: src/engine/pgl/native/pgl_targets.cpp
+msgid "NOT ENOUGH MEMORY"
+msgstr ""
+
+#: src/engine/sound/native/bgm_files.cpp
+msgid "Race start (10-second countdown)"
+msgstr ""
+
+#: src/engine/sound/native/bgm_files.cpp
+msgid "Race finish"
+msgstr ""
+
+#: src/engine/sound/native/bgm_files.cpp src/launcher/song_manager.cpp
+msgid "Race songs"
+msgstr ""
+
+#: src/engine/sound/native/bgm_files.cpp
+msgid "Pre-race menu"
+msgstr ""
+
+#: src/engine/sound/native/bgm_files.cpp
+msgid "Race results"
+msgstr ""
+
+#: src/engine/sound/native/bgm_files.cpp
+msgid "Prize fanfare"
+msgstr ""
+
+#: src/engine/sound/native/bgm_files.cpp
+msgid "Trophy won"
+msgstr ""
+
+#: src/engine/sound/native/bgm_files.cpp
+msgid "Car won"
+msgstr ""
+
+#: src/engine/sound/native/bgm_files.cpp
+msgid "Replay Theater"
+msgstr ""
+
+#: src/engine/sound/native/bgm_files.cpp
+msgid "Race start (4-second countdown)"
+msgstr ""
+
+#: src/engine/sound/native/bgm_files.cpp
+msgid "Not used by the game"
+msgstr ""
+
+#: src/engine/sound/native/bgm_files.cpp
+msgid "License gold"
+msgstr ""
+
+#: src/engine/sound/native/bgm_files.cpp
+msgid "License silver"
+msgstr ""
+
+#: src/engine/sound/native/bgm_files.cpp
+msgid "License bronze"
+msgstr ""
+
+#: src/engine/sound/native/bgm_files.cpp
+msgid "License failed / disqualified"
+msgstr ""
+
+#: src/engine/sound/native/bgm_files.cpp
+msgid "License earned"
+msgstr ""
+
+#: src/engine/sound/native/bgm_files.cpp
+msgid "Demo race"
+msgstr ""
+
+#: src/game/app/pc_challenge.cpp
+msgid "CHALLENGE MODES - DAY %d"
+msgstr ""
+
+#: src/game/app/pc_challenge.cpp
+msgid "NEXT DAY: PAUSED"
+msgstr ""
+
+#: src/game/app/pc_challenge.cpp
+msgid "LICENSE PAUSE: %d DAY LEFT"
+msgstr ""
+
+#: src/game/app/pc_challenge.cpp
+msgid "LICENSE PAUSE: %d DAYS LEFT"
+msgstr ""
+
+#: src/game/app/pc_challenge.cpp
+msgid "YEN"
+msgstr ""
+
+#: src/game/app/pc_challenge.cpp
+msgid "CR."
+msgstr ""
+
+#: src/game/app/pc_challenge.cpp
+msgid "NEXT DAY: -%s %s (MAX)"
+msgstr ""
+
+#: src/game/app/pc_challenge.cpp
+msgid "NEXT DAY: -%s %s"
+msgstr ""
+
+#: src/game/app/pc_challenge.cpp
+msgid "LICENSE TEST: NO DECAY"
+msgstr ""
+
+#: src/game/app/pc_challenge.cpp
+msgid "POWER: %s (MIN)"
+msgstr ""
+
+#: src/game/app/pc_challenge.cpp
+msgid "POWER: %s"
+msgstr ""
+
+#: src/game/app/pc_challenge.cpp
+msgid "NEXT DAY: %s"
+msgstr ""
+
+#: src/game/app/pc_challenge.cpp
+msgid "COURSE SIZE: %s (MIN)"
+msgstr ""
+
+#: src/game/app/pc_challenge.cpp
+msgid "COURSE SIZE: %s"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "CUSTOM CAMERA"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "CAR CENTER"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp src/platform/settings_menu.cpp
+msgid "BUMPER CAM"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp src/platform/settings_menu.cpp
+msgid "CHASE CAM"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "COCKPIT CAM"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "CHASE"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "ONBOARD"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "FROM"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "TYPE"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp src/game/app/pc_headcam.cpp
+msgid "SIDE"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp src/game/app/pc_headcam.cpp
+msgid "HEIGHT"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp src/game/app/pc_headcam.cpp
+msgid "FORWARD"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "PAN"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp src/game/app/pc_headcam.cpp
+msgid "TILT"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "ANGLE"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "FOV"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "TURN"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "PITCH"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "ROLL"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "SPEED SHAKE"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "SLIP SHAKE"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "SIDE FORCE"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "BUMPS"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "SWAY"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "%d cameras already: delete one"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "No custom camera in view"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "Camera deleted: %s"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "%+8.1f DEG"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "%8.1f DEG"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "RIGIDITY (100: FIXED TO THE CAR)"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "every car"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "NEW"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "SWITCH TO A CUSTOM CAMERA"
+msgstr ""
+
+#: src/game/app/pc_customcam.cpp
+msgid "Camera saved: %s"
+msgstr ""
+
+#: src/game/app/pc_debugcam.cpp
+msgid "DEBUG CAMERA SPEED %.1f M/S"
+msgstr ""
+
+#: src/game/app/pc_debugcam.cpp
+msgid "DEBUG CAMERA FIELD OF VIEW %.0f"
+msgstr ""
+
+#: src/game/app/pc_detail.cpp
+msgid "CAMERA: %s"
+msgstr ""
+
+#: src/game/app/pc_frame.cpp
+msgid "REPLAY SPEED %s"
+msgstr ""
+
+#: src/game/app/pc_headcam.cpp
+msgid "COCKPIT CAMERA CALIBRATION"
+msgstr ""
+
+#: src/game/app/pc_headcam.cpp
+msgid "SWITCH TO THE COCKPIT VIEW"
+msgstr ""
+
+#: src/game/app/pc_headcam.cpp
+msgid "MENU MODEL"
+msgstr ""
+
+#: src/game/app/pc_headcam.cpp
+msgid "%+7.1f DEG"
+msgstr ""
+
+#: src/game/app/pc_headcam.cpp
+msgid "%s   COCKPIT%s"
+msgstr ""
+
+#: src/game/app/pc_headcam.cpp src/platform/settings_menu.cpp src/platform/texture_menu.cpp
+msgid "OFF"
+msgstr ""
+
+#: src/game/app/pc_headcam.cpp
+msgid "ON (NOT FOUND)"
+msgstr ""
+
+#: src/game/app/pc_headcam.cpp src/platform/settings_menu.cpp src/platform/texture_menu.cpp
+msgid "ON"
+msgstr ""
+
+#: src/game/camera/T378_onboard_camera.cpp
+msgid "Driver"
+msgstr ""
+
+#: src/game/camera/T378_onboard_camera.cpp
+msgid "Chase"
+msgstr ""
+
+#: src/game/camera/T378_onboard_camera.cpp
+msgid "reserved"
+msgstr ""
+
+#: src/game/camera/T378_onboard_camera.cpp
+msgid "Mirror-L"
+msgstr ""
+
+#: src/game/camera/T378_onboard_camera.cpp
+msgid "Mirror-R"
+msgstr ""
+
+#: src/game/camera/T378_onboard_camera.cpp
+msgid "Nose"
+msgstr ""
+
+#: src/game/camera/T378_onboard_camera.cpp
+msgid "Option-3"
+msgstr ""
+
+#: src/game/camera/T378_onboard_camera.cpp
+msgid "Roof"
+msgstr ""
+
+#: src/game/camera/T378_onboard_camera.cpp
+msgid "Back"
+msgstr ""
+
+#: src/game/camera/T378_onboard_camera.cpp
+msgid "Tail"
+msgstr ""
+
+#: src/game/camera/T378_onboard_camera.cpp
+msgid "Side-L"
+msgstr ""
+
+#: src/game/camera/T378_onboard_camera.cpp
+msgid "Side-R"
+msgstr ""
+
+#: src/game/camera/T378_onboard_camera.cpp
+msgid "Option-4"
+msgstr ""
+
+#: src/game/camera/T378_onboard_camera.cpp
+msgid "Option-5"
+msgstr ""
+
+#: src/game/camera/T378_onboard_camera.cpp
+msgid "FrontWheel-L"
+msgstr ""
+
+#: src/game/camera/T378_onboard_camera.cpp
+msgid "FrontWheel-R"
+msgstr ""
+
+#: src/game/camera/T378_onboard_camera.cpp
+msgid "RearWheel-L"
+msgstr ""
+
+#: src/game/camera/T378_onboard_camera.cpp
+msgid "RearWheel-R"
+msgstr ""
+
+#: src/game/camera/T378_onboard_camera.cpp
+msgid "Option-1"
+msgstr ""
+
+#: src/game/camera/T378_onboard_camera.cpp
+msgid "Option-2"
+msgstr ""
+
+#: src/game/camera/T378_onboard_camera.cpp
+msgid "Cockpit 2"
+msgstr ""
+
+#: src/game/camera/T378_onboard_camera.cpp
+msgid "Cockpit"
+msgstr ""
+
+#: src/game/camera/T378_onboard_camera.cpp
+msgid "Bumper"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Mapping"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Calibration"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Hotkeys"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Press a key, click or move the mouse... (Esc)"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Press or move on any device, press a key or click... (Esc)"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Press a key or click... (Esc)"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Press or move, on any device... (Esc)"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Press the key... (click: cancel)"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Press, on any controller or device... (Esc)"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Hotkey"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Keyboard"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Controller / device (no SDL3.dll)"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Controller / device"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Control"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Any device, key or mouse button"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Wheel"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Gamepad"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "%s (no SDL3.dll)"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Keyboard / mouse"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Automatic (the first wheel)"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Automatic (the next wheel)"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "%s (wheel)"
+msgstr ""
+
+#: src/launcher/controls.cpp src/launcher/ui.cpp
+msgid "%s (not connected)"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "SDL3.dll is missing next to the launcher: no gamepads or wheels."
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "No wheel connected for %s."
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid ""
+"%s\n"
+"Steering %+.2f    Gas %.2f    Brake %.2f    Clutch %s"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "No gamepad connected for %s."
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid ""
+"%s\n"
+"Left stick %+.2f %+.2f    Right stick %+.2f %+.2f    L2 %.2f    R2 %.2f"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Player 2 plays with"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Player 1 plays with"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "The debug camera: %s in a race (the Hotkeys sub-tab)."
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "its hotkey"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Also in the game's settings menu (%s), CONTROLS."
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Also in the game's settings menu, CONTROLS."
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "An H-Shifter has nothing to calibrate: its gates are buttons. Its gears are read with Gear shift behavior Realistic + Clutch and H-shifter On (Game tab, Extras)."
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Analog stick center deadzone and Pedal starting travel."
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Analog stick center deadzone and Trigger starting travel."
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "No SDL3.dll (Esc)"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Taken by %s (Esc)"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Alt+F4 closes the game"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Taken by %s"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Taken by %s, %s"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "%s (click: cancel)"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Reset to defaults"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "The wheel (while both are connected)"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "The controller (while both are connected)"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "Device"
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "A click, then the key, with any of Ctrl, Alt and Shift held; a click again cancels. A right-click or Delete: no key. The game keeps a hotkey's key from the controls, and reads the hotkeys when it starts. Controller / device: a click, then a button, D-pad direction or axis on any controller, wheel or other device (Esc cancels). A controller's works on any controller; the press also reaches the game."
+msgstr ""
+
+#: src/launcher/controls.cpp
+msgid "The hotkey %s's (Esc)"
+msgstr ""
+
+#: src/launcher/databases.cpp
+msgid "the check of the database failed (%s); the files are kept"
+msgstr ""
+
+#: src/launcher/databases.cpp
+msgid "(not deleted: %s)"
+msgstr ""
+
+#: src/launcher/databases.cpp
+msgid "database\\common: %d race display rows named"
+msgstr ""
+
+#: src/launcher/databases.cpp
+msgid "database\\common, naming its race display rows: %s"
+msgstr ""
+
+#: src/launcher/databases.cpp
+msgid "Databases written (<name>.sqlite3), the files they were made of deleted: %s."
+msgstr ""
+
+#: src/launcher/databases.cpp
+msgid "Updated: %s."
+msgstr ""
+
+#: src/launcher/databases.cpp
+msgid "Not converted: %s."
+msgstr ""
+
+#: src/launcher/engines.cpp
+msgid "Gran Turismo 3 PC Enhanced - Engine Selector"
+msgstr ""
+
+#: src/launcher/engines.cpp
+msgid "Not found (%s, %s): %s"
+msgstr ""
+
+#: src/launcher/engines.cpp
+msgid "Choose an engine's folder (it holds gt3launcher.exe and gt3pc.exe)"
+msgstr ""
+
+#: src/launcher/engines.cpp
+msgid "Add engine"
+msgstr ""
+
+#: src/launcher/engines.cpp
+msgid ""
+"%s is not an engine: it has no %s and %s.\n"
+"\n"
+"An engine is the folder \"Build Mod Plugin.cmd\" makes."
+msgstr ""
+
+#: src/launcher/engines.cpp
+msgid "That is this launcher's own folder: it is the first engine of the list."
+msgstr ""
+
+#: src/launcher/engines.cpp
+msgid "That engine is in the list already."
+msgstr ""
+
+#: src/launcher/engines.cpp
+msgid "The list is full: remove an engine first."
+msgstr ""
+
+#: src/launcher/engines.cpp
+msgid ""
+"Make sure this engine is from a source you trust.\n"
+"\n"
+"%s\n"
+"%s\n"
+"\n"
+"An engine is a program: its launcher and its game run on this PC as any program you start, with your files and your settings in reach. Nothing checks what it does.\n"
+"\n"
+"Add it to the list?"
+msgstr ""
+
+#: src/launcher/engines.cpp
+msgid "Choose the engine to start:"
+msgstr ""
+
+#: src/launcher/engines.cpp
+msgid "&Start"
+msgstr ""
+
+#: src/launcher/engines.cpp
+msgid "&Add engine..."
+msgstr ""
+
+#: src/launcher/engines.cpp src/launcher/mod_manager.cpp src/launcher/song_manager.cpp
+#: src/launcher/texture_manager.cpp
+msgid "&Remove"
+msgstr ""
+
+#: src/launcher/engines.cpp src/launcher/ui.cpp
+msgid "E&xit"
+msgstr ""
+
+#: src/launcher/gameconf.cpp
+msgid "the database does not read as the file"
+msgstr ""
+
+#: src/launcher/gameconf.cpp
+msgid "the check of its database failed (%s); the .gcf is kept"
+msgstr ""
+
+#: src/launcher/gameconf.cpp
+msgid "%s (kept)"
+msgstr ""
+
+#: src/launcher/gameconf.cpp
+msgid "its database cannot be read without warnings (%s): kept"
+msgstr ""
+
+#: src/launcher/gameconf.cpp
+msgid "its database lacks tables the game takes from it: kept"
+msgstr ""
+
+#: src/launcher/gameconf.cpp
+msgid "newer than its database, which the game reads: kept (delete the database to have it converted)"
+msgstr ""
+
+#: src/launcher/gameconf.cpp
+msgid "%s: kept (its sections no table holds could not be put in the database)"
+msgstr ""
+
+#: src/launcher/gameconf.cpp
+msgid "Game configs written as databases (gameconf\\<config>.sqlite3), their .gcf files deleted: %s."
+msgstr ""
+
+#: src/launcher/gameconf.cpp
+msgid "The .gcf files beside their databases deleted: %s."
+msgstr ""
+
+#: src/launcher/gameconf.cpp
+msgid "Left as it was: %s."
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "it could not be read"
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "the image name \"%s\" is no file's name"
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "two images are named %s (but for their case)"
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "a file has the folder's name"
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "the folder could not be created: %s"
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "%s.png could not be written"
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "%s.png does not read back the same"
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "%s is not a PNG the game can read"
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "the game's pack from the folder: %s"
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "%s is missing from the game's pack"
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "%s differs in the game's pack"
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "%s's draw size differs in the game's pack"
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "%s could not be written"
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "it could not be deleted: %s"
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "(the disc image it was installed from, %s, could not be read)"
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "(its install does not name the disc image it came from)"
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "The HUD pictures' sizes (<pack>\\sizes.txt: a picture of another size is drawn at it) read from the disc image for %d pack folder."
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "The HUD pictures' sizes (<pack>\\sizes.txt: a picture of another size is drawn at it) read from the disc image for %d pack folders."
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "For %d pack folder the sizes are the pictures' as they are now%s: a picture already resized needs its line in sizes.txt set to the original's."
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "For %d pack folders the sizes are the pictures' as they are now%s: a picture already resized needs its line in sizes.txt set to the original's."
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "%s: %s; it is kept"
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "%d pack"
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "%d packs"
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "%d picture"
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "%d pictures"
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "Image packs written as folders of PNG files (<pack>\\<image>.png): %s, %s, %d already there kept; the .imgs files deleted."
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "Image packs written as folders of PNG files (<pack>\\<image>.png): %s, %s; the .imgs files deleted."
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "Image packs left as they were:"
+msgstr ""
+
+#: src/launcher/image_packs.cpp
+msgid "Left as they were:"
+msgstr ""
+
+#: src/launcher/inflate.cpp
+msgid "not a gzip member"
+msgstr ""
+
+#: src/launcher/inflate.cpp
+msgid "truncated gzip header"
+msgstr ""
+
+#: src/launcher/inflate.cpp
+msgid "the gzip member is too large"
+msgstr ""
+
+#: src/launcher/inflate.cpp
+msgid "damaged deflate data"
+msgstr ""
+
+#: src/launcher/inflate.cpp
+msgid "the unpacked data does not match its gzip check"
+msgstr ""
+
+#: src/launcher/install.cpp src/launcher/stills.cpp
+msgid "The folder %s could not be created: %s."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "The demo replay %s is missing from the launcher."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "Writing %s failed: %s."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "Putting the game files in place: waiting for another program to let go of them (the game, an antivirus scan?)..."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "Reading the list of game files..."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "The game files could not be listed (%s). Make a new image of the disc."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "There is not enough free disk space in %s: the game files need %s, and %s is free."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "Unpacking the game files..."
+msgstr ""
+
+#: src/launcher/install.cpp src/launcher/ui.cpp
+msgid "The installation was cancelled."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "The disc image could not be read (%s)."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "The game file %s could not be unpacked (%s). Make a new image of the disc."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "wrong size"
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "Converting the music to WAV..."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "Writing the game configs as databases..."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "Writing the database folder as databases..."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "Writing the arcade menus' stills as PNG files..."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "Writing the image packs as PNG files..."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "Writing the demo replays..."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "Writing the install marker failed: %s."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "Putting the game files in place..."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "The installed game files in %s could not be replaced: %s."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "If the game is running, close it and install again."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "The game files could not be put in place as %s: %s."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "Another program kept a file of %s open (an antivirus scan of the new files, the search indexer, an Explorer window in it). Install again."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "The installed game files in %s could not be checked. Install again."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "Installed %d game files (%s) in %s."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "Its courses are in courses\\%s (the unified structure)."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "%d demo replays (the licence tests', the arcade time trials') written over the disc's."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "The game files in data were moved to %s (a data folder per version)."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "The disc image could not be read: %s."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "This disc image is not a Gran Turismo 3 engine disc: it has no CORE.GT3 (the engine's main program)."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "The disc image has CORE.GT3 but no game volume (GT3.VOL) beside it: the image is damaged. Make a new image of the disc."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "The disc image is incomplete: it ends before %s does. Make a new image of the disc."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "%s on this disc image is damaged (it has no RoFS table of contents). Make a new image of the disc."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "Checking the disc image..."
+msgstr ""
+
+#: src/launcher/install.cpp src/launcher/ui.cpp
+msgid "The disc image could not be used: %s."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "Extracting %s..."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "Installing %s..."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "Checking gt3.vol..."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "The file %s could not be opened: %s."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "The disc image %s could not be used: %s."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "%s is not a version the game plays (USA, Europe, Japan). \"Install game files...\" extracts its files as data only."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "The disc image's game volume could not be read. Make a new image of the disc."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "The disc image's game volume could not be read (%s). Make a new image of the disc."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "The disc image's game files could not be listed (%s). Make a new image of the disc."
+msgstr ""
+
+#: src/launcher/install.cpp
+msgid "If the game is running from this disc image, close it first."
+msgstr ""
+
+#: src/launcher/iso9660.cpp
+msgid "it ends too early (is the image complete?)"
+msgstr ""
+
+#: src/launcher/iso9660.cpp
+msgid "the file could not be opened (%s)"
+msgstr ""
+
+#: src/launcher/iso9660.cpp
+msgid "the file could not be read (%s)"
+msgstr ""
+
+#: src/launcher/iso9660.cpp
+msgid "this file is not a disc image (no ISO 9660 file system)"
+msgstr ""
+
+#: src/launcher/iso9660.cpp
+msgid "this disc image uses an unsupported sector size (not a DVD image)"
+msgstr ""
+
+#: src/launcher/iso9660.cpp
+msgid "the disc image's root directory is damaged"
+msgstr ""
+
+#: src/launcher/iso9660.cpp
+msgid "read past the end of %s"
+msgstr ""
+
+#: src/launcher/iso9660.cpp
+msgid "%s is too large to read at once"
+msgstr ""
+
+#: src/launcher/iso9660.cpp
+msgid "the disc image's directories are damaged"
+msgstr ""
+
+#: src/launcher/iso9660.cpp
+msgid "the disc image has an interleaved file (%s), which is not supported"
+msgstr ""
+
+#: src/launcher/main.cpp
+msgid "The engine's launcher could not be started: %s."
+msgstr ""
+
+#: src/launcher/mod_manager.cpp
+msgid "No mods installed. Select `Add folder` to add a mod"
+msgstr ""
+
+#: src/launcher/mod_manager.cpp src/launcher/texture_manager.cpp
+msgid "1 folder, %d enabled."
+msgstr ""
+
+#: src/launcher/mod_manager.cpp src/launcher/texture_manager.cpp
+msgid "%d folders, %d enabled."
+msgstr ""
+
+#: src/launcher/mod_manager.cpp src/launcher/texture_manager.cpp
+msgid "By %s"
+msgstr ""
+
+#: src/launcher/mod_manager.cpp src/launcher/texture_manager.cpp
+msgid "not there"
+msgstr ""
+
+#: src/launcher/mod_manager.cpp
+msgid "empty"
+msgstr ""
+
+#: src/launcher/mod_manager.cpp
+msgid "1 file"
+msgstr ""
+
+#: src/launcher/mod_manager.cpp
+msgid "%d files"
+msgstr ""
+
+#: src/launcher/mod_manager.cpp src/launcher/texture_manager.cpp
+msgid "The folder's path has characters gt3pc.ini cannot keep. Rename it, or move it to a folder with a plainer path."
+msgstr ""
+
+#: src/launcher/mod_manager.cpp
+msgid "Mods"
+msgstr ""
+
+#: src/launcher/mod_manager.cpp
+msgid "This is the game's data folder, or holds or is inside one. Choose a folder of its own for the mod."
+msgstr ""
+
+#: src/launcher/mod_manager.cpp
+msgid "Choose a mod folder (laid out as the game's data folder)"
+msgstr ""
+
+#: src/launcher/mod_manager.cpp src/launcher/song_manager.cpp src/launcher/texture_manager.cpp
+msgid "Add"
+msgstr ""
+
+#: src/launcher/mod_manager.cpp
+msgid "Added at the top: its files win over the folders below it."
+msgstr ""
+
+#: src/launcher/mod_manager.cpp src/launcher/texture_manager.cpp
+msgid "Removed from the list (the folder and its files are kept)."
+msgstr ""
+
+#: src/launcher/mod_manager.cpp src/launcher/texture_manager.cpp
+msgid "%s is not there."
+msgstr ""
+
+#: src/launcher/mod_manager.cpp
+msgid "No version is installed: install one first (Play tab)."
+msgstr ""
+
+#: src/launcher/mod_manager.cpp
+msgid "Choose (or make, with New folder) the folder for the template"
+msgstr ""
+
+#: src/launcher/mod_manager.cpp
+msgid "Create template"
+msgstr ""
+
+#: src/launcher/mod_manager.cpp
+msgid "This folder is not empty. Make the data folder's folders in it anyway? Nothing in it is changed or deleted."
+msgstr ""
+
+#: src/launcher/mod_manager.cpp
+msgid "The template could not be made: %s."
+msgstr ""
+
+#: src/launcher/mod_manager.cpp
+msgid "Template made: %d folders. Edit mod.txt and mod.png; add files where the game has its own."
+msgstr ""
+
+#: src/launcher/mod_manager.cpp
+msgid "Template made. Edit these two files to set the mod's title, author, description and picture:"
+msgstr ""
+
+#: src/launcher/mod_manager.cpp
+msgid "Mod"
+msgstr ""
+
+#: src/launcher/mod_manager.cpp src/launcher/save_manager.cpp src/launcher/texture_manager.cpp
+msgid "Folder"
+msgstr ""
+
+#: src/launcher/mod_manager.cpp
+msgid "Files"
+msgstr ""
+
+#: src/launcher/mod_manager.cpp
+msgid ""
+"Tip: A mod folder is laid out the same as the game's data folder and overrides the original files.\n"
+"Top = 1st Priority"
+msgstr ""
+
+#: src/launcher/mod_manager.cpp src/launcher/texture_manager.cpp
+msgid "&Add folder..."
+msgstr ""
+
+#: src/launcher/mod_manager.cpp src/launcher/texture_manager.cpp
+msgid "Move &up"
+msgstr ""
+
+#: src/launcher/mod_manager.cpp src/launcher/texture_manager.cpp
+msgid "Move &down"
+msgstr ""
+
+#: src/launcher/mod_manager.cpp src/launcher/texture_manager.cpp
+msgid "&Open folder"
+msgstr ""
+
+#: src/launcher/mod_manager.cpp
+msgid "Create &template..."
+msgstr ""
+
+#: src/launcher/mod_manager.cpp src/launcher/save_manager.cpp src/launcher/song_manager.cpp
+#: src/launcher/texture_manager.cpp
+msgid "Close"
+msgstr ""
+
+#: src/launcher/music.cpp
+msgid "The music conversion was stopped (%d files converted); it carries on with the rest the next time."
+msgstr ""
+
+#: src/launcher/music.cpp
+msgid "%s: not an .ads (left as it is)"
+msgstr ""
+
+#: src/launcher/music.cpp
+msgid "%s: writing its .wav failed: %s"
+msgstr ""
+
+#: src/launcher/music.cpp
+msgid "%s: converted, but it could not be deleted: %s"
+msgstr ""
+
+#: src/launcher/music.cpp
+msgid "ads.inf: %s (no ads.txt written)"
+msgstr ""
+
+#: src/launcher/music.cpp
+msgid "Music: %d files converted to WAV, the list written as bgm\\ads.txt."
+msgstr ""
+
+#: src/launcher/music.cpp
+msgid "Music: %d files converted to WAV."
+msgstr ""
+
+#: src/launcher/music.cpp
+msgid "Not converted:"
+msgstr ""
+
+#: src/launcher/music.cpp src/launcher/song_manager.cpp
+msgid "(%d more)"
+msgstr ""
+
+#: src/launcher/music.cpp
+msgid "bgm\\ads.txt could not be written: %s."
+msgstr ""
+
+#: src/launcher/music.cpp
+msgid "the original songs' beat markers repaired (1 track: the conversion had misread them from ads.inf)."
+msgstr ""
+
+#: src/launcher/music.cpp
+msgid "the original songs' beat markers repaired (%d tracks: the conversion had misread them from ads.inf)."
+msgstr ""
+
+#: src/launcher/music.cpp
+msgid "%s: missing, or not a music file the game plays"
+msgstr ""
+
+#: src/launcher/music.cpp
+msgid "%s: an .mp3 in a disc image is not read"
+msgstr ""
+
+#: src/launcher/music.cpp
+msgid "%s: no samples could be read from the disc image"
+msgstr ""
+
+#: src/launcher/music.cpp
+msgid "%s: Media Foundation does not decode it"
+msgstr ""
+
+#: src/launcher/music.cpp
+msgid "%s: no samples could be read"
+msgstr ""
+
+#: src/launcher/music.cpp
+msgid "%s: its name has characters the game cannot open (rename it)"
+msgstr ""
+
+#: src/launcher/music.cpp src/launcher/song_manager.cpp
+msgid "%s: not a format the game plays (a .wav of PCM or float samples, an .mp3)"
+msgstr ""
+
+#: src/launcher/music.cpp
+msgid "1 new song added to the race songs."
+msgstr ""
+
+#: src/launcher/music.cpp
+msgid "%d new songs added to the race songs."
+msgstr ""
+
+#: src/launcher/save_card.cpp
+msgid "USA"
+msgstr ""
+
+#: src/launcher/save_card.cpp
+msgid "Europe"
+msgstr ""
+
+#: src/launcher/save_card.cpp
+msgid "Japan"
+msgstr ""
+
+#: src/launcher/save_card.cpp src/launcher/save_manager.cpp
+msgid "Game data"
+msgstr ""
+
+#: src/launcher/save_card.cpp
+msgid "Car settings"
+msgstr ""
+
+#: src/launcher/save_card.cpp
+msgid "Car setting"
+msgstr ""
+
+#: src/launcher/save_card.cpp
+msgid "Replays"
+msgstr ""
+
+#: src/launcher/save_card.cpp
+msgid "Replay"
+msgstr ""
+
+#: src/launcher/save_card.cpp
+msgid "Best lap replays"
+msgstr ""
+
+#: src/launcher/save_card.cpp
+msgid "Best lap replay"
+msgstr ""
+
+#: src/launcher/save_card.cpp
+msgid "License replays"
+msgstr ""
+
+#: src/launcher/save_card.cpp
+msgid "License replay"
+msgstr ""
+
+#: src/launcher/save_card.cpp
+msgid "Other saves"
+msgstr ""
+
+#: src/launcher/save_card.cpp
+msgid "Other save"
+msgstr ""
+
+#: src/launcher/save_card.cpp
+msgid "Day %s, Cr. %s, %s cars, license %s"
+msgstr ""
+
+#: src/launcher/save_card.cpp
+msgid "Day %s, Cr. %s, %s cars"
+msgstr ""
+
+#: src/launcher/save_card.cpp src/launcher/save_manager.cpp
+msgid "%s, %s KB, saved %s"
+msgstr ""
+
+#: src/launcher/save_card.cpp
+msgid "%s (%s), %s KB, saved %s"
+msgstr ""
+
+#: src/launcher/save_card.cpp
+msgid "Power %s PS"
+msgstr ""
+
+#: src/launcher/save_card.cpp
+msgid "Time %s"
+msgstr ""
+
+#: src/launcher/save_card.cpp
+msgid "1 lap"
+msgstr ""
+
+#: src/launcher/save_card.cpp
+msgid "%s laps"
+msgstr ""
+
+#: src/launcher/save_card.cpp
+msgid "%s PS"
+msgstr ""
+
+#: src/launcher/save_card.cpp
+msgid "Top speed %s km/h"
+msgstr ""
+
+#: src/launcher/save_card.cpp
+msgid "%s kg"
+msgstr ""
+
+#: src/launcher/save_card.cpp
+msgid "Mode: %s"
+msgstr ""
+
+#: src/launcher/save_card.cpp
+msgid "Comment: %s"
+msgstr ""
+
+#: src/launcher/save_card.cpp
+msgid "Folder: %s"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Saves"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "%d saves selected, %s KB."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "No save folders yet. New makes one: a blank memory card."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "%s is not there any more."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "no saves"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "1 save"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "%s saves"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "%s: %s, %s KB used of %s KB (%s KB free), in memory card slot %d."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "%s: %s, %s KB used of %s KB (%s KB free)."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Game data (%s)"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Save"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Kind"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Size"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Saved"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "%s KB"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "(No card)"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "%s (not found)"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Slot"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Used"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "No save folders yet: New makes one."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "1 save folder in %s"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "%s save folders in %s"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Memory card slot %d: no card. The game takes it when it starts (in the game: F2 > MEMORY CARDS)."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Memory card slot %d: %s. The game takes it when it starts (in the game: F2 > MEMORY CARDS)."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Could not make %s: %s."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Made %s, a blank memory card. Type its name, or Enter to keep this one."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "There is a save folder named %s already."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid ""
+"Could not rename %s:\n"
+"%s.\n"
+"\n"
+"Is the game using it?"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Renamed %s to %s."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid ""
+"Delete every save in %s?\n"
+"\n"
+"1 save, %s KB. The folder stays, empty: a blank memory card."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid ""
+"Delete every save in %s?\n"
+"\n"
+"%s saves, %s KB. The folder stays, empty: a blank memory card."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "This cannot be undone."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Cleared %s."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Not all of %s could be deleted: %s"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Delete the save folder %s and everything in it?"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "It has no saves."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "1 save, %s KB."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "%s saves, %s KB."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Memory card slot %d will have no card."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Deleted %s."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid ""
+"%s has this save already:\n"
+"%s\n"
+"(%s)\n"
+"\n"
+"Replace it with this one?"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "%s has not enough space for %s: it needs %s KB, %s KB free."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Could not replace %s in %s: %s"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Could not copy %s: %s"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Copied 1 save to %s."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Copied %s saves to %s."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "%s not copied."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "%s KB free"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "There is no other save folder to copy to: New makes one."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Delete this save from %s?"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid ""
+"Delete these %d saves from %s?\n"
+"\n"
+"%s KB."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Deleted 1 save."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Deleted %s saves."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Not deleted: %s"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Each save folder is one memory card (8 MB). The game's memory card slots take the folders picked here when it starts; in the game, F2 > MEMORY CARDS swaps them."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "The folders: %s"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Memory card slot &1:"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Memory card slot &2:"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Save &folders"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "&New"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "&Rename"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "C&lear..."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "&Delete..."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "&Copy to..."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Delete sa&ves..."
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Slot %d: no card"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Slot %d: %s"
+msgstr ""
+
+#: src/launcher/save_manager.cpp
+msgid "Slot %d: %s (not found)"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "checking..."
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "missing"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "not a format the game plays"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "%s, on the disc"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "Saved to bgm\\ads.txt. The game reads it when it starts."
+msgstr ""
+
+#: src/launcher/song_manager.cpp src/launcher/ui.cpp
+msgid "Songs"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "making..."
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "the disc's"
+msgstr ""
+
+#: src/launcher/song_manager.cpp src/launcher/texture_manager.cpp
+msgid "none"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "%s BPM"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "set"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "new"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "(silence)"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "%s (+%d more)"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "changed"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "%s (missing)"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "Songs - %s"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "Race songs (%d)"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "Changes are saved to bgm\\ads.txt as they are made."
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "bgm\\ads.txt has lines the game skips (%d); saving writes the list anew without them."
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "Music"
+msgstr ""
+
+#: src/launcher/song_manager.cpp src/launcher/ui.cpp
+msgid "All files"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "Looking at the songs..."
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "No .wav or .mp3 files there."
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "No songs added."
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "1 song added. They play from where they are: nothing was copied."
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "%d songs added. They play from where they are: nothing was copied."
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "%d already on the list."
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "Not added:"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "Add songs to the race music (.wav, .mp3)"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "Add a folder of songs to the race music (with the folders under it)"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "\"%s\" is off the race songs. Its file was not touched."
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "Choose the music for this event (.wav, .mp3)"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "Title"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "Artist"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "Markers"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "File"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "Format"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "Event"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "Music file"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "Source"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "Version"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "Tip: Music files are in the bgm folder. Optional: Add the beats per minute to get replay markers for a song"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "Event music"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "BPM"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "&Add files..."
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "Add a &folder..."
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "A&dd a file..."
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "&Original"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "Each event plays one music file. Original: the disc's. Silence: no music for the event."
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "tempo"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "\"%s\": no tempo, no beat markers (the replay cameras cut by time)."
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "BPM: the song's beats a minute, a number from %s to %s."
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "Making the beat markers of \"%s\" at %s BPM..."
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "no beats found in its sound"
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "\"%s\": %d beats, %d bars, %d camera cuts. The replays' cameras follow them."
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "The beat markers of \"%s\" were not made: %s."
+msgstr ""
+
+#: src/launcher/song_manager.cpp
+msgid "Looking at the songs... %d of %d"
+msgstr ""
+
+#: src/launcher/stills.cpp
+msgid "not a picture"
+msgstr ""
+
+#: src/launcher/stills.cpp
+msgid "it does not decode"
+msgstr ""
+
+#: src/launcher/stills.cpp
+msgid "the file could not be written"
+msgstr ""
+
+#: src/launcher/stills.cpp
+msgid "the file does not read back the same"
+msgstr ""
+
+#: src/launcher/stills.cpp
+msgid "%s could not be read as an archive of stills: it is left as it is."
+msgstr ""
+
+#: src/launcher/stills.cpp
+msgid "its entry is damaged"
+msgstr ""
+
+#: src/launcher/stills.cpp
+msgid "its name is no file's"
+msgstr ""
+
+#: src/launcher/stills.cpp
+msgid "Still %d of %s: %s. The archive is kept."
+msgstr ""
+
+#: src/launcher/stills.cpp
+msgid "%s could not be deleted: %s."
+msgstr ""
+
+#: src/launcher/stills.cpp
+msgid "Stills written as PNG files (%s\\<name>.png): %d, %d already there kept; %s deleted."
+msgstr ""
+
+#: src/launcher/stills.cpp
+msgid "Stills written as PNG files (%s\\<name>.png): %d; %s deleted."
+msgstr ""
+
+#: src/launcher/texture_manager.cpp
+msgid "No texture folders installed. Select `Add folder` to add one"
+msgstr ""
+
+#: src/launcher/texture_manager.cpp
+msgid "1 texture"
+msgstr ""
+
+#: src/launcher/texture_manager.cpp
+msgid "%d textures"
+msgstr ""
+
+#: src/launcher/texture_manager.cpp
+msgid "Textures"
+msgstr ""
+
+#: src/launcher/texture_manager.cpp
+msgid "Choose a texture folder (replacement textures named by their hashes)"
+msgstr ""
+
+#: src/launcher/texture_manager.cpp
+msgid "Added at the top: its textures win over the folders below it."
+msgstr ""
+
+#: src/launcher/texture_manager.cpp
+msgid "This folder is in the list already: ticked where it is."
+msgstr ""
+
+#: src/launcher/texture_manager.cpp
+msgid "%s could not be made."
+msgstr ""
+
+#: src/launcher/texture_manager.cpp
+msgid "Pack"
+msgstr ""
+
+#: src/launcher/texture_manager.cpp
+msgid ""
+"Tip: A texture folder holds replacement textures (.png, .jpg, .dds) named by their hashes, as the game dumps them.\n"
+"Top = 1st Priority"
+msgstr ""
+
+#: src/launcher/texture_manager.cpp
+msgid "Open dum&ps folder"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Gran Turismo 3 A-Spec - Launcher"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Play"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Display"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Graphics"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Audio"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Game"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Controls"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Debug"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Remove from this list (the file stays)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Installed"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Disc"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid ""
+"No disc image has been added yet.\n"
+"\n"
+"\"Add disc...\" adds a Gran Turismo 3 disc image (USA, Europe, Japan) straight from its file, without installing it, and keeps it in this list."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Settings"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "General"
+msgstr ""
+
+#: src/launcher/ui.cpp src/platform/settings_menu.cpp
+msgid "HUD"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Cameras"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Extras"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Surfaces"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Challenges"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid ""
+"No disc image has been added yet.\n"
+"Choose \"Add disc...\" and pick a Gran Turismo 3 disc image."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid ""
+"Ready.\n"
+"\"Add disc...\" adds another disc image; its Play plays it without installing it."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid ""
+"Ready.\n"
+"\"Install game files...\" installs another version from its disc image."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid ""
+"The game files need unpacking from gt3.vol (installed by an earlier version).\n"
+"Choose \"Install game files...\" to unpack them."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid ""
+"No version is installed.\n"
+"Choose \"Install game files...\" and pick a Gran Turismo 3 disc image."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Installed from %s."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Incomplete (%s): install it again from its disc image."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Not installed: \"Install game files...\" with its disc image."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Data only, not playable:"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "No mod folders are installed"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "No mod folders enabled"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "1 mod folder"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "%ld mod folders"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "No texture folders are installed"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "No texture folders enabled"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "1 texture folder"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "%ld texture folders"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Time played: %.1f hours"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Disc image: %s"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "%s: 1 race song"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "%s: %zu race songs"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "No version is installed and no disc image is added."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "No new songs. Add .wav / .mp3 / .ads files into the bgm folder and restart the launcher to add more"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "%s of %s (%s)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Not found: %s"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "No version is installed and no disc image is added: install one, or add a disc image (Play tab)."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "The desktop's"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Default (60 Hz)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Desktop (%s)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "%s (the window's size)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Off"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "%s (not side by side)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Automatic"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "%s (supersampling)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "%s (horizontal, mirrored)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "%s (horizontal)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "%s (height)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "%.0f degrees"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Always menu wheels"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Japanese"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "English (US)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "English (UK)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "French"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "German"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Italian"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Spanish"
+msgstr ""
+
+#: src/launcher/ui.cpp src/platform/settings_menu.cpp
+msgid "Default"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Automatic (%s)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Vertical sync"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "1 frame"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "2 frames"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "3 frames"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Menu aspect"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Original (4:3)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Stretch"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Movie aspect"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Original"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Anti-aliasing"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Anisotropic filtering"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Resolution scale"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Levels of detail"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Normal"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Always best"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Road reflection"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "High"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Road reflection resolution"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Half"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Full"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Car reflections"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Low"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Env map detail"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Replay depth of field"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Reduced"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Test"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Render distance"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Smoke opacity"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Reduced (75%%)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Menu wheels"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "On"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Race wheels from"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Menu tires"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Rear view: bumper cam"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Rear view: chase cam"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Menu music"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Race music"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Replay music"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Menu sound effects"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Race sound effects"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Replay sound effects"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Audio output"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Auto"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Low latency kernel streaming"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Audio buffer"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Language"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Interface language"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Speed unit"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "mph, miles"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Power unit"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Torque unit"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Starting credits"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Custom"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Custom starting credits"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Split screen"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Horizontal"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Vertical"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Two monitors"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Split screen HUD"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Digital"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Analog"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Single player HUD"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Race HUD max width"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "HUD safe zone"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Replay logo"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Field of view"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Replay field of view"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Replay cameras"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Chase cam angle"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Cockpit camera"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Cockpit field of view"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Course scale X"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Course scale Y"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Course scale Z"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Prize car randomizer"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Course randomizer"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Extended"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Unrestrict wheels"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Buy cars not for sale"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Cars in a race"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Override race limits"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Rev cut behavior"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Realistic"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Gear shift behavior"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Realistic + Clutch"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "H-shifter"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Tire wear (player)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Tire wear (enemies)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Power (player)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Power (enemies)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Grip (player)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Grip (enemies)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Tarmac grip"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Kerbs grip"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Grass grip"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Sand grip"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Gravel grip"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Dirt grip"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "SF grip"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "WD grip"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "HT grip"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Wet tarmac grip"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Wet kerbs grip"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Wet HT grip"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Tarmac resistance"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Kerbs resistance"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Grass resistance"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Sand resistance"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Gravel resistance"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Dirt resistance"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "SF resistance"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "WD resistance"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "HT resistance"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Wet tarmac resistance"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Wet kerbs resistance"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Wet HT resistance"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Money decay"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Car decay"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Course shrinkage"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Debug console"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Log file loads"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Log D3D syncs"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Physics threads"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Auto (all cores)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Fill garage"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Fill money"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Unlock arcade tracks"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Unlock all licenses"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Menu race model"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Race model level of detail"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "0 (finest)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "2 (coarsest)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "%s (as set)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Windowed"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Borderless window"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Fullscreen"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid ""
+"Realistic + Clutch: nothing is mapped to the clutch.\n"
+"\n"
+"Add a mapping in the Controls tab: choose a controller or a wheel, then its Clutch row (an axis or a pedal; 85 %% of its travel is fully out).\n"
+"\n"
+"Until then the gears shift as Realistic."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid ""
+"Realistic + Clutch: the clutch is mapped to%s\n"
+"\n"
+"85 %% of its travel is fully out. Change it in the Controls tab."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "The launcher shows the new language from its next start."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "The game (%s) was not found in %s."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "The game could not be started: %s."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "%s: %s (%s) Set their titles, artists and tempos (BPM: the replay cameras' beat markers) in the song manager."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "%s: not added, %s."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "%d demo replays"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid ""
+"The game configs were written as SQLite databases, which the game reads from now on:\n"
+"%s\n"
+"\n"
+"Each is gameconf\\<config>.sqlite3 in the version's folder, a table for each part of the config, for any SQLite editor (DB Browser for SQLite...); the tables' schema says what the columns are. The .gcf files they were made of are deleted."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid ""
+"The game configs' .gcf files were deleted - their databases (gameconf\\<config>.sqlite3), which the game reads, hold what they held:\n"
+"%s"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid ""
+"Game data files were written as SQLite databases, which the game reads from now on:\n"
+"%s\n"
+"\n"
+"A region's car database is database\\paramdb<region>.sqlite3 in the version's folder (its parameters, strings and labels in one), the colours and race modes database\\common.sqlite3, the texts the game prints in each language text\\realtime.sqlite3, for any SQLite editor; the tables' schema says what the columns are. The files they were made of are deleted."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid ""
+"Databases updated (the race display's rows that had only a number for a name now have names, which the game takes as before):\n"
+"%s"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid ""
+"The arcade menus' course and class stills were written as PNG files, which the game reads from now on:\n"
+"%s"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid ""
+"The image packs (.imgs: the race HUD's pictures, race\\<language>\\display.imgs, and the packs the game leaves unused) were written as folders of PNG files, which the game reads from now on - race\\US\\display\\<picture>.png, any picture editor's, alpha included; a picture of another size is drawn at its original's (the folder's sizes.txt):\n"
+"%s"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid ""
+"The demo replays of the licence tests and the arcade time trials built into this launcher were written where the installed ones differed (demo\\<name>, and the disc's copies of it):\n"
+"%s"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid ""
+"Left as they were:\n"
+"%s"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Converting the music of %s to WAV (once)..."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid ""
+"The game now reads the unpacked files in the data folder, and no longer uses gt3.vol (%s), which an earlier version installed.\n"
+"\n"
+"Delete gt3.vol?"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "gt3.vol could not be deleted: %s."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "The music conversion was stopped: it carries on the next time the launcher starts."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "(The game plays the files not converted as they were.)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "The installation failed."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "PlayStation 2 disc image"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid ""
+"This folder has gt3.vol, the game files as an earlier version installed them.\n"
+"\n"
+"Unpack the game files from gt3.vol? (No: install them from a disc image instead.)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Choose a Gran Turismo 3 disc image (USA, Europe, Japan; other Gran Turismo 3 engine discs: data only)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "%s is not a version the game plays: its files are extracted as data only, into %s."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "%s is installed as %s, into %s."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "The files of %s there are replaced."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Extract them?"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Install?"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "&Play"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Choose a Gran Turismo 3 disc image to add (USA, Europe, Japan)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "%s added: its Play starts it."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Cancelling..."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Stop converting the music? (It carries on the next time the launcher starts.)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Stop installing the game files?"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Frame rate cap"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "&Install game files..."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Add &disc..."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Display mode"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Resolution"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Refresh rate"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Multi-Monitor"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Song &manager..."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "Split screen 2nd monitor"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "M&ods..."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "&Textures..."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "&Saves..."
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "&Cancel"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid ""
+"The music is being converted.\n"
+"\n"
+"Stop the conversion and exit? (It carries on the next time the launcher starts.)"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid ""
+"The game files are being installed.\n"
+"\n"
+"Stop the installation and exit?"
+msgstr ""
+
+#: src/launcher/ui.cpp
+msgid "The launcher window could not be created."
+msgstr ""
+
+#: src/launcher/util.cpp
+msgid "%.2f GB"
+msgstr ""
+
+#: src/launcher/util.cpp
+msgid "%.0f MB"
+msgstr ""
+
+#: src/launcher/util.cpp
+msgid "%.0f KB"
+msgstr ""
+
+#: src/launcher/util.cpp
+msgid "%u bytes"
+msgstr ""
+
+#: src/launcher/volume.cpp
+msgid "the volume could not be read"
+msgstr ""
+
+#: src/launcher/volume.cpp
+msgid "the volume has no RoFS table of contents"
+msgstr ""
+
+#: src/launcher/volume.cpp
+msgid "the volume's table of contents does not fit the volume"
+msgstr ""
+
+#: src/launcher/volume.cpp
+msgid "the volume's table of contents could not be read"
+msgstr ""
+
+#: src/launcher/volume.cpp
+msgid "the volume's table of contents is damaged"
+msgstr ""
+
+#: src/launcher/volume.cpp
+msgid "a file of the volume lies past its end"
+msgstr ""
+
+#: src/platform/audio.cpp
+msgid ""
+"AUDIO: KERNEL STREAMING: THE DEVICE IS BUSY\n"
+"(WINDOWS OR ANOTHER PROGRAM IS PLAYING ON IT).\n"
+"PLAYING THROUGH WASAPI INSTEAD."
+msgstr ""
+
+#: src/platform/audio.cpp
+msgid ""
+"AUDIO: KERNEL STREAMING: THE DEVICE IS BUSY\n"
+"(WINDOWS OR ANOTHER PROGRAM IS PLAYING ON IT).\n"
+"NO SOUND: TRYING AGAIN EVERY 2 S.\n"
+"OR: %s, AUDIO OUTPUT, AUTO OR WASAPI."
+msgstr ""
+
+#: src/platform/audio.cpp
+msgid ""
+"AUDIO: KERNEL STREAMING: THE DEVICE IS BUSY\n"
+"(WINDOWS OR ANOTHER PROGRAM IS PLAYING ON IT).\n"
+"NO SOUND: TRYING AGAIN EVERY 2 S.\n"
+"OR: THE SETTINGS MENU, AUDIO OUTPUT, AUTO OR WASAPI."
+msgstr ""
+
+#: src/platform/audio.cpp
+msgid ""
+"AUDIO: KERNEL STREAMING HAS THIS DEVICE TO ITSELF.\n"
+"OTHER PROGRAMS (VOICE CHAT, BROWSER) ARE SILENT ON IT\n"
+"WHILE THE GAME PLAYS. TO SHARE IT: F2, AUDIO OUTPUT, WASAPI."
+msgstr ""
+
+#: src/platform/audio.cpp
+msgid "Audio buffer insufficient. Raising buffer by 0.5ms..."
+msgstr ""
+
+#: src/platform/audio.cpp
+msgid "Persistent insufficient audio buffer. Switching output..."
+msgstr ""
+
+#: src/platform/audio.cpp
+msgid "KS EXCLUSIVE %.1f + %.1f MS"
+msgstr ""
+
+#: src/platform/audio.cpp
+msgid "KS %.1f + %.1f MS"
+msgstr ""
+
+#: src/platform/audio.cpp
+msgid "WASAPI %.1f + %.1f MS"
+msgstr ""
+
+#: src/platform/audio.cpp
+msgid "NONE (KS BUSY)"
+msgstr ""
+
+#: src/platform/audio.cpp src/platform/settings_menu.cpp
+msgid "NONE"
+msgstr ""
+
+#: src/platform/challenge_osd.cpp src/platform/settings_menu.cpp
+msgid "MONEY DECAY"
+msgstr ""
+
+#: src/platform/challenge_osd.cpp src/platform/settings_menu.cpp
+msgid "CAR DECAY"
+msgstr ""
+
+#: src/platform/challenge_osd.cpp src/platform/settings_menu.cpp
+msgid "COURSE SHRINKAGE"
+msgstr ""
+
+#: src/platform/challenge_osd.cpp src/platform/settings_menu.cpp
+msgid "CHALLENGE MODES"
+msgstr ""
+
+#: src/platform/challenge_osd.cpp
+msgid "%s ACTIVE"
+msgstr ""
+
+#: src/platform/cockpit_osd.cpp src/platform/hotkey_hint.cpp
+msgid "UP"
+msgstr ""
+
+#: src/platform/cockpit_osd.cpp src/platform/hotkey_hint.cpp
+msgid "DOWN"
+msgstr ""
+
+#: src/platform/cockpit_osd.cpp
+msgid "AXIS"
+msgstr ""
+
+#: src/platform/cockpit_osd.cpp src/platform/hotkey_hint.cpp
+msgid "LEFT"
+msgstr ""
+
+#: src/platform/cockpit_osd.cpp src/platform/hotkey_hint.cpp
+msgid "RIGHT"
+msgstr ""
+
+#: src/platform/cockpit_osd.cpp
+msgid "ADJUST"
+msgstr ""
+
+#: src/platform/cockpit_osd.cpp
+msgid "CAMERA CONTROLS TOO"
+msgstr ""
+
+#: src/platform/cockpit_osd.cpp
+msgid "THE OTHER PAD: TAKE OVER"
+msgstr ""
+
+#: src/platform/cockpit_osd.cpp
+msgid "SAVE"
+msgstr ""
+
+#: src/platform/cockpit_osd.cpp
+msgid "CANCEL"
+msgstr ""
+
+#: src/platform/cockpit_osd.cpp
+msgid "RESET %s"
+msgstr ""
+
+#: src/platform/cockpit_osd.cpp src/platform/settings_menu.cpp
+msgid "PLAYER 2"
+msgstr ""
+
+#: src/platform/cockpit_osd.cpp src/platform/settings_menu.cpp
+msgid "PLAYER 1"
+msgstr ""
+
+#: src/platform/debug_camera.cpp
+msgid "DEBUG CAMERA ENABLED"
+msgstr ""
+
+#: src/platform/debug_camera.cpp
+msgid "DEBUG CAMERA DISABLED"
+msgstr ""
+
+#: src/platform/debug_camera.cpp
+msgid "DEBUG CAMERA LOCKED"
+msgstr ""
+
+#: src/platform/debug_camera.cpp
+msgid "DEBUG CAMERA UNLOCKED"
+msgstr ""
+
+#: src/platform/debug_camera.cpp
+msgid "DEBUG CAMERA Y-AXIS LOOK ON"
+msgstr ""
+
+#: src/platform/debug_camera.cpp
+msgid "DEBUG CAMERA Y-AXIS LOOK OFF"
+msgstr ""
+
+#: src/platform/debug_camera.cpp
+msgid "DEBUG CAMERA GROUND COLLISION ON"
+msgstr ""
+
+#: src/platform/debug_camera.cpp
+msgid "DEBUG CAMERA GROUND COLLISION OFF"
+msgstr ""
+
+#: src/platform/frame_step.cpp
+msgid "PAUSED  TICK +%u"
+msgstr ""
+
+#: src/platform/frame_step.cpp
+msgid "%s NEXT TICK   %s RESUME"
+msgstr ""
+
+#: src/platform/frame_step.cpp
+msgid "%s NEXT TICK"
+msgstr ""
+
+#: src/platform/gamepad.cpp src/platform/hotkey_hint.cpp
+msgid "CROSS"
+msgstr ""
+
+#: src/platform/gamepad.cpp src/platform/hotkey_hint.cpp
+msgid "CIRCLE"
+msgstr ""
+
+#: src/platform/gamepad.cpp src/platform/hotkey_hint.cpp
+msgid "SQUARE"
+msgstr ""
+
+#: src/platform/gamepad.cpp src/platform/hotkey_hint.cpp
+msgid "TRIANGLE"
+msgstr ""
+
+#: src/platform/gamepad.cpp src/platform/hotkey_hint.cpp
+msgid "GUIDE"
+msgstr ""
+
+#: src/platform/gamepad.cpp
+msgid "HOME"
+msgstr ""
+
+#: src/platform/hotkey_hint.cpp src/platform/texture_menu.cpp
+msgid "SELECT"
+msgstr ""
+
+#: src/platform/hotkey_hint.cpp src/platform/settings_menu.cpp
+msgid "START"
+msgstr ""
+
+#: src/platform/hud_colors.h
+msgid "Text color"
+msgstr ""
+
+#: src/platform/hud_colors.h
+msgid "Messages color"
+msgstr ""
+
+#: src/platform/hud_colors.h
+msgid "Warnings color"
+msgstr ""
+
+#: src/platform/hud_colors.h
+msgid "Event board color"
+msgstr ""
+
+#: src/platform/hud_colors.h
+msgid "Gap ahead color"
+msgstr ""
+
+#: src/platform/hud_colors.h
+msgid "Gap behind color"
+msgstr ""
+
+#: src/platform/hud_colors.h
+msgid "Odometer color"
+msgstr ""
+
+#: src/platform/hud_colors.h
+msgid "Meter dial color"
+msgstr ""
+
+#: src/platform/hud_colors.h
+msgid "Meter marks color"
+msgstr ""
+
+#: src/platform/hud_colors.h
+msgid "Red zone color"
+msgstr ""
+
+#: src/platform/hud_colors.h
+msgid "Needle color"
+msgstr ""
+
+#: src/platform/hud_colors.h
+msgid "Rev bar color"
+msgstr ""
+
+#: src/platform/hud_colors.h
+msgid "Shift lamp color"
+msgstr ""
+
+#: src/platform/hud_colors.h
+msgid "VSC lamp color"
+msgstr ""
+
+#: src/platform/hud_colors.h
+msgid "TCS lamp color"
+msgstr ""
+
+#: src/platform/hud_colors.h
+msgid "Brake lamps color"
+msgstr ""
+
+#: src/platform/hud_colors.h
+msgid "Throttle bar color"
+msgstr ""
+
+#: src/platform/hud_colors.h
+msgid "Brake bar color"
+msgstr ""
+
+#: src/platform/hud_colors.h
+msgid "Map car color"
+msgstr ""
+
+#: src/platform/hud_colors.h
+msgid "Map others color"
+msgstr ""
+
+#: src/platform/hud_colors.h
+msgid "Back panels color"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Controller 1"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Controller 2"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Wheel 1"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Wheel 2"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Debug camera"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "H-Shifter 1"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "H-Shifter 2"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "D-pad up"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "D-pad down"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "D-pad left"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "D-pad right"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Cross"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Circle"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Square"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Triangle"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "L3 (left stick click)"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "R3 (right stick click)"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Select"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Start"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Left stick up"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Left stick down"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Left stick left"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Left stick right"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Right stick up"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Right stick down"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Right stick left"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Right stick right"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Clutch"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Chase cam left"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Chase cam right"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Chase cam up"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Chase cam down"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Neutral"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "1st"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "2nd"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "3rd"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "4th"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "5th"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "6th"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "7th"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "8th"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "9th"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Reverse"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Steer left"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Steer right"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Gas pedal"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Brake pedal"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Clutch pedal"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Move forward"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Move back"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Move left"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Move right"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Move up"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Move down"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Look up"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Look down"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Look left"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Look right"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Move speed up"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Move speed down"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Field of view up"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Field of view down"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Lock camera (drive)"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Y-axis look"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Ground collision"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Left stick dead zone"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Right stick dead zone"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Trigger dead zone"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Steering dead zone"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Gas pedal dead zone"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Brake pedal dead zone"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Clutch pedal dead zone"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "South (A / Cross)"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "East (B / Circle)"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "West (X / Square)"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "North (Y / Triangle)"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Back / Share"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Guide"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Start / Options"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Left stick click"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Right stick click"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Left shoulder (LB / L1)"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Right shoulder (RB / R1)"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Misc (Share / Mic)"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Right paddle 1"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Left paddle 1"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Right paddle 2"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Left paddle 2"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Touchpad"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Misc 2"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Misc 3"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Misc 4"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Misc 5"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Misc 6"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Left trigger -"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Left trigger (LT / L2)"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Right trigger -"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Right trigger (RT / R2)"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Hat %d up"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Hat %d right"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Hat %d down"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Hat %d left"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Mouse left"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Mouse right"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Mouse middle"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Mouse X1"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Mouse X2"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Settings menu"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Esc menu"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Frame time monitor"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Windowed / full screen"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Pause / next tick"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Resume"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Flicker capture (debug)"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Draw trace (debug)"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Debug camera (in a race)"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Song changer (in a race)"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Previous song (song changer)"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Next song (song changer)"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Frame capture (debug)"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Calibration: previous axis"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Calibration: next axis"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Calibration: step down"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Calibration: step up"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Calibration: save"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Calibration: cancel"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Calibration: axis to 0"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Texture replacement menu"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Refresh replacement textures"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Replacement textures on / off"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Screenshot"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Button %d"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Axis %d (whole, at rest %s)"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Axis %d %c"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Mouse wheel up"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Mouse wheel down"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Mouse move left"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Mouse move right"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Mouse move up"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "Mouse move down"
+msgstr ""
+
+#: src/platform/input_map.cpp
+msgid "%s on %s"
+msgstr ""
+
+#: src/platform/language.cpp
+msgid "JAPANESE"
+msgstr ""
+
+#: src/platform/language.cpp
+msgid "ENGLISH (US)"
+msgstr ""
+
+#: src/platform/language.cpp
+msgid "ENGLISH (UK)"
+msgstr ""
+
+#: src/platform/language.cpp
+msgid "FRENCH"
+msgstr ""
+
+#: src/platform/language.cpp
+msgid "GERMAN"
+msgstr ""
+
+#: src/platform/language.cpp
+msgid "ITALIAN"
+msgstr ""
+
+#: src/platform/language.cpp
+msgid "SPANISH"
+msgstr ""
+
+#: src/platform/save_folders.cpp
+msgid "A save folder needs a name."
+msgstr ""
+
+#: src/platform/save_folders.cpp
+msgid "That name is too long (64 characters at most)."
+msgstr ""
+
+#: src/platform/save_folders.cpp
+msgid "A folder's name cannot have any of these characters:  < > : \" / \\ | ? *"
+msgstr ""
+
+#: src/platform/save_folders.cpp
+msgid "That name is not a folder's name."
+msgstr ""
+
+#: src/platform/save_folders.cpp
+msgid "A folder's name cannot start with a space, nor end with a space or a dot."
+msgstr ""
+
+#: src/platform/save_folders.cpp
+msgid "That name is one Windows keeps for a device (CON, NUL, COM1 ...)."
+msgstr ""
+
+#: src/platform/save_folders.cpp
+msgid "That name has characters gt3pc_engine.ini cannot keep: use plainer letters."
+msgstr ""
+
+#: src/platform/screenshot.cpp
+msgid "SCREENSHOT: %s %d X %d"
+msgstr ""
+
+#: src/platform/screenshot.cpp
+msgid "SCREENSHOT COULD NOT BE WRITTEN (SEE THE LOG)"
+msgstr ""
+
+#: src/platform/screenshot.cpp
+msgid "SCREENSHOT: STILL WRITING THE LAST ONES"
+msgstr ""
+
+#: src/platform/screenshot.cpp
+msgid "NO SCREENSHOT: %s"
+msgstr ""
+
+#: src/platform/screenshot.cpp
+msgid "NO THREAD TO WRITE IT"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "NORMAL"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "ALWAYS BEST"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "HIGH"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "HALF"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "FULL"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "LOW"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "REDUCED"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "ALWAYS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "SAVING..."
+msgstr ""
+
+#: src/platform/settings_menu.cpp src/platform/texture_menu.cpp
+msgid "ENTER"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "AUTO"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "STOP"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "ENTER AGAIN"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "REDUCED (75%)"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "TWO MONITORS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "VERTICAL"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "HORIZONTAL"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "ANALOG"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "DIGITAL"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "ITS RED, 0 .. 255. ENTER: THE GAME'S."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "ITS GREEN, 0 .. 255. ENTER: THE GAME'S."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "ITS BLUE, 0 .. 255. ENTER: THE GAME'S."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "RED"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "GREEN"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "BLUE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "SIMPLE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "DETAILED"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "VERBOSE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "WINDOWED"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "BORDERLESS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "FULLSCREEN"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "ORIGINAL (4:3)"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "STRETCH"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "ORIGINAL"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "1 FRAME"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "2 FRAMES"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "3 FRAMES"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "LOW LATENCY KERNEL STREAMING"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "AUTO (%s) - NEXT START"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "AUTO (%s)"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "%s - NEXT START"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "MPH, MILES"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "CUSTOM"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "%d%% MIRRORED"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "NONE (NO SAVE FOLDERS)"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "%s (NOT FOUND)"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "%s (AFTER THE SAVE)"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE SAVE FOLDER IN THIS SLOT: ONE OF THE ENGINE'S SAVES FOLDER.\n"
+"NONE: NO CARD. CHANGING IT SWAPS THE CARD: THE GAME SEES THE NEW ONE\n"
+"AT ONCE (ITS GAME DATA: LOAD IT IN THE GAME). ENTER: THE NEXT ONE.\n"
+"THE LAUNCHER'S SAVES... WINDOW MAKES, RENAMES AND CLEARS THEM."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "EXTENDED"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "REALISTIC"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "REALISTIC + CLUTCH"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE CLUTCH IS MAPPED TO"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"NOTHING IS MAPPED TO THE CLUTCH\n"
+"ADD ONE IN THE LAUNCHER: CONTROLS, A CONTROLLER\n"
+"OR A WHEEL, CLUTCH. UNTIL THEN THE GEARS\n"
+"SHIFT AS REALISTIC."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "%.2f (GAME'S)"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE ROAD (THE DATABASE'S TA). ENTER: THE GAME'S."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE KERBS (GU). ENTER: THE GAME'S."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE GRASS (GR). ENTER: THE GAME'S."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE SAND TRAPS (SA). ENTER: THE GAME'S."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE GRAVEL TRAPS: LAGUNA SECA (GV). ENTER: THE GAME'S."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE RALLY COURSES' DIRT (DT). ENTER: THE GAME'S."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"A ROAD SURFACE OF ROME, COTE D'AZUR, GRAND VALLEY,\n"
+"DEEP FOREST AND THE TEST CIRCLES (THE DATABASE'S SF).\n"
+"ENTER: THE GAME'S."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"A SURFACE OF SMOKEY MOUNTAIN SOUTH (THE DATABASE'S WD).\n"
+"ENTER: THE GAME'S."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"A ROAD SURFACE OF TOKYO R246 AND ROUTE 5 DRY\n"
+"(THE DATABASE'S HT). ENTER: THE GAME'S."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE WET ROAD: ROUTE 5 WET, THE WET CIRCLES (WR).\n"
+"ENTER: THE GAME'S."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE WET KERBS (WH). ENTER: THE GAME'S."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "HT WET: ROUTE 5 WET (WG). ENTER: THE GAME'S."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "NOT KNOWN YET"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "%s (%d CAR)"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "%s (%d CARS)"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "%d LAP"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "%d LAPS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "FINISH LINE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "MAX SPEED (6845 M)"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "0 (FINEST)"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "2 (COARSEST)"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "WHEEL"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "CONTROLLER"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE DEVICE IN USE WHILE BOTH A CONTROLLER AND A WHEEL ARE CONNECTED."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"HOW FAR THE STICK MOVES BEFORE IT COUNTS.\n"
+"ENTER: 0%."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"HOW FAR THE TRIGGERS MOVE BEFORE THEY COUNT.\n"
+"ENTER: 0%."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"HOW FAR THE WHEEL TURNS BEFORE IT STEERS.\n"
+"ENTER: 0%."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"HOW FAR THE PEDAL GOES BEFORE IT COUNTS.\n"
+"ENTER: 0%."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "DISPLAY"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"SCREEN MODE, MENU ASPECT, VERTICAL SYNC, FRAME RATE\n"
+"AND FRAME TIMES."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "SCREEN MODE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"WINDOWED: A RESIZABLE WINDOW.\n"
+"BORDERLESS: A WINDOW COVERING THE MONITOR.\n"
+"FULLSCREEN: EXCLUSIVE, THE MONITOR'S DISPLAY MODE."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "MENU ASPECT"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "MOVIE ASPECT"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "VERTICAL SYNC"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"OFF: NO VSYNC.\n"
+"1-3: VSYNC ON, NUMBER OF BUFFERED FRAMES.\n"
+"1 FRAME PROVIDES THE BEST FRAME PACING\n"
+"IF YOUR MACHINE CAN MAINTAIN FRAME RATE."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "FRAME RATE CAP"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE FRAMES AT MOST THIS OFTEN (A FRAME TIME CAP);\n"
+"OFF: AS FAST AS THEY ARE DRAWN."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "  FRAME TIME CAP"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE SAME CAP IN MS, 0.01 A STEP (HOLD: FASTER);\n"
+"BELOW 1 MS, OFF."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "FRAME TIME MONITOR"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE FRAME TIMES OVER THE TOP LEFT CORNER.\n"
+"DETAILED: WITH THE FRAME TIME'S BREAKDOWN.\n"
+"VERBOSE: ALSO THE GPU'S TIME BY SECTION."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "GRAPHICS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"RESOLUTION, ANTI-ALIASING, DETAIL.\n"
+"SMOKE OPACITY. REAR VIEW."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "RESOLUTION SCALE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE GAME'S RESOLUTION, OF THE WINDOW'S.\n"
+"ABOVE 100%: SCALED DOWN TO THE WINDOW\n"
+"(SUPERSAMPLING AA); MORE GPU. ENTER: 100%."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "ANTI-ALIASING"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"FXAA: THE RACE VIEWS' 3D, BEFORE THE HUD.\n"
+"MSAA: EVERY PICTURE, MENUS TOO; MORE GPU.\n"
+"AGSS: MSAA WITH THE 3D SHADED AT EVERY SAMPLE (SUPERSAMPLING):\n"
+"TEXTURE EDGES (TREES, FENCES) AND SHIMMER TOO; MUCH MORE GPU."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "ANISOTROPIC FILTERING"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"SHARPER TEXTURES ON SURFACES SEEN AT AN ANGLE (THE ROAD).\n"
+"THE TRANSPARENT PARTS OF TEXTURES ADD NO COLOR (NO HIDDEN COLORS SHOWING)."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "LEVELS OF DETAIL"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "BEST: CARS, COURSES, AND SPLIT-SCREEN ALWAYS AT FULL DETAIL."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "ROAD REFLECTION"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "HIGH IMPACT ON FRAME RATE WITH MANY CARS."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "ROAD REFLECTION RESOLUTION"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE REFLECTIONS ON ROUTE 5, ROUTE 11 AND THE TEST CIRCLES.\n"
+"NORMAL: THE PS2'S (64 X 128 FOR THE WHOLE SCREEN).\n"
+"HALF: HALF THE SCREEN'S RESOLUTION. FULL: THE SCREEN'S. SHARPER; MORE GPU."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "CAR REFLECTIONS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "ENV MAP DETAIL"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "CAR REFLECTIONS QUALITY"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "REPLAY DEPTH OF FIELD"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "RENDER DISTANCE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"HOW FAR THE COURSE AND THE CARS ARE DRAWN,\n"
+"OF THE ORIGINAL GAME'S DISTANCE."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "SMOKE OPACITY"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE TIRE SMOKE AND DUST.\n"
+"REDUCED: 75% OF THEIR OPACITY. HALF: 50%."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "MENU WHEELS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "SHOWROOM WHEEL MODELS IN RACES"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "RACE WHEELS FROM"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "WHEEL MODEL SWITCH THRESHOLD"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "MENU TIRES"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "SHOWROOM TIRE MODELS IN RACES"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "REAR VIEW"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE REAR-VIEW MIRROR, BY CAMERA.\n"
+"HIGH IMPACT ON FRAME RATE."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE REAR-VIEW MIRROR IN THE BUMPER CAMERA.\n"
+"HIGH IMPACT ON FRAME RATE."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE REAR-VIEW MIRROR IN THE CHASE CAMERA.\n"
+"HIGH IMPACT ON FRAME RATE."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "CAMERAS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"FIELD OF VIEW, EXTRA CAMERAS,\n"
+"THE CHASE CAMERA'S ANGLE, THE COCKPIT CAMERA.\n"
+"CUSTOM CAMERAS."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "FIELD OF VIEW"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE DRIVING VIEWS' ANGLE, OF EACH CAMERA'S OWN.\n"
+"NOT THE MIRROR. ENTER: 100%."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "  REPLAY FIELD OF VIEW"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE REPLAY CAMERAS' ANGLE, OF EACH CAMERA'S OWN\n"
+"(THE ATTRACT MODE'S DEMOS TOO). ENTER: 100%."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "REPLAY CAMERAS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "CYCLE THROUGH REPLAY CAMERAS IN RACES (MIRRORS, NOSE, ROOF, TAIL, WHEELS...)."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "CHASE CAM ANGLE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"CHASE CAMERA'S HEIGHT ADJUSTMENT.\n"
+"ABOVE 0 LOOKS DOWN ON THE CAR. ENTER: 0."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "COCKPIT CAMERA"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE COCKPIT VIEW FROM THE DRIVER'S HEAD, THE HEAD HIDDEN.\n"
+"THE CHASE CAMERA'S CONTROLS LOOK ROUND.\n"
+"THE VIEW BUTTON REACHES IT, EXTRA CAMERAS OR NOT."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "COCKPIT FIELD OF VIEW"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE COCKPIT CAMERA'S VERTICAL ANGLE IN DEGREES.\n"
+"ENTER: 90."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "CALIBRATE COCKPIT CAMERA"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"IN A RACE, IN THE COCKPIT VIEW: THE D-PAD, THE ARROW KEYS\n"
+"OR THE CAMERA CONTROLS MOVE THE CAMERA AND TILT IT, ONE\n"
+"AXIS AT A TIME; SAVED FOR THIS CAR MODEL.\n"
+"ITS MENU MODEL ROW: THE CAR DRAWN WITH ITS SHOWROOM MODEL.\n"
+"ENTER: START (THE MENU CLOSES, A PANEL SHOWS THE KEYS)."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "CUSTOM CAMERAS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"YOUR OWN CAMERAS, ON THE VIEW BUTTON AFTER THE COCKPIT:\n"
+"FOR EVERY CAR, OR FOR ONE CAR MODEL.\n"
+"MADE AND EDITED IN A RACE. SAVED IN GT3PC.INI."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "NEW CAMERA: EVERY CAR"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"IN A RACE: A NEW CAMERA FOR EVERY CAR, STARTED AS A COPY\n"
+"OF THE VIEW SHOWN. ITS EDITOR: POSITION WITHOUT LIMITS,\n"
+"PAN, TILT, ANGLE, FIELD OF VIEW, RIGIDITY.\n"
+"ENTER: START (THE MENU CLOSES, A PANEL SHOWS THE KEYS)."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "NEW CAMERA: THIS CAR"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"IN A RACE: A NEW CAMERA FOR THE MODEL OF THE CAR IN VIEW\n"
+"ALONE, STARTED AS A COPY OF THE VIEW SHOWN.\n"
+"ENTER: START (THE MENU CLOSES, A PANEL SHOWS THE KEYS)."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "EDIT CAMERA"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"IN A RACE, IN A CUSTOM CAMERA'S VIEW: THE D-PAD, THE ARROW\n"
+"KEYS OR THE CAMERA CONTROLS CHANGE IT, ONE ROW AT A TIME.\n"
+"ENTER: START (THE MENU CLOSES, A PANEL SHOWS THE KEYS)."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "DELETE CAMERA"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"IN A RACE: DELETES THE CUSTOM CAMERA IN VIEW.\n"
+"ENTER TWICE."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "SPLIT SCREEN"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE 2-PLAYER SPLIT SCREEN."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"HORIZONTAL: ONE VIEW ABOVE THE OTHER.\n"
+"VERTICAL: SIDE BY SIDE.\n"
+"TWO MONITORS: PLAYER 2 ON A SECOND MONITOR.\n"
+"FROM THE NEXT RACE OR REPLAY."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "AUDIO"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE SOUND OUTPUT AND THE VOLUMES."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "VOLUME"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE MUSIC'S AND THE SOUND EFFECTS' LEVELS.\n"
+"THE GAME'S OWN OPTIONS STILL TURN EACH ON OR OFF."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "MENU MUSIC"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE MENUS' MUSIC. 100%: THE MUSIC FILES AS THEY ARE.\n"
+"ENTER: 100%."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "RACE MUSIC"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"A RACE'S MUSIC: THE SONGS AND THE JINGLES.\n"
+"100%: THE MUSIC FILES AS THEY ARE. ENTER: 50%."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "REPLAY MUSIC"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"A REPLAY'S MUSIC (THE DEMOS' TOO).\n"
+"100%: THE MUSIC FILES AS THEY ARE. ENTER: 50%."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "MENU SOUND EFFECTS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE MENUS' SOUNDS: CURSOR, DECIDE, CANCEL.\n"
+"ENTER: 100%."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "RACE SOUND EFFECTS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "A RACE'S CARS AND COURSE. ENTER: 100%."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "REPLAY SOUND EFFECTS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "A REPLAY'S CARS AND COURSE. ENTER: 100%."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "AUDIO OUTPUT"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"KS: DIRECT-TO-DRIVER AUDIO, BEST LATENCY.\n"
+"OTHER PROGRAMS MAY NOT HAVE AUDIO\n"
+"IF YOUR AUDIO DEVICE IS NOT SHAREABLE.\n"
+"WASAPI: NORMAL WINDOWS WASAPI, WORSE AUDIO LATENCY\n"
+"AUTO: TRIES KS, ELSE WASAPI."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "AUDIO BUFFER"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"SHORTER: LESS LATENCY.\n"
+" AUTOMATICALLY ADJUSTS IF A CRACKLE IS DETECTED."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "  RUNNING"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE OUTPUT IN USE AND ITS LATENCY\n"
+"(OUTPUT + SCHEDULING)"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "GAME"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE GAME'S LANGUAGE, UNITS AND A NEW GAME'S MONEY.\n"
+"THE RACE HUD."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "LANGUAGE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE MENUS, TEXTS, CAR NAMES AND UNITS.\n"
+"AUTO: THE INSTALLED DISC'S OWN.\n"
+"TAKES EFFECT AT THE NEXT START."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "SPEED UNIT"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"SPEEDS AND DISTANCES.\n"
+"AUTO: THE LANGUAGE'S OWN (US ENGLISH MPH, THE OTHERS KM/H).\n"
+"A RACE'S SPEEDOMETER DIAL: FROM THE NEXT RACE."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "POWER UNIT"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"ENGINE POWER.\n"
+"AUTO: THE LANGUAGE'S OWN (US ENGLISH HP, JAPANESE AND GERMAN PS,\n"
+"UK ENGLISH, ITALIAN AND SPANISH BHP, FRENCH CV)."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "TORQUE UNIT"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"ENGINE TORQUE.\n"
+"AUTO: THE LANGUAGE'S OWN (US ENGLISH FT.LB, THE OTHERS KGF.M)."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "STARTING CREDITS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE MONEY A NEW GAME STARTS WITH (JAPANESE: x100, YEN).\n"
+"VERSION'S OWN: USA / EUROPE 18,000, JAPAN 1,500,000 YEN.\n"
+"FROM THE NEXT NEW GAME.\n"
+"CUSTOM: YOUR OWN AMOUNT."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "CUSTOM AMOUNT"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE MONEY A NEW GAME STARTS WITH: 0 .. 999,999,999.\n"
+"HOLD LEFT / RIGHT FOR BIGGER STEPS. ENTER: 18,000.\n"
+"THE LAUNCHER'S GAME TAB TAKES A TYPED AMOUNT."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE RACE HUD'S WIDTH, SIZE AND METERS. THE REPLAY LOGO.\n"
+"ITS COLORS."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "RACE HUD MAX WIDTH"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "ADJUST SIDE-ANCHORED HUD ELEMENTS."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "HUD SAFE ZONE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE RACE HUD SCALED DOWN TO FIT THIS MUCH\n"
+"OF THE SCREEN. 100%: THE WHOLE SCREEN. ENTER: 100%."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "SINGLE PLAYER HUD"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "A SINGLE PLAYER'S METERS."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "SPLIT SCREEN HUD"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE SPLIT SCREEN'S METERS."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "REPLAY LOGO"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE GT LOGO OVER THE BOTTOM RIGHT CORNER\n"
+"OF THE REPLAYS AND THE DEMOS."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "COLORS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE RACE HUD'S COLORS, EACH BY ITS RED, GREEN AND BLUE.\n"
+"ON AN IMAGE THEY TINT IT. THE LAUNCHER HAS THEM TOO."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "TEXT"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE LAPS, THE RANK, THE GEAR, THE SPEED, THE TIMES."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "MESSAGES"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE TITLE, THE CAR'S NAME, THE START AND FINISH."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "WARNINGS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "WRONG WAY, REVERSE, THE SUGGESTED GEAR, WORN TIRES."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "EVENT BOARD"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE EVENT BOARD'S MESSAGES."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "GAP AHEAD"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "A GAP ON THE EVENT BOARD, AHEAD."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "GAP BEHIND"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "A GAP ON THE EVENT BOARD, BEHIND."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "ODOMETER"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE ODOMETER AND THE TRIP METER."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "METER DIAL"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "TINTS THE METERS' DIAL IMAGES."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "METER MARKS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE MARKS ROUND THE DIALS."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "METER RED ZONE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE MARKS OF THE RED ZONE."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "NEEDLE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE METERS' NEEDLES."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "REV BAR"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "TINTS THE DIGITAL METERS' REV BAR IMAGE."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "SHIFT LAMP"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE SHIFT LAMP, LIT."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "VSC LAMP"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE VSC LAMP, LIT."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "TCS LAMP"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE TCS LAMP, LIT."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "BRAKE AND OIL LAMPS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE HANDBRAKE AND OIL LAMPS, LIT."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THROTTLE BAR"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE THROTTLE'S BAR."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "BRAKE BAR"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE BRAKE'S BAR."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "MAP: CAR SHOWN"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE CAR SHOWN, ON THE MINI MAP."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "MAP: OTHER CARS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE OTHER CARS, ON THE MINI MAP."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "BACK PANELS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE TRANSLUCENT PANELS BEHIND THE HUD, THE UNLIT LAMPS."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "EXTRAS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE COURSES SCALED: THEIR MODELS, ROAD, CAMERAS...\n"
+"THE CARS KEEP THEIR SIZE.\n"
+"RANDOM PRIZE CARS. RANDOM COURSES. CAR MULTIPLIERS.\n"
+"SURFACE GRIP AND RESISTANCE. THE REV CUT BEHAVIOR. THE GEAR SHIFT BEHAVIOR."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "COURSE SCALE X"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE COURSES ALONG THE WORLD'S X (ACROSS).\n"
+"ENTER: 100%. FROM THE NEXT COURSE LOADED.\n"
+"-1000% .. 1000%; NEGATIVE: MIRRORED."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "COURSE SCALE Y"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE COURSES' HEIGHT (THE WORLD'S Y).\n"
+"ENTER: 100%. FROM THE NEXT COURSE LOADED.\n"
+"5% .. 1000%"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "COURSE SCALE Z"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE COURSES ALONG THE WORLD'S Z (ACROSS).\n"
+"ENTER: 100%. FROM THE NEXT COURSE LOADED.\n"
+"-1000% .. 1000%; NEGATIVE: MIRRORED."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "PRIZE CAR RANDOMIZER"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE PRIZE CARS ARE DRAWN FROM ALL CARS IN THE GAME'S DATABASE."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "COURSE RANDOMIZER"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"GT MODE'S CAREER EVENTS WILL HAVE RANDOM COURSES.\n"
+"THE LAPS GET SCALED BY THE LAP LENGTHS.\n"
+"EXTENDED: ANY COURSE OF THE DATABASE, WHATEVER ITS SURFACE."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "UNRESTRICTED WHEELS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid " EVERY CAR CAN ENTER THE WHEEL SHOP AND THE GARAGE'S WHEEL CHANGE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "BUY CARS NOT FOR SALE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "CARS NOT FOR SALE IN SHOWROOMS CAN BE BOUGHT"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "CARS IN A RACE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE AMOUNT OF CARS IN A RACE.\n"
+" IF A RACE HAS A LIMIT, IT WILL NEED TO BE OVERRIDDEN WITH THE SETTING BELOW."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "  OVERRIDE RACE LIMITS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "RALLY AND WET COURSES CAN HAVE MORE CARS TOO."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "REV CUT BEHAVIOR"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"ORIGINAL: THE FUEL IS CUT AT THE REDLINE UNTIL THE REVS DROP 500 RPM.\n"
+"REALISTIC: A SHORT CUT OF A TIME, SHORTER THE HIGHER THE REVS.\n"
+"FROM THE NEXT RACE ENTERED."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "GEAR SHIFT BEHAVIOR"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"ORIGINAL: A SHIFT WAITS FOR THE REVS TO REACH THE NEW GEAR'S.\n"
+"REALISTIC: THE CLUTCH IS OUT FOR A TIME (THE GEARBOX PART, THE FLYWHEEL\n"
+"AND ENGINE BRAKE), THEN SNAPS IN WHEREVER THE REVS ARE. GEAR TYPE 0.\n"
+"DOWNSHIFTS: BLIP THE THROTTLE, ELSE THE ENGINE BRAKES THE WHEELS.\n"
+"REALISTIC + CLUTCH: A MANUAL GEARBOX IS WORKED BY YOUR CLUTCH (85% IS OUT).\n"
+"FROM THE NEXT RACE ENTERED."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "H-SHIFTER"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE GEARS FROM YOUR H-SHIFTER'S GATES (THE LAUNCHER: CONTROLS,\n"
+"H-SHIFTER 1 / 2); NEUTRAL FREES THE CLUTCH. A GEAR TAKEN WITHOUT\n"
+"THE CLUTCH PAST 85% GRINDS.\n"
+"FROM THE NEXT RACE ENTERED."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "CAR MULTIPLIERS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE CARS' TIRE WEAR, POWER AND GRIP."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "TIRE WEAR (PLAYER)"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"HOW FAST THE TIRES WEAR, WHERE THE RACE HAS TIRE WEAR.\n"
+"0%: NO WEAR. ENTER: 100%."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "TIRE WEAR (ENEMIES)"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "POWER (PLAYER)"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE ENGINE'S POWER AT EVERY RPM. ENTER: 100%."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "POWER (ENEMIES)"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "GRIP (PLAYER)"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE TIRES' GRIP. ENTER: 100%."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "GRIP (ENEMIES)"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE TIRES' GRIP; THE COMPUTER DRIVES THE CORNERS\n"
+"AT THE GRIP IT HAS. ENTER: 100%."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "SURFACE GRIP"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE TIRES' GRIP ON EACH SURFACE (X THE TIRE'S GRIP; 0.01 .. 10.00).\n"
+"THE GAME'S: ROAD 1.00, GRASS / SAND / GRAVEL 0.60, DIRT 0.80.\n"
+"EVERY CAR. FROM THE NEXT RACE ENTERED."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "TARMAC"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "KERBS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "GRASS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "SAND"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "GRAVEL"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "DIRT"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "WET TARMAC"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "WET KERBS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "WET HT"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "SURFACE RESISTANCE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"WHAT SLOWS THE CARS ON EACH SURFACE (ROLLING RESISTANCE,\n"
+"0.00 .. 327.67). THE GAME'S: ROAD 0.10, GRASS 0.20, GRAVEL 0.30,\n"
+"DIRT 0.20, SAND 25.50. EVERY CAR. FROM THE NEXT RACE ENTERED."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "ADDITIONAL GAME RULES"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"EACH DAY PASSED TAKES CREDITS: DAYS 2-9 (DAY - 1) X 50,\n"
+"FROM DAY 10 (DAY - 9) X 500, AT MOST 200,000 A DAY.\n"
+"A LICENSE EARNED PAUSES DECAY FOR 10 DAYS (DOES NOT STACK).\n"
+"FROM THE NEXT DAY PASSED."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"YOUR CARS' POWER 0.25% LESS FOR EACH DAY PASSED, DOWN TO 5%,\n"
+"FROM THE NEXT RACE ENTERED.\n"
+"NOT ACTIVE DURING LICENSE TESTS."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"COURSES GET 0.2% SMALLER ON EACH AXIS FOR EACH DAY PASSED,\n"
+"DOWN TO 25%.\n"
+"FROM THE NEXT RACE ENTERED."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "MEMORY CARDS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE SAVE FOLDER IN EACH MEMORY CARD SLOT."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "SLOT 1"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "SLOT 2"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "CONTROLS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"EACH PLAYER'S DEVICE AND DEAD ZONES.\n"
+"THE MAPPINGS: THE LAUNCHER'S CONTROLS TAB."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "PLAYER 1'S DEVICE, CONTROLLER AND WHEEL."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "DEVICE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "PLAYER 1'S CONTROLLER (PORT 1)."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "LEFT STICK DEAD ZONE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "RIGHT STICK DEAD ZONE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "TRIGGER DEAD ZONE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "PLAYER 1'S WHEEL."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "STEERING DEAD ZONE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "GAS PEDAL DEAD ZONE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "BRAKE PEDAL DEAD ZONE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "CLUTCH PEDAL DEAD ZONE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "PLAYER 2'S DEVICE, CONTROLLER AND WHEEL."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "PLAYER 2'S CONTROLLER (PORT 2)."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "PLAYER 2'S WHEEL."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "DEBUG"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "TESTING AIDS AND DEVELOPER CHEATS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "FILL GARAGE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"NEW GAME: GET ONE OF EVERY CAR IN THE DATABASE\n"
+"IN EVERY COLOR."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "FILL MONEY"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "NEW GAME: GET CR. 100,000,000"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "UNLOCK ARCADE TRACKS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"EVERY COURSE IN ALL MODES OF ARCADE MODE\n"
+" ARE AVAILABLE TO RACE."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "UNLOCK ALL LICENSES"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "NEW GAME: GET BRONZE ON ALL LICENSES"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "COURSE FORCER"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"FORCES THE GAME TO LOAD ANY COURSE FOUND IN THE GAME FILES\n"
+" WHEN ENTERING ANY RACE."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "COURSE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE COURSE, BY ITS FILE NAME: ANY FILE OF THE COURSE FOLDER.\n"
+"(N CARS): ITS START PLACES; MORE CARS START ALONG ITS RACING LINE.\n"
+"ENTER: THE NEXT ONE."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "LAP FORCER"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "OVERRIDES THE AMOUNT OF LAPS OF A RACE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "LAPS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "# OF LAPS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "RACE TIME FORCER"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "OVERRIDES THE TIME LIMIT OF A RACE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "MINUTES"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "THE TIME OF EVERY TIMED RACE."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "COURSE MODE FORCER"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"WHAT ENDS EVERY RACE ENTERED. FINISH LINE: THE COURSE'S OWN\n"
+"FINISH LINE, WHERE THE LICENSE TESTS END (NONE: ITS LAPS).\n"
+"0-400 M, 0-1000 M, MAX SPEED: A LINE THAT FAR ALONG THE LAP\n"
+"AND NO LAP COUNT, AS THE MACHINE TESTS."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "MENU RACE MODEL"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE MENUS' CARS DRAWN WITH THEIR RACE MODELS (BODY AND WHEELS),\n"
+"NOT THEIR SHOWROOM ONES. A CAR ON SHOW LOADS AGAIN.\n"
+"THE PRIZE CARS: FROM THE NEXT PRIZE."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "LEVEL OF DETAIL"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE RACE MODEL'S LEVEL OF DETAIL, FORCED. 0: THE FINEST.\n"
+"AUTO: AS THE GAME PICKS (GRAPHICS > LEVELS OF DETAIL)."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "INTERFACE LANGUAGE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE LANGUAGE OF THIS MENU, THE ESC MENU, THE PANELS AND THE LAUNCHER,\n"
+"NOT THE GAME'S (GAME > LANGUAGE). AUTO: WINDOWS' DISPLAY LANGUAGE.\n"
+"THE LAUNCHER TAKES IT AT ITS NEXT START."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "TAKE SCREENSHOT"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE GAME'S PICTURE AT ITS OWN RESOLUTION, WITHOUT THIS MENU,\n"
+"AS A PNG IN THE SCREENSHOTS FOLDER (BESIDE GT3PC.INI)."
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "UP/DOWN CHOOSE   LEFT/RIGHT CHANGE   %s%sESC CLOSE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "A GROUP: RIGHT OPENS IT, LEFT CLOSES IT"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "PAD: D-PAD, %s NEXT VALUE, %s CLOSE, %s %s"
+msgstr ""
+
+#: src/platform/settings_menu.cpp src/platform/song_osd.cpp
+msgid "CLOSE"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "GT3 PC SETTINGS"
+msgstr ""
+
+#: src/platform/settings_menu.cpp
+msgid "CHANGES APPLY AT ONCE, SAVED IN GT3PC.INI."
+msgstr ""
+
+#: src/platform/song_osd.cpp
+msgid "PREVIOUS"
+msgstr ""
+
+#: src/platform/song_osd.cpp
+msgid "NEXT"
+msgstr ""
+
+#: src/platform/song_osd.cpp
+msgid "RACE SONGS  %d / %d"
+msgstr ""
+
+#: src/platform/song_osd.cpp
+msgid "RACE SONGS"
+msgstr ""
+
+#: src/platform/song_osd.cpp
+msgid "NO SONG PLAYING"
+msgstr ""
+
+#: src/platform/system_menu.cpp
+msgid "BACK"
+msgstr ""
+
+#: src/platform/system_menu.cpp
+msgid "CLOSES THIS MENU."
+msgstr ""
+
+#: src/platform/system_menu.cpp
+msgid "RESTART"
+msgstr ""
+
+#: src/platform/system_menu.cpp
+msgid ""
+"THE GAME STARTS AGAIN FROM THE BEGINNING.\n"
+"WHAT IS NOT SAVED IS LOST."
+msgstr ""
+
+#: src/platform/system_menu.cpp
+msgid "RESTART AS NEW GAME"
+msgstr ""
+
+#: src/platform/system_menu.cpp
+msgid ""
+"THE GAME STARTS AGAIN WITHOUT LOADING A SAVE.\n"
+"YOUR SAVES STAY ON THE MEMORY CARD.\n"
+"WHAT IS NOT SAVED IS LOST."
+msgstr ""
+
+#: src/platform/system_menu.cpp
+msgid "EXIT"
+msgstr ""
+
+#: src/platform/system_menu.cpp
+msgid ""
+"CLOSES THE GAME.\n"
+"WHAT IS NOT SAVED IS LOST."
+msgstr ""
+
+#: src/platform/system_menu.cpp
+msgid ""
+"WAITING FOR THE MEMORY CARD:\n"
+"THE SAVE GOES ON. ESC: CANCEL."
+msgstr ""
+
+#: src/platform/system_menu.cpp
+msgid "UP/DOWN CHOOSE   ENTER SELECT   ESC CLOSE"
+msgstr ""
+
+#: src/platform/system_menu.cpp
+msgid "PAD: D-PAD, %s SELECT, %s CLOSE"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "TEXTURES: NOT READY"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "TEXTURE REFRESH: TURN THE PRE-CACHE OFF FIRST"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "TEXTURES: LOOKING FOR CHANGED FILES"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "COMPRESSION: FOR THE FILES LOADED FROM NOW ON"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "WRITTEN TO TEX_REPLACEMENTS/DUMPS_SELECTED"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "NO TEXTURE CHOSEN, OR NOT DRAWN YET"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "REPLACEMENT TEXTURES: ON"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "REPLACEMENT TEXTURES: OFF"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "TEXTURES: NO FILE CHANGED"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "TEXTURES: %u CHANGED, %u NEW, %u GONE"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "ALL"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "REPLACEMENTS"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "DUMPING"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "PRE-CACHE"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "COMPRESSION"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "REFRESH"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "PRE-CACHE IS ON"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "LOOKING..."
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "TEXTURE"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "NONE DRAWN"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "(NOT DRAWN NOW) / %u"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "REPLACED"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "DUMPED"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "LEFT / RIGHT ON TEXTURE: CHOOSE ONE (DRAWN GREEN)"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "%u FOLDERS, %u FILES: %u LOADED, %u WAITING, %u REFUSED"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "%u FOLDERS, %u FILE: %u LOADED, %u WAITING, %u REFUSED"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "%u FOLDER, %u FILES: %u LOADED, %u WAITING, %u REFUSED"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "%u FOLDER, %u FILE: %u LOADED, %u WAITING, %u REFUSED"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "FOLDERS: BEING LISTED"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "DUMPS: %u WRITTEN, %u WAITING"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "DUMPS: %u WRITTEN"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "PRE-CACHE: %u MADE, %u TO LOOK AT"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "PRE-CACHE: UP TO DATE (%u MADE)"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "LAST REFRESH: %u CHANGED, %u NEW, %u GONE"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "UP / DOWN  LEFT / RIGHT  ENTER DUMP  PAGE UP / DOWN 10  %s%sESC CLOSE"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "UP / DOWN  LEFT / RIGHT  %s%sESC CLOSE"
+msgstr ""
+
+#: src/platform/texture_menu.cpp
+msgid "TEXTURES"
+msgstr ""

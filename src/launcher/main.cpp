@@ -30,6 +30,7 @@
 #include "install.h"
 #include "ui.h"
 #include "util.h"
+#include "platform/ui_text.h"
 
 #include <windows.h>
 #include <shellapi.h>
@@ -205,6 +206,17 @@ int run_install(const std::wstring &source, bool from_volume, const std::wstring
     return code;
 }
 
+/* PC (2026-11-16): the interface's language (platform/ui_text.h), [Interface]
+ * Language of gt3pc.ini - the shared one's with --shared - for the selector
+ * and the window (the command line modes stay English: scripts read them). */
+void set_interface_language(const std::wstring &shared)
+{
+    const std::wstring ini = (shared.empty() ? util::exe_folder() : util::with_slash(shared)) + L"gt3pc.ini";
+    wchar_t v[32] = L"";
+    GetPrivateProfileStringW(L"Interface", L"Language", L"auto", v, 32, ini.c_str());
+    ui_text::set_language(ui_text::resolve(ui_text::from_value(v)));
+}
+
 int usage(const std::wstring &error)
 {
     Output out;
@@ -253,6 +265,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int show)
         /* The window.  An engine started by a selector has none of its own
          * (a selector never leads to another); else the selector first: this
          * launcher's window, or another engine's launcher in its place. */
+        set_interface_language(shared);
         if (!engine) {
             const std::wstring own = util::exe_folder();
             engines::migrate(own);
@@ -265,7 +278,9 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int show)
                     break;
                 if (engines::start(launcher, other, own, &error))
                     return 0;
-                MessageBoxW(nullptr, (L"The engine's launcher could not be started: " + error + L".\n\n" + launcher).c_str(),
+                MessageBoxW(nullptr,
+                            (trf(L"The engine's launcher could not be started: %s.", error.c_str()) + L"\n\n" + launcher)
+                                .c_str(),
                             L"Gran Turismo 3 A-Spec", MB_OK | MB_ICONERROR);
             }
             shared.clear();

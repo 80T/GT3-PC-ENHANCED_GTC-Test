@@ -37,6 +37,7 @@
 #include "game/app/pc_customcam.h"          /* PC: the user's own cameras (applyMountView, update, pcNextView) */
 #include "game/save/T426_controller_config.h"   /* PC: ControllerConfig::keyAxis (update) */
 #include <string.h>                         /* PC: memset (pc_freecam_ground) */
+#include "platform/ui_text.h"               /* PC (2026-11-16): the interface's language (pcNextView's notice) */
 
 /* The height of the other cars' boxes the in-car cameras test against
  * (isViewBlocked, isInsideCar: a point on each side face this far up).
@@ -53,15 +54,17 @@
 /* The camera mounts' names (by mount index, as a car file lists them);
  * nothing in the program reads the table.  Under -G8 the names of 8 bytes
  * or less are in .sdata (0x003529C8..), the others in .rodata (0x0033E040..),
- * each written just before the table. */
+ * each written just before the table.  PC (2026-11-16): the interface's
+ * language - the names marked N_ (a mark only: the same strings), pcNextView
+ * names the camera over the picture by them, translated. */
 const CameraMountName g_0033E100[21] = {    /* 0x0033E100 */
-    {  0, "Driver" },       {  1, "Chase" },        {  2, "reserved" },
-    {  3, "Mirror-L" },     {  4, "Mirror-R" },     {  5, "Nose" },
-    {  6, "Option-3" },     {  7, "Roof" },         {  8, "Back" },
-    {  9, "Tail" },         { 10, "Side-L" },       { 11, "Side-R" },
-    { 12, "Option-4" },     { 13, "Option-5" },     { 14, "FrontWheel-L" },
-    { 15, "FrontWheel-R" }, { 16, "RearWheel-L" },  { 17, "RearWheel-R" },
-    { 18, "Option-1" },     { 19, "Option-2" },     { -1, "" }
+    {  0, N_("Driver") },       {  1, N_("Chase") },        {  2, N_("reserved") },
+    {  3, N_("Mirror-L") },     {  4, N_("Mirror-R") },     {  5, N_("Nose") },
+    {  6, N_("Option-3") },     {  7, N_("Roof") },         {  8, N_("Back") },
+    {  9, N_("Tail") },         { 10, N_("Side-L") },       { 11, N_("Side-R") },
+    { 12, N_("Option-4") },     { 13, N_("Option-5") },     { 14, N_("FrontWheel-L") },
+    { 15, N_("FrontWheel-R") }, { 16, N_("RearWheel-L") },  { 17, N_("RearWheel-R") },
+    { 18, N_("Option-1") },     { 19, N_("Option-2") },     { -1, "" }
 };
 int g_00352A0C = 20;                        /* 0x00352A0C (? the table's count) */
 
@@ -899,16 +902,18 @@ void OnBoardCamera::pcNextView()
     } else {
         setMount(mount + 1 < getMountCount() ? mount + 1 : MOUNT_SWAY);
     }
+    /* PC (2026-11-16): the interface's language (tr; a custom camera's name
+     * is the user's own) */
     if (pcCustom != 0)
         name = pc_customcam_name(car, pcCustom);
     else if (pcCockpit == 2)
-        name = "Cockpit 2";
+        name = tr("Cockpit 2");
     else if (pcCockpit)
-        name = "Cockpit";
+        name = tr("Cockpit");
     else if (mount == MOUNT_SWAY)
-        name = "Bumper";
+        name = tr("Bumper");
     else
-        name = g_0033E100[mount < 20 ? mount : 20].name;
+        name = tr(g_0033E100[mount < 20 ? mount : 20].name);
     pc_camera_notice(name);
 }
 

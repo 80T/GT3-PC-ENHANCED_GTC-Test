@@ -3,6 +3,7 @@
 #include "platform/input_map.h"
 #include "platform/log.h"
 #include "platform/overlay.h"
+#include "platform/ui_text.h"                  /* PC (2026-11-16): the interface's languages */
 
 #include <algorithm>
 #include <atomic>
@@ -80,14 +81,14 @@ void present(ID3D11RenderTargetView *bb)
         return;
     int bw, bh;
     overlay::size(&bw, &bh);
-    char l1[48], step[32], run[32], l2[96];
-    snprintf(l1, sizeof(l1), "PAUSED  TICK +%u", g_steps.load());
+    char l1[256], step[32], run[32], l2[256];   /* (PC 2026-11-16: 48, 96 before - UTF-8 translations) */
+    snprintf(l1, sizeof(l1), tr("PAUSED  TICK +%u"), g_steps.load());
     input_map::hotkey_text(input_map::kHotPause, step, sizeof(step));
     input_map::hotkey_text(input_map::kHotResume, run, sizeof(run));
     if (run[0] != '\0')
-        snprintf(l2, sizeof(l2), "%s NEXT TICK   %s RESUME", step, run);
+        snprintf(l2, sizeof(l2), tr("%s NEXT TICK   %s RESUME"), step, run);
     else
-        snprintf(l2, sizeof(l2), "%s NEXT TICK", step);
+        snprintf(l2, sizeof(l2), tr("%s NEXT TICK"), step);
     const int s = std::max(1, bh / 540);
     const float pad = 6.0f * s, lineH = 12.0f * s;
     const float w = std::max(overlay::text_width(l1, s), overlay::text_width(l2, s)) + 2.0f * pad;

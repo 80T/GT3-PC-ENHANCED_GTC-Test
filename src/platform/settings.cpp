@@ -4,6 +4,7 @@
 #include "platform/input_map.h"
 #include "platform/log.h"
 #include "platform/paths.h"
+#include "platform/ui_text.h"                  /* PC (2026-11-16): [Interface] Language */
 
 #include <windows.h>
 
@@ -128,6 +129,7 @@ constexpr int kLanguages = 7;
 const char *const kLanguageNames[kLanguages] = {"japanese", "english_us", "english_uk", "french",
                                                 "german",   "italian",    "spanish"};
 std::atomic<int> g_language{kLanguageAuto};
+std::atomic<int> g_interfaceLanguage{ui_text::kAuto};  /* PC (2026-11-16): [Interface] Language */
 
 CarKind g_carKinds[32];
 int g_carKindCount;
@@ -416,6 +418,15 @@ void load()
                 v = i;
         g_language = v;
         pclog::write("settings: language %s", language_name(v));
+    }
+    {
+        /* PC (2026-11-16): GT3 PC's own text (platform/ui_text.h) */
+        char lang[32] = "";
+        GetPrivateProfileStringA("Interface", "Language", "auto", lang, sizeof(lang), ini_path().c_str());
+        const int v = ui_text::from_value(lang);
+        g_interfaceLanguage = v;
+        ui_text::set_language(ui_text::resolve(v));
+        pclog::write("settings: interface language %s (%s)", ui_text::value(v), ui_text::code(ui_text::language()));
     }
     g_display = d;
     pclog::write("settings: display %s, fullscreen %dx%d %d Hz (0: the desktop's / the nearest to 60), window"
@@ -2322,6 +2333,22 @@ void set_language(int lang)
 const char *language_name(int lang)
 {
     return lang >= 0 && lang < kLanguages ? kLanguageNames[lang] : "auto";
+}
+
+/* PC (2026-11-16): [Interface] Language */
+int interface_language()
+{
+    return g_interfaceLanguage.load(std::memory_order_relaxed);
+}
+
+void set_interface_language(int lang)
+{
+    if (lang < ui_text::kAuto || lang >= ui_text::kCount || lang == g_interfaceLanguage.load())
+        return;
+    g_interfaceLanguage = lang;
+    ui_text::set_language(ui_text::resolve(lang));
+    WritePrivateProfileStringA("Interface", "Language", ui_text::value(lang), ini_path().c_str());
+    pclog::write("settings: interface language %s (%s)", ui_text::value(lang), ui_text::code(ui_text::language()));
 }
 
 void set_display_mode(DisplayMode m)

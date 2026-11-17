@@ -5,6 +5,7 @@
 
 #include "engine/media/native/ipu_image.h"
 #include "platform/png_image.h"
+#include "platform/ui_text.h"  /* PC (2026-11-16): the interface's languages */
 
 #include <windows.h>
 
@@ -59,18 +60,18 @@ bool write_still(const uint8_t *p, size_t avail, const std::wstring &path, std::
 {
     gt3media::IpuImageInfo info;
     if (!gt3media::ipu_image_info(p, avail, &info)) {
-        *why = L"not a picture";
+        *why = tr(L"not a picture");
         return false;
     }
     std::vector<uint8_t> rgba((size_t)info.width * info.height * 4);
     gt3media::IpuImageStats stats;
     if (!gt3media::ipu_image_decode(p, avail, rgba.data(), 0, gt3media::IpuLayout::Linear, 0xFF, &stats, rgba.size()) ||
         stats.macroblocks != info.width / 16 * (info.height / 16)) {
-        *why = L"it does not decode";
+        *why = tr(L"it does not decode");
         return false;
     }
     if (!png_image::encode_file(path, rgba.data(), info.width, info.height)) {
-        *why = L"the file could not be written";
+        *why = tr(L"the file could not be written");
         return false;
     }
     std::vector<uint8_t> file, back;
@@ -78,7 +79,7 @@ bool write_still(const uint8_t *p, size_t avail, const std::wstring &path, std::
     if (!read_file(path, &file) || !png_image::decode(file.data(), file.size(), &back, &w, &h) || w != info.width ||
         h != info.height || back != rgba) {
         DeleteFileW(path.c_str());
-        *why = L"the file does not read back the same";
+        *why = tr(L"the file does not read back the same");
         return false;
     }
     return true;
@@ -102,12 +103,13 @@ bool convert(const std::wstring &data, std::wstring *message)
     if (read_file(archive, &bytes))
         count = gt3media::ipic_archive_count(bytes.data(), bytes.size());
     if (count <= 0) {
-        *message = std::wstring(kArchive) + L" could not be read as an archive of stills: it is left as it is.";
+        *message = trf(L"%s could not be read as an archive of stills: it is left as it is.", kArchive);
         return false;
     }
     const std::wstring folder = util::with_slash(data) + kFolder;
     if (!util::make_folders(folder)) {
-        *message = L"The folder " + folder + L" could not be created: " + util::system_error_text(GetLastError()) + L".";
+        *message = trf(L"The folder %s could not be created: %s.", folder.c_str(),
+                       util::system_error_text(GetLastError()).c_str());
         return false;
     }
     int written = 0, kept = 0;
@@ -115,9 +117,9 @@ bool convert(const std::wstring &data, std::wstring *message)
         gt3media::IpicEntryInfo e;
         std::wstring why;
         if (!gt3media::ipic_archive_entry(bytes.data(), bytes.size(), i, &e)) {
-            why = L"its entry is damaged";
+            why = tr(L"its entry is damaged");
         } else if (!plain_name(e.name)) {
-            why = L"its name is no file's";
+            why = tr(L"its name is no file's");
         } else {
             const std::wstring png = util::with_slash(folder) + util::widen(e.name) + L".png";
             if (is_file(png)) {
@@ -129,17 +131,18 @@ bool convert(const std::wstring &data, std::wstring *message)
                 continue;
             }
         }
-        *message = L"Still " + std::to_wstring(i + 1) + L" of " + kArchive + L": " + why + L". The archive is kept.";
+        *message = trf(L"Still %d of %s: %s. The archive is kept.", i + 1, kArchive, why.c_str());
         return false;
     }
     if (!DeleteFileW(archive.c_str())) {
-        *message = std::wstring(kArchive) + L" could not be deleted: " + util::system_error_text(GetLastError()) + L".";
+        *message = trf(L"%s could not be deleted: %s.", kArchive, util::system_error_text(GetLastError()).c_str());
         return false;
     }
-    *message = L"Stills written as PNG files (" + std::wstring(kFolder) + L"\\<name>.png): " + std::to_wstring(written);
     if (kept != 0)
-        *message += L", " + std::to_wstring(kept) + L" already there kept";
-    *message += L"; " + std::wstring(kArchive) + L" deleted.";
+        *message = trf(L"Stills written as PNG files (%s\\<name>.png): %d, %d already there kept; %s deleted.", kFolder,
+                       written, kept, kArchive);
+    else
+        *message = trf(L"Stills written as PNG files (%s\\<name>.png): %d; %s deleted.", kFolder, written, kArchive);
     return true;
 }
 

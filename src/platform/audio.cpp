@@ -31,6 +31,7 @@
 #include "platform/scheduler.h"
 #include "platform/settings.h"
 #include "platform/settings_menu.h"
+#include "platform/ui_text.h"                  /* PC (2026-11-16): the interface's languages */
 
 namespace audio {
 namespace {
@@ -618,17 +619,28 @@ bool g_ksGaveUp;                                /* Output=auto: kernel streaming
  * Output=ks has no sound and tries again every 2 s (kRetryMs). */
 void notice_ks_busy(bool fallback)
 {
-    char menu[32], text[320];
+    /* (PC 2026-11-16: in the interface's language, platform/ui_text.h - each
+     * case one whole text) */
+    char menu[32], text[1024];
     input_map::hotkey_text(input_map::kHotSettingsMenu, menu, sizeof(menu));
-    snprintf(text, sizeof(text),
-             "AUDIO: KERNEL STREAMING: THE DEVICE IS BUSY\n"
-             "(WINDOWS OR ANOTHER PROGRAM IS PLAYING ON IT).\n%s",
-             fallback ? "PLAYING THROUGH WASAPI INSTEAD." : "NO SOUND: TRYING AGAIN EVERY 2 S.");
-    if (!fallback) {
-        const size_t at = strlen(text);
-        snprintf(text + at, sizeof(text) - at, "\nOR: %s%sAUDIO OUTPUT, AUTO OR WASAPI.", menu,
-                 menu[0] != '\0' ? ", " : "THE SETTINGS MENU, ");
-    }
+    if (fallback)
+        snprintf(text, sizeof(text), "%s",
+                 tr("AUDIO: KERNEL STREAMING: THE DEVICE IS BUSY\n"
+                    "(WINDOWS OR ANOTHER PROGRAM IS PLAYING ON IT).\n"
+                    "PLAYING THROUGH WASAPI INSTEAD."));
+    else if (menu[0] != '\0')
+        snprintf(text, sizeof(text),
+                 tr("AUDIO: KERNEL STREAMING: THE DEVICE IS BUSY\n"
+                    "(WINDOWS OR ANOTHER PROGRAM IS PLAYING ON IT).\n"
+                    "NO SOUND: TRYING AGAIN EVERY 2 S.\n"
+                    "OR: %s, AUDIO OUTPUT, AUTO OR WASAPI."),
+                 menu);
+    else
+        snprintf(text, sizeof(text), "%s",
+                 tr("AUDIO: KERNEL STREAMING: THE DEVICE IS BUSY\n"
+                    "(WINDOWS OR ANOTHER PROGRAM IS PLAYING ON IT).\n"
+                    "NO SOUND: TRYING AGAIN EVERY 2 S.\n"
+                    "OR: THE SETTINGS MENU, AUDIO OUTPUT, AUTO OR WASAPI."));
     settings_menu::notice(text, 8.0);
 }
 
@@ -668,9 +680,9 @@ Mode open_output(IMMDeviceEnumerator *en)
                              "browser) are silent on it while the game plays; [Audio] Output=wasapi shares it",
                              info.device);
                 if (!warned)
-                    settings_menu::notice("AUDIO: KERNEL STREAMING HAS THIS DEVICE TO ITSELF.\n"
-                                          "OTHER PROGRAMS (VOICE CHAT, BROWSER) ARE SILENT ON IT\n"
-                                          "WHILE THE GAME PLAYS. TO SHARE IT: F2, AUDIO OUTPUT, WASAPI.",
+                    settings_menu::notice(tr("AUDIO: KERNEL STREAMING HAS THIS DEVICE TO ITSELF.\n"
+                                             "OTHER PROGRAMS (VOICE CHAT, BROWSER) ARE SILENT ON IT\n"
+                                             "WHILE THE GAME PLAYS. TO SHARE IT: F2, AUDIO OUTPUT, WASAPI."),
                                           12.0);
                 warned = true;
             }
@@ -723,7 +735,7 @@ bool raise_buffer(uint32_t underruns)
                                                                          : settings::kAudioBufferMax;
     pclog::write("audio: a crackle (%u underrun%s) at a %.1f ms buffer: raising it to %.1f ms", underruns,
                  underruns == 1 ? "" : "s", cur, next);
-    settings_menu::notice("Audio buffer insufficient. Raising buffer by 0.5ms...", 2.0);
+    settings_menu::notice(tr("Audio buffer insufficient. Raising buffer by 0.5ms..."), 2.0);
     settings::set_audio_buffer_ms(next);
     return true;
 }
@@ -795,7 +807,7 @@ void thread_main()
                     g_ksGaveUp = true;
                     pclog::write("audio: kernel streaming fails even at the largest buffer: WASAPI from now on "
                                  "(until [Audio] Output changes)");
-                    settings_menu::notice("Persistent insufficient audio buffer. Switching output...", 2.0);
+                    settings_menu::notice(tr("Persistent insufficient audio buffer. Switching output..."), 2.0);
                 }
             }
             if (failed) {
@@ -936,14 +948,15 @@ void describe(char *out, size_t n)
     SndNativeScheduleInfo si;
     snd_native_schedule_info(&si);
     switch (g_mode.load()) {
-    case MODE_KS:
-        snprintf(out, n, "KS%s %.1f + %.1f MS", g_ksExclusive ? " EXCLUSIVE" : "", g_latencyMs.load(), si.delayMs);
+    case MODE_KS:                               /* (PC 2026-11-16: exclusive or not, a string each) */
+        snprintf(out, n, g_ksExclusive ? tr("KS EXCLUSIVE %.1f + %.1f MS") : tr("KS %.1f + %.1f MS"),
+                 g_latencyMs.load(), si.delayMs);
         break;
     case MODE_WASAPI:
-        snprintf(out, n, "WASAPI %.1f + %.1f MS", g_latencyMs.load(), si.delayMs);
+        snprintf(out, n, tr("WASAPI %.1f + %.1f MS"), g_latencyMs.load(), si.delayMs);
         break;
     default:
-        snprintf(out, n, g_ksBusy ? "NONE (KS BUSY)" : "NONE");
+        snprintf(out, n, "%s", g_ksBusy ? tr("NONE (KS BUSY)") : tr("NONE"));
         break;
     }
 }

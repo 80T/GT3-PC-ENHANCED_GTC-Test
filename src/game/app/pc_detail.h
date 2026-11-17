@@ -76,7 +76,9 @@ int pc_rear_view_chase(void);
 /* The view button's extra cameras ([Graphics] ExtraCameras, the F2 menu's
  * GRAPHICS > EXTRA CAMERAS; OnBoardCamera::pcNextView, T378). */
 int pc_extra_cameras(void);
-/* The camera the view button chose, named over the picture a moment. */
+/* The camera the view button chose, named over the picture a moment (PC
+ * 2026-11-16: `name' in the interface's language, the caller's tr(), or the
+ * user's own camera name). */
 void pc_camera_notice(const char *name);
 /* The render distance as a factor of the original (1 .. 4). */
 f32 pc_render_scale(void);

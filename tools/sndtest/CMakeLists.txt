@@ -42,7 +42,8 @@ target_compile_definitions(sndgame PRIVATE _CRT_SECURE_NO_WARNINGS)
 # with the native SPU2, playing an .ads in real time (sndplay.cpp stands in
 # for the scheduler's clock and the settings).
 add_executable(sndplay sndplay.cpp ${GT3PC}/src/platform/audio.cpp ${GT3PC}/src/platform/audio_ks.cpp
-    ${GT3PC}/src/platform/log.cpp)
+    ${GT3PC}/src/platform/log.cpp
+    ${GT3PC}/src/platform/ui_text.cpp)  # (PC 2026-11-16: audio.cpp's notices translate)
 target_include_directories(sndplay PRIVATE ${GT3PC}/src)
 target_link_libraries(sndplay PRIVATE gt3_sound_native ole32 avrt setupapi ksuser)
 target_compile_definitions(sndplay PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN)

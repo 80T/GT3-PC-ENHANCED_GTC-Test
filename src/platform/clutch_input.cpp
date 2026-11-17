@@ -118,7 +118,7 @@ void clutch_text(int profile, char *out, int n)
         return;
     const Profile &p = input_map::profile(profile);
     for (int s = 0; s < kSlots; s++) {
-        char d[160];
+        char d[256];                        /* (PC 2026-11-16: 160 before - describe's UTF-8 translations) */
         describe(p.map[c][s], d, sizeof(d));
         if (d[0] == '\0')
             continue;
