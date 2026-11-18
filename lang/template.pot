@@ -2448,10 +2448,6 @@ msgid "Reduced"
 msgstr ""
 
 #: src/launcher/ui.cpp
-msgid "Test"
-msgstr ""
-
-#: src/launcher/ui.cpp
 msgid "Render distance"
 msgstr ""
 

@@ -2500,10 +2500,6 @@ msgid "Reduced"
 msgstr "Пониженное"
 
 #: src/launcher/ui.cpp
-msgid "Test"
-msgstr "TestRU"
-
-#: src/launcher/ui.cpp
 msgid "Render distance"
 msgstr "Дальность прорисовки"
 
@@ -6341,3 +6337,6 @@ msgstr "ВВЕРХ / ВНИЗ  ВЛЕВО / ВПРАВО  %s%sESC ЗАКРЫТЬ
 #: src/platform/texture_menu.cpp
 msgid "TEXTURES"
 msgstr "ТЕКСТУРЫ"
+
+#~ msgid "Test"
+#~ msgstr "TestRU"

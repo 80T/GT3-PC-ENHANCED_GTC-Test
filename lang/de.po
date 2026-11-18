@@ -2500,10 +2500,6 @@ msgid "Reduced"
 msgstr "Reduziert"
 
 #: src/launcher/ui.cpp
-msgid "Test"
-msgstr "TestDE"
-
-#: src/launcher/ui.cpp
 msgid "Render distance"
 msgstr "Sichtweite"
 
@@ -6344,3 +6340,6 @@ msgstr "AUF / AB  LINKS / RECHTS  %s%sESC SCHLIESSEN"
 #: src/platform/texture_menu.cpp
 msgid "TEXTURES"
 msgstr "TEXTUREN"
+
+#~ msgid "Test"
+#~ msgstr "TestDE"

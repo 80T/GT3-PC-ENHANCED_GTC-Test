@@ -51,7 +51,12 @@ int pc_debugcam_view(int view, const f32 *cam, f32 *out);
 int pc_debugcam_eye(int view, f32 *xyz);
 /* After a race view's projection is set (pc_fov_apply; the projection
  * matrix current): its vertical angle the debug camera's (the first call
- * takes the camera's). */
+ * takes the camera's).  PC (2026-11-17): and its near plane the debug
+ * camera's own - 0.1 m, nearer at a wide field of view (a 60 degree view's
+ * half height there, 2 cm at the nearest) - not the game camera's (a
+ * replay's course camera has it at 0.07 m x its zoom: up to 1.6 m); and the
+ * texture LOD bias its field of view's (the game camera's setLodBias moved
+ * by -log2 of the debug view's magnification of that camera's projection). */
 void pc_debugcam_projection(int view);
 /* Once a frame (pc_frame_render_begin): the controls applied. */
 void pc_debugcam_frame(void);

@@ -26,7 +26,9 @@
  * The clutch: the pedal's travel p (0 released .. 1 pressed); from
  * PC_CLUTCH_DISENGAGED (85 %) on the clutch is out, below it it grips e = 1
  * - p / 0.85 of its whole: it passes at most e x PC_CLUTCH_CAPACITY x the
- * engine's peak torque, the torque that brings the engine to the wheels'
+ * engine's peak torque (PC 2026-11-17: x the car's power multiplier,
+ * pc_car_tuning.h - sized for the engine as tuned; at 1000 % a stock-sized
+ * clutch let out on a flared engine never locked), the torque that brings the engine to the wheels'
  * speed within the step when that is less (it locks where they meet), else
  * all of it, slipping.  Locked, it slips again once the drive passes what
  * it holds (a pedal half let out under full throttle).  So the pedal's speed

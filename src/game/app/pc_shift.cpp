@@ -62,9 +62,12 @@ std::atomic<int> g_logLeft{-1};
  * upshift quicker a gear) - a race saved with another replays with this
  * one, logged.  PC (2026-11-09): the version in the byte's low 6 bits, the
  * clutch mode bit 6 (kMarkClutch), the H-shifters bit 7 (kMarkHShifter):
- * the players' frames then hold their clutch and gates (pc_clutch.h). */
+ * the players' frames then hold their clutch and gates (pc_clutch.h).
+ * PC (2026-11-17): 5 - the clutch mode's clutch holds the engine as the
+ * power multiplier makes it (pc_clutch.cpp capacity; a race at 100 % power
+ * drives as with 4). */
 constexpr int kMarkAt = 0x1E;
-constexpr u8 kMark = 'S', kVersion = 4;
+constexpr u8 kMark = 'S', kVersion = 5;
 constexpr u8 kMarkClutch = 0x40, kMarkHShifter = 0x80, kVersionMask = 0x3F;
 
 constexpr f32 kRpmToRad = 0.10471976f;

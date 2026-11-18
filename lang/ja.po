@@ -2500,10 +2500,6 @@ msgid "Reduced"
 msgstr "軽減"
 
 #: src/launcher/ui.cpp
-msgid "Test"
-msgstr "TestJA"
-
-#: src/launcher/ui.cpp
 msgid "Render distance"
 msgstr "描画距離"
 
@@ -6342,3 +6338,6 @@ msgstr "上 / 下  左 / 右  %s%sESC：閉じる"
 #: src/platform/texture_menu.cpp
 msgid "TEXTURES"
 msgstr "テクスチャ"
+
+#~ msgid "Test"
+#~ msgstr "TestJA"

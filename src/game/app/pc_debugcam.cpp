@@ -1,7 +1,8 @@
 /* pc_debugcam.cpp - the debug camera (pc_debugcam.h).  No original: new PC
  * code. */
 #include "game/app/pc_debugcam.h"
-#include "engine/pgl/G001_flare.h"              /* pgl_get_matrix, vu0_scale */
+#include "engine/pgl/G001_flare.h"              /* pgl_get_matrix / pgl_load_matrix, vu0_scale, the LOD bias */
+#include "game/app/pc_detail.h"                 /* pc_fov_applied */
 #include "game/course/T457_runway.h"            /* the road's triangles (pc_debugcam_ground) */
 #include "platform/debug_camera.h"
 #include "platform/frame_step.h"
@@ -28,6 +29,14 @@
 #define DEBUGCAM_DEAD_ZONE   0.1f
 #define DEBUGCAM_MOUSE_DEG   0.05f          /* degrees a count of the mouse's movement (raw: 40 an inch at 800 dpi) */
 #define DEBUGCAM_GROUND_MIN  0.3f           /* m: the eye above the road at the least (as the chase camera's, pc_freecam) */
+/* PC (2026-11-17): its near plane (pc_debugcam_projection): the race cameras'
+ * own (CameraManager proj.nearClip, T383), nearer at a wide field of view -
+ * the plane's half height no more than a 60 degree view's there (tan 30
+ * degrees x 0.1 m) - but not nearer than DEBUGCAM_NEAR_MIN (the depth
+ * buffer's 24 bits far away) */
+#define DEBUGCAM_NEAR        0.1f           /* m */
+#define DEBUGCAM_NEAR_MIN    0.02f          /* m */
+#define DEBUGCAM_NEAR_FOV    60.0f          /* degrees */
 #define DEBUGCAM_GROUND_RISE 1.0f           /* m: the road rising this, and the step moved, is still the same road */
 
 static const f32 kDegToRad = 0.017453292f;
@@ -251,12 +260,48 @@ void pc_debugcam_projection(int view)
     if (!(sy > 0.0f))
         return;
     const f32 half = atanf(1.0f / sy);
-    if (s.fov <= 0.0f) {
+    if (s.fov <= 0.0f)
         s.fov = clampf(2.0f * half / kDegToRad, DEBUGCAM_FOV_MIN, DEBUGCAM_FOV_MAX);     /* the camera's */
-        return;
+    /* PC (2026-11-17): its own near plane.  The camera's projection is the
+     * game camera's in view, and a replay's course camera (DesignerCamera::
+     * setProjection, T398) puts its near plane at 0.07 m x its zoom - 1.6 m
+     * at a zoom of 22.9 (a 5 degree telephoto shot), whatever it changed to
+     * as the replay cut: from the debug camera everything nearer than that
+     * was clipped away, at 150 degrees a cut some 6 m high and 8 m wide in
+     * front of the eye (user report: "a large area around the camera being
+     * culled ... Gets worse as the FOV increases"; reproduced offline, the
+     * scratch dcam harness).  The z terms of the frustum (pgl_frustum:
+     * m10 = -(f + n) / (f - n), m14 = -2 f n / (f - n); the field of view
+     * settings and the aspect scale x and y alone) give its n and f; the
+     * far plane is kept, the near one put at the debug camera's. */
+    if (m[11] < 0.0f && m[15] == 0.0f && m[10] != 1.0f && m[10] != -1.0f) {
+        const f32 n = m[14] / (m[10] - 1.0f), f = m[14] / (m[10] + 1.0f);
+        const f32 wide = tanf(0.5f * DEBUGCAM_NEAR_FOV * kDegToRad) / tanf(0.5f * s.fov * kDegToRad);
+        const f32 nd = clampf(DEBUGCAM_NEAR * wide, DEBUGCAM_NEAR_MIN, DEBUGCAM_NEAR);
+        if (n > 0.0f && f > nd && nd != n) {
+            m[10] = -(f + nd) / (f - nd);
+            m[14] = -2.0f * f * nd / (f - nd);
+            pgl_load_matrix(m);
+        }
     }
     const f32 k = tanf(half) / tanf(0.5f * s.fov * kDegToRad);
     vu0_scale(k, k, 1.0f);
+    /* PC (2026-11-17): the texture LOD bias its own field of view's (user:
+     * "make it use the debug camera's own FOV").  The camera's setLodBias
+     * (applyProjection, T397: -log2 of its zoom, + textureLODBias) kept the
+     * game camera's: after a replay's telephoto shot (zoom 22.9: 4.5 levels
+     * finer) a wide debug view drew the finest mip levels far away - the
+     * textures shimmered.  The zoom scales the projection's y (the frustum's
+     * focal), so the debug view's magnification of the camera's own
+     * projection - its scale k times the FIELD OF VIEW setting's
+     * (pc_fov_applied: the debug camera's angle is the one shown) - moves
+     * the bias by -log2 of it, and the camera's zoom drops out: the bias is
+     * that of a camera showing the debug camera's angle, whichever was in
+     * view (VariableCameraBase's own setProjection biases a zoom it does not
+     * use: there it is half a level off, as the camera's own was). */
+    const f32 mag = k * pc_fov_applied();
+    if (mag > 0.0f)
+        gfx_tex_param(PGL_TEXPARAM_LOD_BIAS, gfx_get_tex_lod_bias() - (int)lroundf(256.0f * log2f(mag)));
 }
 
 void pc_debugcam_frame(void)

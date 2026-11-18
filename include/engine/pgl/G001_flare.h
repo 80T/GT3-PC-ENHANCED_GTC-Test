@@ -1181,6 +1181,9 @@ void gfx_set_texture_buffer(int level, u32 addr, int psm, int width); /* 0x00253
 void gfx_set_texture_size(int w, int h);                    /* 0x00254228 */
 void gfx_set_texture_function(int tfx);                     /* 0x00254308 */
 void gfx_tex_param(int pname, int value);                   /* 0x00254358 */
+/* PC (2026-11-17, no original): PGL_TEXPARAM_LOD_BIAS as it is (GsContext.lodBias:
+ * the camera's setLodBias, game/app/pc_debugcam.cpp moves it by its own field of view) */
+int  gfx_get_tex_lod_bias(void);
 void gfx_set_texture_region(int axis, u32 min, u32 max);    /* 0x002545D8 */
 void gfx_texflush(void);                                    /* 0x00254690 */
 void gfx_set_clut_mode(int mode);                           /* 0x002546B0 */

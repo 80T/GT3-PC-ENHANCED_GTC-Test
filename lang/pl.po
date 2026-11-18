@@ -2500,10 +2500,6 @@ msgid "Reduced"
 msgstr "Ograniczona"
 
 #: src/launcher/ui.cpp
-msgid "Test"
-msgstr "TestPL"
-
-#: src/launcher/ui.cpp
 msgid "Render distance"
 msgstr "Zasięg rysowania"
 
@@ -6340,3 +6336,6 @@ msgstr "GÓRA / DÓŁ  LEWO / PRAWO  %s%sESC ZAMKNIJ"
 #: src/platform/texture_menu.cpp
 msgid "TEXTURES"
 msgstr "TEKSTURY"
+
+#~ msgid "Test"
+#~ msgstr "TestPL"

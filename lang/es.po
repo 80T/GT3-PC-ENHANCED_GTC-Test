@@ -2500,10 +2500,6 @@ msgid "Reduced"
 msgstr "Reducida"
 
 #: src/launcher/ui.cpp
-msgid "Test"
-msgstr "TestES"
-
-#: src/launcher/ui.cpp
 msgid "Render distance"
 msgstr "Distancia de dibujado"
 
@@ -6350,3 +6346,6 @@ msgstr "ARRIBA / ABAJO  IZQUIERDA / DERECHA  %s%sESC CERRAR"
 #: src/platform/texture_menu.cpp
 msgid "TEXTURES"
 msgstr "TEXTURAS"
+
+#~ msgid "Test"
+#~ msgstr "TestES"

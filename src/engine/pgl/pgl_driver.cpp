@@ -2203,6 +2203,12 @@ void gfx_tex_param(int pname, int value)
     }
 }
 
+/* PC (2026-11-17, no original): G001_flare.h. */
+int gfx_get_tex_lod_bias(void)
+{
+    return GS_SPR_CTX->lodBias;
+}
+
 // FUNC 0x002545D8 gfx_set_texture_region
 void gfx_set_texture_region(int axis, u32 min, u32 max)
 {

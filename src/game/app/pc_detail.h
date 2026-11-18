@@ -38,6 +38,10 @@ struct VisionList;
  * camera's view (game/app/pc_customcam.h: its field of view is its own row;
  * `cockpit' is then set too). */
 void pc_fov_apply(int replay, int cockpit);
+/* PC (2026-11-17): the scale the last pc_fov_apply put on the projection's x
+ * and y (1: none) - the debug camera's texture LOD bias takes the camera's
+ * own projection from it (game/app/pc_debugcam.cpp). */
+f32 pc_fov_applied(void);
 /* PC (2026-11-14): [Graphics] Fov, the driving views' percent (a custom
  * camera made from a fixed view starts with the field of view shown:
  * OnBoardCamera::pcDescribeView). */

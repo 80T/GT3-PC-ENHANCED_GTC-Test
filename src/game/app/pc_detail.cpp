@@ -14,8 +14,13 @@
 #include <unordered_map>
 #include <vector>
 
+/* PC (2026-11-17): the scale pc_fov_apply last put on the projection (1:
+ * none; pc_fov_applied) */
+static f32 s_fovApplied = 1.0f;
+
 void pc_fov_apply(int replay, int cockpit)
 {
+    s_fovApplied = 1.0f;
     if (cockpit)
         return;                             /* PC (2026-11-09): the cockpit camera's own (pc_detail.h) */
     const int pct = replay ? settings::replay_fov_percent() : settings::fov_percent();
@@ -32,6 +37,12 @@ void pc_fov_apply(int replay, int cockpit)
     want = want < lo ? lo : want > hi ? hi : want;
     const f32 k = tanf(half) / tanf(want);
     vu0_scale(k, k, 1.0f);
+    s_fovApplied = k;
+}
+
+f32 pc_fov_applied(void)
+{
+    return s_fovApplied;
 }
 
 f32 pc_fov_percent(void)

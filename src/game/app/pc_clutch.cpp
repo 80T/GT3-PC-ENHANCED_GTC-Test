@@ -2,6 +2,7 @@
  * original: new PC code. */
 #include "game/app/pc_clutch.h"
 #include "game/app/pc_shift.h"                          /* the race's flags */
+#include "game/app/pc_car_tuning.h"                     /* PC (2026-11-17): the power multiplier (capacity) */
 #include "game/car/physics/T302_car_state.h"            /* RaceCarState, DynCarState, CarEngine, GearCalc */
 #include "game/car/physics/T296_car_drivetrain.h"       /* car_engine_speed_from_wheels */
 #include "game/car/physics/T342_car_input.h"            /* CarInput, CarCtrlOut */
@@ -87,7 +88,18 @@ f32 engagement(const Clutch &k)
     return e < 0.0f ? 0.0f : e > 1.0f ? 1.0f : e;
 }
 
-/* the most it passes now (N m) */
+/* the most it passes now (N m).  PC (2026-11-17): of the engine as the car's
+ * power multiplier makes it (pc_car_tuning: engine_output, T338, multiplies
+ * the drive; Car Decay's power too) - the clutch is sized for the engine the
+ * car has.  User report: "high-powered cars ... (over 3,000 horsepower) ...
+ * can get stuck in rev cut and slowly accelerating even when shifting
+ * correctly, happens when the throttle is on before the clutch is
+ * re-engaged": sized for the stock engine, at 1000 % power the clutch held a
+ * fifth of the engine, so a clutch let out with the engine flared never
+ * locked - the engine on the limiter, the car pulling what a stock clutch
+ * passes until the wheels caught the engine up (the harness: +0.98 g against
+ * +7.1 g locked, half a second in 3rd).  With the throttle off as it went in
+ * the engine fell to the wheels and it locked first. */
 f32 capacity(const RaceCarState *car, Clutch &k)
 {
     if (k.peak < 0.0f) {
@@ -97,7 +109,7 @@ f32 capacity(const RaceCarState *car, Clutch &k)
             peak = e->torque[i] > peak ? e->torque[i] : peak;
         k.peak = peak;
     }
-    return engagement(k) * PC_CLUTCH_CAPACITY * k.peak;
+    return engagement(k) * PC_CLUTCH_CAPACITY * k.peak * pc_car_tuning(car, PC_TUNE_POWER);
 }
 
 f32 idle_speed(const RaceCarState *car)
@@ -149,8 +161,9 @@ void pc_clutch_input(RaceCarState *car, const CarInput *in, CarCtrlOut *out)
     if (k->have && !k->logged && car->st.driver == DRIVER_PAD) {
         k->logged = true;
         printf("PC: clutch: car %p - the player's clutch%s (out from %d %% travel, %d x the engine's peak torque all"
-               " the way in)\n", (void *)car, k->gate >= 0 ? " and H-shifter" : "",
-               (int)(PC_CLUTCH_DISENGAGED * 100.0f + 0.5f), (int)(PC_CLUTCH_CAPACITY + 0.5f));
+               " the way in, at %d %% power)\n", (void *)car, k->gate >= 0 ? " and H-shifter" : "",
+               (int)(PC_CLUTCH_DISENGAGED * 100.0f + 0.5f), (int)(PC_CLUTCH_CAPACITY + 0.5f),
+               (int)(pc_car_tuning(car, PC_TUNE_POWER) * 100.0f + 0.5f));
     }
 }
 
