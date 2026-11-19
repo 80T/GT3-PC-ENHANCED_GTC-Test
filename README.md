@@ -6,6 +6,8 @@
 
 Based on the `GT3 Enhanced engine` from the [Gran Turismo 3 Decompilation](https://github.com/Silentwarior112/gt3-decomp).
 
+Thank you @MisukaM @Hatersbby for testing
+
 ## How to install
 Download the compiled package, or compile from the source code with `build.cmd`.
 Then open the launcher, extract the game files from any of the three main versions
