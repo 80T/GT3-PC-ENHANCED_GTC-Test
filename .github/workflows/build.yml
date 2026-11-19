@@ -1,0 +1,23 @@
+name: Build GT Concept Plugin
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build GT Concept Mod Plugin
+        shell: cmd
+        run: echo skipall | "Build Mod Plugin.cmd" "GT Concept Physics"
+
+      - name: Upload compiled plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: GT-Concept-Physics-Plugin
+          path: build/plugins/GT Concept Physics/
