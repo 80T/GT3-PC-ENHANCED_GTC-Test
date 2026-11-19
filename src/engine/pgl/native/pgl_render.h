@@ -391,6 +391,9 @@ void target_detail(uint32_t base, int w, int h, float dx, float dy);
  * CMD_TARGET of size -1, the frame's last commands): its targets are dead. */
 void target_freed(uint32_t base);
 void target_stats(int *alive, unsigned *created, unsigned *reused, unsigned *retired);
+/* PC (2026-11-18): t is a live target (one of the targets kept; a debug
+ * check, GT3PC_PGL_STALE_LOG: a scan of them) */
+bool target_alive(const Target *t);
 /* The colour target at base for a draw: the size known for base, else the
  * fallback (the scissor's extent).  Created when missing. */
 Target *color_target(uint32_t base, uint32_t fbw, uint32_t psm, int fallbackW, int fallbackH);

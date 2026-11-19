@@ -2141,6 +2141,14 @@ void target_freed(uint32_t base)
             tp->freedAt = g_frameNo;
 }
 
+bool target_alive(const Target *t)
+{
+    for (const auto &tp : g_targets)
+        if (tp.get() == t)
+            return true;
+    return false;
+}
+
 void target_stats(int *alive, unsigned *created, unsigned *reused, unsigned *retired)
 {
     if (alive != nullptr)

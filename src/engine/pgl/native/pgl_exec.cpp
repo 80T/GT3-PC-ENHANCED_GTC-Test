@@ -3201,6 +3201,36 @@ inline void target_read_by_vu1(Target *t, int prog)
         t->envRead = true;
 }
 
+/* PC (2026-11-18, the user's crash of 2026-11-18 - D3D11's Flush reading
+ * address 0 - and the run records found written over before it, 2026-11-08
+ * too: a command index + 0x10000, byte 178 of a 208-byte block, a Target's
+ * envRead): GT3PC_PGL_STALE_LOG=1 - a draw's state naming a texture target
+ * that is gone (target_alive: a scan of the live ones) logged, the first 20;
+ * where: what the state was taken from */
+bool stale_log_on()
+{
+    static int on = -1;
+    if (on < 0) {
+        const char *e = getenv("GT3PC_PGL_STALE_LOG");
+        on = (e != nullptr && atoi(e) > 0) ? 1 : 0;
+        if (on)
+            pclog::write("pgl: GT3PC_PGL_STALE_LOG=1: a draw's state naming a texture target that is gone is logged"
+                         " (the first 20)");
+    }
+    return on != 0;
+}
+
+void stale_check(const Target *t, const char *where)
+{
+    static int logged = 0;
+    if (t == nullptr || logged >= 20 || target_alive(t))
+        return;
+    logged++;
+    pclog::write("pgl stale: frame %llu: %s names texture target %p, which is gone (program %d, a run's work %s)%s",
+                 (unsigned long long)frame_number(), where, (const void *)t, g_traceProg,
+                 g_work != nullptr ? "yes" : "no", logged == 20 ? " (no more of these lines)" : "");
+}
+
 void draw_bookkeep(const D3D11_RECT *area, ID3D11ShaderResourceView *dateSrv)
 {
     BatchState &b = g_bs;
@@ -3316,8 +3346,11 @@ void submit_prologue(const D3D11_RECT *area, bool indexed, ID3D11ShaderResourceV
             mirror_sync(*b.rt, mdsv);
         }
     }
-    if (indexed && b.tme && b.tex.target != nullptr)
+    if (indexed && b.tme && b.tex.target != nullptr) {
+        if (stale_log_on())
+            stale_check(b.tex.target, "submit_prologue's state");   /* PC (2026-11-18) */
         target_read_by_vu1(b.tex.target, g_traceProg);  /* PC (2026-11-06): ([Graphics] EnvMapDetail) */
+    }
     mirror = dated && b.rt->mirrorValid;
     /* PC (2026-11-06): the lazy mirror (g_mirrorLazyOn) - a draw whose mirror
      * pass would cover an eighth of the target or more lets the mirror go
@@ -5934,6 +5967,24 @@ void run_replay_tex(RunRec &r, RunStep &s, BatchState &b)
                 g_workTex = &t;
                 g_workSrv = run_tex_srv(t); /* (may cut the work: g_work is the new one after) */
                 work_view_note(t, g_workSrv);   /* PC (step 3) */
+                /* PC (2026-11-18): and the executor's state the record's too,
+                 * as run_tex_apply below.  The state is a copy of the run's
+                 * (run_replay_part: RunState::bs), its texture as the state was
+                 * recorded, and run_rec_tex renews only the step's record: once
+                 * the texture's target had gone (a car's environment map at a
+                 * new block, the old target retired) and the record was taken
+                 * anew from the new one, the state still named the old target,
+                 * freed - submit_prologue's env-pass note (target_read_by_vu1:
+                 * envRead = true) wrote into its memory, since taken by other
+                 * objects: run records found written over (a command index +
+                 * 0x10000 - byte 178 of a 208-byte block, a Target's envRead;
+                 * 2026-11-08, 2026-11-18) and the user's crash in D3D11's
+                 * Flush (2026-11-18); the executor's other reads of it (the
+                 * alpha bounds, the samples) read freed memory.  The stage
+                 * draws from the record (WorkState / WorkStep tex): its
+                 * pictures as before. */
+                tex_apply(t, b, g_workSrv);
+                b.tex0 = tex0;
             } else {
                 run_tex_apply(t, b, tex0);
             }
