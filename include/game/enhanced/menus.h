@@ -13,9 +13,9 @@
 #ifndef GAME_ENHANCED_MENUS_H
 #define GAME_ENHANCED_MENUS_H
 
-#define ENH_MENU_ATTRACT_REPLAYS   0   /* one attract demo per idle; GCF demo kind 1000 plays a replay file
+#define ENH_MENU_ATTRACT_REPLAYS   1   /* one attract demo per idle; GCF demo kind 1000 plays a replay file
                                           (menus_a.md 4) */
-#define ENH_MENU_BUSY_MARK         0   /* GT Concept's spinning oval instead of the blinking white square during loading (menus_a.md 11) */
+#define ENH_MENU_BUSY_MARK         1   /* GT Concept's spinning oval instead of the blinking white square during loading (menus_a.md 11) */
 #define ENH_MENU_REMEMBER_CURSOR   1   /* the top menu's page and cursor kept across races, in memory only
                                           (menus_a.md 15) */
 #define ENH_MENU_WIDE_FROM_CONSOLE 1   /* wide screen from the console's 16:9 setting at boot and in the option
@@ -30,7 +30,7 @@
                                           their time gap (menus_b.md 14 b) */
 #define ENH_MENU_LINK_RESULT_END   1   /* the i.LINK battle result ends when all cars but one have finished,
                                           not at the first goal (menus_b.md 15) */
-#define ENH_MENU_FREE_RUN_ASSISTS  0   /* free run: the options' ASM / TCS for every car, not only the arcade
+#define ENH_MENU_FREE_RUN_ASSISTS  1   /* free run: the options' ASM / TCS for every car, not only the arcade
                                           cars (menus_a.md 8) */
 #define ENH_MENU_TEXT_WIDTH        1   /* Item::setText measures centred texts (menus_a.md 31) */
 #define ENH_MENU_MOVIE_WAIT        1   /* MenuBgMovie::start waits for the first decoded frame (menus_a.md 32,
