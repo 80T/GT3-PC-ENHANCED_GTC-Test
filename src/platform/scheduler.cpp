@@ -8,7 +8,8 @@
  * goes to the tail.
  *
  * The timer thread is the interrupt source: vblank start / end at
- * 60000/1001 Hz, alarms, and the ends of DelayThread waits.  Handlers run
+ * 60000/1001 Hz (PC 2026-11-19: or on the display's vblanks,
+ * set_display_clock), alarms, and the ends of DelayThread waits.  Handlers run
  * under the interrupt lock, which a game thread holds while it is inside a
  * DI section; the lock follows the EE thread, not the native one: it is let
  * go when such a thread is switched out and taken back when it resumes
@@ -22,9 +23,12 @@
 #include <timeapi.h>
 #include <float.h>
 #include <stdio.h>
+#include <stdlib.h>                         /* getenv, atof (PC 2026-11-19: GT3PC_VBLANK_PHASE_MS) */
 #include <string.h>
 
+#include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <condition_variable>
 #include <deque>
 #include <mutex>
@@ -137,6 +141,18 @@ HANDLE g_timerWake = nullptr;               /* nudges the timer thread */
 LARGE_INTEGER g_qpcFreq, g_qpcStart;
 std::atomic<uint64_t> g_vblanks{0};
 std::atomic<double> g_vblankTime{0.0};     /* now_seconds() of the last vblank */
+/* PC (2026-11-19): the display's vblank grid the vblanks follow
+ * (set_display_clock; read by the timer thread at each vblank), the period
+ * in use (vblank_period) */
+struct DisplayClock {
+    bool on = false;
+    double period = 0.0, vblank = 0.0;
+};
+std::mutex g_clockMtx;
+DisplayClock g_clock;
+std::atomic<double> g_period{kVblankPeriod};
+std::atomic<double> g_phase{0.001};         /* (set_vblank_phase; GT3PC_VBLANK_PHASE_MS fixes it) */
+int g_phaseFixed = 0;                       /* (1: GT3PC_VBLANK_PHASE_MS, read by init) */
 /* The times of the last 32 vblanks, by their count (vblanks_at). */
 std::atomic<double> g_vblankTimes[32];
 
@@ -426,6 +442,29 @@ double next_alarm_time()
     return best;
 }
 
+/* PC (2026-11-19): the vblank after `last' - the PS2's period on, or the
+ * display's grid point (set_display_clock) between half a period and a
+ * period and a half after it: the vblanks follow the display's, a switch
+ * moving one by up to half a period */
+double next_vblank(double last)
+{
+    DisplayClock c;
+    {
+        std::lock_guard<std::mutex> lk(g_clockMtx);
+        c = g_clock;
+    }
+    if (!c.on || !(c.period > 0.0)) {
+        g_period = kVblankPeriod;
+        return last + kVblankPeriod;
+    }
+    const double base = c.vblank + std::fmod(g_phase.load(), c.period);
+    double g = base + std::ceil((last + 0.5 * c.period - base) / c.period) * c.period;
+    if (g <= last + 0.5 * c.period)
+        g += c.period;
+    g_period = c.period;
+    return g;
+}
+
 /* The interrupt source.  Sleeps with a high-resolution waitable timer
  * until the next event (or until g_timerWake is set by a new alarm /
  * delay), so vblanks are within a fraction of a millisecond. */
@@ -461,9 +500,9 @@ unsigned __stdcall timer_thread(void *)
             g_vblanks.fetch_add(1);
             run_handlers(INTC_VBLANK_START);
             nextEnd = nextStart + kVblankEndDelay;
-            nextStart += kVblankPeriod;
+            nextStart = next_vblank(nextStart);     /* PC (2026-11-19): the PS2's period or the display's grid */
             if (nextStart < now)                    /* fell far behind (debugger): resync */
-                nextStart = now + kVblankPeriod;
+                nextStart = next_vblank(now);
         }
         if (now >= nextEnd) {                       /* (at once: kVblankEndDelay) */
             nextEnd = 1e30;
@@ -497,7 +536,28 @@ double vblank_time()
 
 double vblank_period()
 {
-    return kVblankPeriod;
+    return g_period;
+}
+
+void set_display_clock(bool on, double period, double displayVblank)
+{
+    std::lock_guard<std::mutex> lk(g_clockMtx);
+    g_clock.on = on;
+    g_clock.period = period;
+    g_clock.vblank = displayVblank;
+}
+
+bool display_clock_on()
+{
+    std::lock_guard<std::mutex> lk(g_clockMtx);
+    return g_clock.on;
+}
+
+void set_vblank_phase(double seconds)
+{
+    if (g_phaseFixed == 1)
+        return;                             /* (GT3PC_VBLANK_PHASE_MS) */
+    g_phase = std::max(0.0, seconds);
 }
 
 uint64_t vblanks_at(double t, double *time)
@@ -521,6 +581,14 @@ void init()
     QueryPerformanceFrequency(&g_qpcFreq);
     QueryPerformanceCounter(&g_qpcStart);
     timeBeginPeriod(1);
+    {
+        /* PC (2026-11-19): the vblanks' offset after the display's, fixed
+         * (set_vblank_phase) */
+        const char *e = getenv("GT3PC_VBLANK_PHASE_MS");
+        g_phaseFixed = e != nullptr ? 1 : 0;
+        if (e != nullptr)
+            g_phase = std::max(0.0, atof(e) * 0.001);
+    }
     g_timerWake = CreateEventW(nullptr, FALSE, FALSE, nullptr);
     uintptr_t h = _beginthreadex(nullptr, 256 * 1024, timer_thread, nullptr, 0, nullptr);
     if (h == 0)

@@ -12,7 +12,8 @@
 # .ipic to .png conversion), its texture library (src/engine/pgl/native/
 # gs_imgs.cpp, gs_tex*.cpp: the .imgs to PNG folders conversion) and SDL3,
 # delay-loaded as in the game, for the Controls tab's capture of gamepad and
-# wheel inputs (cmake/sdl3.cmake).
+# wheel inputs (cmake/sdl3.cmake) and (PC 2026-11-20) its force feedback
+# testers, through the game's src/platform/wheel_ffb.cpp.
 # Included from src/CMakeLists.txt; also buildable on its own:
 #   tools\msvc.cmd cmake -S src/launcher -B build/launcher -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
@@ -61,6 +62,7 @@ add_executable(gt3launcher WIN32
     ps2_icon.cpp
     pclog.cpp
     ${GT3PC_ROOT}/src/platform/input_map.cpp
+    ${GT3PC_ROOT}/src/platform/wheel_ffb.cpp
     ${GT3PC_ROOT}/src/platform/save_folders.cpp
     ${GT3PC_ROOT}/src/engine/sound/native/bgm_files.cpp
     ${GT3PC_ROOT}/src/engine/sound/native/spu2_adpcm.cpp

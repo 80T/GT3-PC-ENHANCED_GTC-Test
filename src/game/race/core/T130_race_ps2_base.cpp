@@ -221,8 +221,10 @@ void RacePS2Base::virtual_41(int replay, int retry)
         virtual_43();
         /* The enhanced engine (backend.md B2): no wheel spring while racing
          * (Lupo 2 L2 0x0017B168) */
-        if (replayMode == RACE_LIVE)
+        if (replayMode == RACE_LIVE) {
             virtual_25()->setMode(0);
+            virtual_25()->pcFfbNotice();    /* PC (2026-11-20): GT3's force feedback option off (game/app/pc_ffb.h) */
+        }
         render_set_object(this);
         while (virtual_38() != RACE_SIGNAL_END)
             ;

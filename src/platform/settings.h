@@ -402,6 +402,15 @@ void set_menu_aspect(MenuAspect a);
  * the game (the settings menu), written at once. */
 bool movie_stretch();
 void set_movie_stretch(bool on);
+/* PC (2026-11-19, user request: "Make this a setting in the display
+ * category: 'Game Clock Sync': Variable, Static NTSC.  Variable is the
+ * default"): [Display] GameClockSync=variable | ntsc - variable, the game's
+ * vblanks on the display's when it refreshes at 59.90 .. 60.10 Hz or 2, 3, 4
+ * times that (platform/gpu.cpp's watcher, scheduler.h set_display_clock);
+ * ntsc, the PS2's 59.94 Hz always.  Any thread; changed in the game (the
+ * settings menu: at once), written at once. */
+bool game_clock_variable();
+void set_game_clock_variable(bool on);
 /* The race HUD canvas's widest aspect w:h, changed in the game (held to
  * 4:3 .. 32:9), written to gt3pc.ini at once. */
 void set_hud_max_aspect(int w, int h);
