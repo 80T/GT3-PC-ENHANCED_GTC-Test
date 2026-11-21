@@ -122,6 +122,13 @@ const char *const kWheelDeadzoneKeys[kDeadzones] = {"SteeringDeadzone", "GasDead
                                                     "ClutchDeadzone"};
 const char *const kWheelDeadzoneNames[kDeadzones] = {N_("Steering dead zone"), N_("Gas pedal dead zone"),
                                                      N_("Brake pedal dead zone"), N_("Clutch pedal dead zone")};
+/* PC (2026-11-20): a wheel's force feedback (FfbSetting) */
+const char *const kFfbKeys[kFfbSettings] = {"FfbStrength", "FfbSpring", "FfbMinimum", "FfbInvert"};
+const char *const kFfbNames[kFfbSettings] = {N_("Force feedback strength"), N_("Centering spring"),
+                                             N_("Minimum force"), N_("Invert force feedback")};
+/* (PC 2026-11-20, user: "Default FFB% should be 25%": the strength's) */
+const int kFfbDefaults[kFfbSettings] = {25, 100, 0, 0};
+const int kFfbMax[kFfbSettings] = {200, 300, 30, 1};
 
 /* SDL3's gamepad buttons and axes: the ini names (SDL_GetGamepadStringForButton's)
  * and the labels. */
@@ -325,11 +332,25 @@ constexpr size_t kDeviceIds = 255;          /* (Binding::device) */
 Profile g_profiles[kProfileCount];
 std::atomic<int> g_deadzones[kProfileCount][kDeadzones];
 std::atomic<bool> g_controller[2];          /* the wheels' Input=controller */
+std::atomic<int> g_ffb[2][kFfbSettings];    /* PC (2026-11-20): the wheels' force feedback */
+std::atomic<bool> g_steerFilter[2] = {{true}, {true}};     /* PC (2026-11-20): the wheels' steering */
+std::atomic<int> g_steerCurve[2];
 std::string g_ini;
 
 int clamp_deadzone(int v)
 {
     return v < 0 ? 0 : v > kDeadzoneMax ? kDeadzoneMax : v;
+}
+
+int clamp_ffb(int i, int v)
+{
+    const int hi = i >= 0 && i < kFfbSettings ? kFfbMax[i] : 0;
+    return v < 0 ? 0 : v > hi ? hi : v;
+}
+
+int clamp_curve(int c)
+{
+    return c < -kSteerCurveMax ? -kSteerCurveMax : c > kSteerCurveMax ? kSteerCurveMax : c;
 }
 
 /* ---- the hotkeys ---- */
@@ -743,6 +764,12 @@ const char *deadzone_name(int profile, int i)
     return is_wheel(profile) ? kWheelDeadzoneNames[i] : kPadDeadzoneNames[i];
 }
 
+/* PC (2026-11-20) */
+const char *ffb_key(int i) { return i >= 0 && i < kFfbSettings ? kFfbKeys[i] : ""; }
+const char *ffb_name(int i) { return i >= 0 && i < kFfbSettings ? kFfbNames[i] : ""; }
+int ffb_default(int i) { return i >= 0 && i < kFfbSettings ? kFfbDefaults[i] : 0; }
+int ffb_max(int i) { return i >= 0 && i < kFfbSettings ? kFfbMax[i] : 0; }
+
 void defaults(int profile, Profile *out)
 {
     *out = Profile();
@@ -875,6 +902,25 @@ void load(const char *ini, int profile, Profile *out)
         GetPrivateProfileStringA(sec, "Input", "wheel", input, sizeof(input), ini);
         trim(input);
         out->controller = _stricmp(input, "controller") == 0;
+        /* PC (2026-11-20): the force feedback's (FfbInvert on / off, the
+         * others a number) */
+        for (int i = 0; i < kFfbSettings; i++) {
+            char v[16];
+            GetPrivateProfileStringA(sec, ffb_key(i), "", v, sizeof(v), ini);
+            trim(v);
+            if (v[0] == '\0')
+                out->ffb[i] = kFfbDefaults[i];
+            else if (i == kFfbInvert)
+                out->ffb[i] = _stricmp(v, "on") == 0 || strcmp(v, "1") == 0 ? 1 : 0;
+            else
+                out->ffb[i] = clamp_ffb(i, atoi(v));
+        }
+        /* PC (2026-11-20): the steering's */
+        char f[16];
+        GetPrivateProfileStringA(sec, "SteeringFilter", "on", f, sizeof(f), ini);
+        trim(f);
+        out->steerFilter = !(_stricmp(f, "off") == 0 || strcmp(f, "0") == 0);
+        out->steerCurve = clamp_curve((int)GetPrivateProfileIntA(sec, "SteeringCurve", 0, ini));
     }
 }
 
@@ -896,6 +942,18 @@ void save(const char *ini, int profile, const Profile &p)
     if (is_wheel(profile)) {
         WritePrivateProfileStringA(sec, "Device", p.device[0] != '\0' ? p.device : "auto", ini);
         WritePrivateProfileStringA(sec, "Input", p.controller ? "controller" : "wheel", ini);
+        for (int i = 0; i < kFfbSettings; i++) {     /* PC (2026-11-20) */
+            char v[16];
+            if (i == kFfbInvert)
+                snprintf(v, sizeof(v), "%s", p.ffb[i] != 0 ? "on" : "off");
+            else
+                snprintf(v, sizeof(v), "%d", clamp_ffb(i, p.ffb[i]));
+            WritePrivateProfileStringA(sec, ffb_key(i), v, ini);
+        }
+        char c[16];                         /* PC (2026-11-20): the steering's */
+        WritePrivateProfileStringA(sec, "SteeringFilter", p.steerFilter ? "on" : "off", ini);
+        snprintf(c, sizeof(c), "%d", clamp_curve(p.steerCurve));
+        WritePrivateProfileStringA(sec, "SteeringCurve", c, ini);
     }
 }
 
@@ -964,9 +1022,79 @@ void init(const char *ini)
         for (int i = 0; i < kDeadzones; i++)
             g_deadzones[p][i] = g_profiles[p].deadzone[i];
     }
-    for (int w = 0; w < 2; w++)
+    for (int w = 0; w < 2; w++) {
         g_controller[w] = g_profiles[kWheel1 + w].controller;
+        for (int i = 0; i < kFfbSettings; i++)  /* PC (2026-11-20) */
+            g_ffb[w][i] = g_profiles[kWheel1 + w].ffb[i];
+        g_steerFilter[w] = g_profiles[kWheel1 + w].steerFilter;
+        g_steerCurve[w] = g_profiles[kWheel1 + w].steerCurve;
+    }
     load_hotkeys(ini, g_hotkeys, g_hotDevices);
+}
+
+/* PC (2026-11-20) */
+int ffb(int player, int i)
+{
+    if (player < 0 || player >= 2 || i < 0 || i >= kFfbSettings)
+        return 0;
+    return g_ffb[player][i].load(std::memory_order_relaxed);
+}
+
+void set_ffb(int player, int i, int v)
+{
+    if (player < 0 || player >= 2 || i < 0 || i >= kFfbSettings)
+        return;
+    v = clamp_ffb(i, v);
+    if (g_ffb[player][i].exchange(v) == v || g_ini.empty())
+        return;
+    char t[16];
+    if (i == kFfbInvert)
+        snprintf(t, sizeof(t), "%s", v != 0 ? "on" : "off");
+    else
+        snprintf(t, sizeof(t), "%d", v);
+    WritePrivateProfileStringA(profile_section(kWheel1 + player), ffb_key(i), t, g_ini.c_str());
+}
+
+/* PC (2026-11-20) */
+float apply_steer_curve(float x, int c)
+{
+    c = clamp_curve(c);
+    if (c == 0)
+        return x;
+    const float a = x < 0.0f ? -x : x, s = x < 0.0f ? -1.0f : 1.0f;
+    const float m = a > 1.0f ? 1.0f : a;
+    const float k = 9.0f * (float)(c < 0 ? -c : c) / 100.0f;
+    const float y = c > 0 ? (1.0f + k) * m / (1.0f + k * m) : m / (1.0f + k - k * m);
+    return s * y;
+}
+
+bool steer_filter(int player)
+{
+    return player < 0 || player >= 2 || g_steerFilter[player].load(std::memory_order_relaxed);
+}
+
+void set_steer_filter(int player, bool on)
+{
+    if (player < 0 || player >= 2 || g_steerFilter[player].exchange(on) == on || g_ini.empty())
+        return;
+    WritePrivateProfileStringA(profile_section(kWheel1 + player), "SteeringFilter", on ? "on" : "off", g_ini.c_str());
+}
+
+int steer_curve(int player)
+{
+    return player < 0 || player >= 2 ? 0 : g_steerCurve[player].load(std::memory_order_relaxed);
+}
+
+void set_steer_curve(int player, int c)
+{
+    if (player < 0 || player >= 2)
+        return;
+    c = clamp_curve(c);
+    if (g_steerCurve[player].exchange(c) == c || g_ini.empty())
+        return;
+    char t[16];
+    snprintf(t, sizeof(t), "%d", c);
+    WritePrivateProfileStringA(profile_section(kWheel1 + player), "SteeringCurve", t, g_ini.c_str());
 }
 
 bool plays_with_controller(int player)

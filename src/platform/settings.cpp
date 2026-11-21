@@ -35,6 +35,8 @@ const char *const kReflectionResolutionNames[kReflectionResolutionCount] = {"nor
 std::atomic<int> g_menuAspect{(int)MenuAspect::original};
 const char *const kMenuAspectNames[kMenuAspectCount] = {"original", "16:9", "stretch"};
 const char *const kMenuAspectLog[kMenuAspectCount] = {"at 4:3", "at 16:9, stretched", "stretched over the window"};
+/* PC (2026-11-19): [Display] GameClockSync (game_clock_variable) */
+std::atomic<bool> g_gameClockVariable{true};
 std::atomic<bool> g_movieStretch{false};
 std::atomic<bool> g_rearView[kRearViewCameras] = {{true}, {false}};     /* bumper, chase */
 const char *const kRearViewKeys[kRearViewCameras] = {"RearViewBumper", "RearViewChase"};
@@ -408,6 +410,13 @@ void load()
         GetPrivateProfileStringA(kSection, "MovieAspect", "original", menu, sizeof(menu), ini_path().c_str());
         g_movieStretch = _stricmp(menu, "stretch") == 0;
         pclog::write("settings: movies %s", g_movieStretch.load() ? "stretched over their place" : "in their own shape");
+        /* PC (2026-11-19) */
+        GetPrivateProfileStringA(kSection, "GameClockSync", "variable", menu, sizeof(menu), ini_path().c_str());
+        g_gameClockVariable = _stricmp(menu, "ntsc") != 0;
+        pclog::write("settings: game clock %s", g_gameClockVariable.load()
+                                                     ? "variable (the display's vblanks at 59.90 .. 60.10 Hz or 2 .. 4"
+                                                       " times that)"
+                                                     : "static NTSC (59.94 Hz)");
     }
     {
         char lang[32] = "";
@@ -2304,6 +2313,20 @@ void set_movie_stretch(bool on)
         return;
     g_movieStretch = on;
     WritePrivateProfileStringA(kSection, "MovieAspect", on ? "stretch" : "original", ini_path().c_str());
+}
+
+bool game_clock_variable()
+{
+    return g_gameClockVariable.load(std::memory_order_relaxed);
+}
+
+void set_game_clock_variable(bool on)
+{
+    if (on == g_gameClockVariable.load())
+        return;
+    g_gameClockVariable = on;
+    WritePrivateProfileStringA(kSection, "GameClockSync", on ? "variable" : "ntsc", ini_path().c_str());
+    pclog::write("settings: game clock %s", on ? "variable" : "static NTSC (59.94 Hz)");
 }
 
 void set_menu_aspect(MenuAspect a)

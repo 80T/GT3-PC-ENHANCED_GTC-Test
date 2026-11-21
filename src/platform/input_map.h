@@ -268,11 +268,43 @@ constexpr int kStickDeadzoneDefault = 15;   /* Controller 1 / 2: both sticks' (t
 const char *deadzone_key(int profile, int i);
 const char *deadzone_name(int profile, int i);      /* the launcher's / settings menu's label */
 
+/* PC (2026-11-20, user: "Force feedback for the virtual wheels ... FFB
+ * settings: Strength, etc."): a wheel's force feedback (platform/wheel_ffb.h),
+ * [WheelN] FfbStrength=25 (percent, 0..200: the game's steering force; 0
+ * none; 25 by default, the user's), FfbSpring=100 (0..300: the menus' centring spring, the game's own
+ * at 100), FfbMinimum=0 (0..30: the least force a non-zero one is lifted to,
+ * for a wheel that does not move below it), FfbInvert=off (on: every force
+ * the other way). */
+enum FfbSetting { kFfbStrength, kFfbSpring, kFfbMinimum, kFfbInvert, kFfbSettings };
+const char *ffb_key(int i);                 /* the ini key: "FfbStrength" .. */
+const char *ffb_name(int i);                /* the launcher's label (N_) */
+int ffb_default(int i);
+int ffb_max(int i);                         /* (the least is 0; FfbInvert's 1) */
+
+/* PC (2026-11-20, user: "There is a steering input filter for the wheel, add
+ * an option to disable it, so steering is directly dictated by the wheel's
+ * steering input.  Also, a steering input curve ... from a slow ramp up at
+ * the end, to linear, to a fast ramp up"): a wheel's [WheelN]
+ * SteeringFilter=on (GT3's: the car's lock shrinking with speed, following
+ * slides, changing at 90 deg/s) | off (the car's full lock straight from the
+ * wheel: game/car/physics/T342, INPUT_DEV_WHEEL_DIRECT) and SteeringCurve=0
+ * (-100..100: below 0 a slow ramp up - fine near the centre, steep at the
+ * end - 0 linear, above 0 a fast ramp up; apply_steer_curve). */
+constexpr int kSteerCurveMax = 100;
+/* The steering input x (-1..1) through curve c (-100..100): for c > 0
+ * (1 + k) x / (1 + k |x|), for c < 0 its mirror over the diagonal x / (1 + k
+ * - k |x|), k = 9 |c| / 100 (the slope at the centre 10 x or 1 / 10 at the
+ * ends of the range, finite everywhere); 0 the input as it is. */
+float apply_steer_curve(float x, int c);
+
 struct Profile {
     Binding map[kMaxControls][kSlots];
     int deadzone[kDeadzones] = {0, 0, 0, 0};    /* (defaults: kStickDeadzoneDefault for a controller's sticks) */
     char device[128] = "";                  /* wheels: the joystick's name ("": auto) */
     bool controller = false;                /* wheels: Input=controller (else wheel) */
+    int ffb[kFfbSettings] = {25, 100, 0, 0};    /* wheels: the force feedback's (PC 2026-11-20) */
+    bool steerFilter = true;                /* wheels: SteeringFilter (PC 2026-11-20) */
+    int steerCurve = 0;                     /* wheels: SteeringCurve (PC 2026-11-20) */
 };
 void defaults(int profile, Profile *out);
 /* gt3pc.ini at `ini' (a full path): a missing value the default. */
@@ -337,6 +369,17 @@ float apply_deadzone(float v, float d);
  * written to gt3pc.ini at once.  Any thread. */
 bool plays_with_controller(int player);
 void set_plays_with_controller(int player, bool on);
+/* PC (2026-11-20): wheel `player''s (0, 1) force feedback setting i
+ * (FfbSetting); set: held to 0..ffb_max, written to gt3pc.ini at once.  Any
+ * thread. */
+int ffb(int player, int i);
+void set_ffb(int player, int i, int v);
+/* PC (2026-11-20): wheel `player''s steering filter (on: GT3's) and curve
+ * (-100..100); set: written to gt3pc.ini at once.  Any thread. */
+bool steer_filter(int player);
+void set_steer_filter(int player, bool on);
+int steer_curve(int player);
+void set_steer_curve(int player, int c);
 
 /* ---- the hotkeys ([Hotkeys]) ------------------------------------------ */
 

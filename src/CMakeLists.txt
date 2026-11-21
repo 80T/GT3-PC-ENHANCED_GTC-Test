@@ -147,6 +147,7 @@ add_library(gt3_platform STATIC
     platform/gamepad.cpp
     platform/input_map.cpp
     platform/wheel.cpp
+    platform/wheel_ffb.cpp
     platform/clutch_input.cpp
     platform/debug_camera.cpp
     platform/memcard.cpp

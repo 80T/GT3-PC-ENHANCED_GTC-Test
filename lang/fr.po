@@ -297,6 +297,18 @@ msgstr "CHAMP DE VISION CAMÉRA DE DÉBOGAGE %.0f"
 msgid "CAMERA: %s"
 msgstr "CAMÉRA: %s"
 
+#: src/game/app/pc_ffb.cpp
+msgid "FORCE FEEDBACK IS OFF (PLAYER %d)"
+msgstr "RETOUR DE FORCE DÉSACTIVÉ (JOUEUR %d)"
+
+#: src/game/app/pc_ffb.cpp
+msgid ""
+"THE GAME'S OWN FORCE FEEDBACK OPTION IS OFF: THE WHEEL\n"
+"GETS NO STEERING FORCE. TURN IT ON IN THE GAME'S OPTIONS."
+msgstr ""
+"L'OPTION RETOUR DE FORCE DU JEU EST DÉSACTIVÉE: LE VOLANT\n"
+"N'A AUCUNE FORCE. ACTIVEZ-LA DANS LES OPTIONS DU JEU."
+
 #: src/game/app/pc_frame.cpp
 msgid "REPLAY SPEED %s"
 msgstr "VITESSE DU REPLAY %s"
@@ -438,6 +450,22 @@ msgid "Hotkeys"
 msgstr "Raccourcis"
 
 #: src/launcher/controls.cpp
+msgid "Push left"
+msgstr "Pousser à gauche"
+
+#: src/launcher/controls.cpp
+msgid "Push right"
+msgstr "Pousser à droite"
+
+#: src/launcher/controls.cpp src/platform/input_map.cpp
+msgid "Centering spring"
+msgstr "Ressort de centrage"
+
+#: src/launcher/controls.cpp src/launcher/ui.cpp
+msgid "Off"
+msgstr "Désactivé"
+
+#: src/launcher/controls.cpp
 msgid "Press a key, click or move the mouse... (Esc)"
 msgstr "Touche, clic ou mouvement de souris... (Échap)"
 
@@ -546,6 +574,83 @@ msgstr ""
 "Stick gauche %+.2f %+.2f    Stick droit %+.2f %+.2f    L2 %.2f    R2 %.2f"
 
 #: src/launcher/controls.cpp
+msgid "Force feedback: the centering spring is on for 4 seconds - turn the wheel: it pulls back to the center."
+msgstr "Retour de force : le ressort de centrage est actif 4 secondes - tournez le volant : il revient au centre."
+
+#: src/launcher/controls.cpp
+msgid "Force feedback: %s..."
+msgstr "Retour de force : %s..."
+
+#: src/launcher/controls.cpp
+msgid "Force feedback: the centering spring test is over."
+msgstr "Retour de force : le test du ressort de centrage est terminé."
+
+#: src/launcher/controls.cpp
+msgid "Force feedback: done. If the wheel turned the other way, set Invert force feedback to On."
+msgstr "Retour de force : terminé. Si le volant a tourné dans l'autre sens, réglez « Inverser le retour de force » sur Activé."
+
+#: src/launcher/controls.cpp
+msgid "Force feedback: the wheel is not connected."
+msgstr "Retour de force : le volant n'est pas connecté."
+
+#: src/launcher/controls.cpp
+msgid "Force feedback: SDL finds none on this wheel."
+msgstr "Retour de force : SDL n'en trouve aucun sur ce volant."
+
+#: src/launcher/controls.cpp
+msgid "Force feedback: it could not be opened (%s)."
+msgstr "Retour de force : impossible de l'ouvrir (%s)."
+
+#: src/launcher/controls.cpp
+msgid "Force feedback: this wheel plays no constant force (the steering force)."
+msgstr "Retour de force : ce volant ne joue pas de force constante (la force de direction)."
+
+#: src/launcher/controls.cpp
+msgid "Force feedback: this wheel plays no spring (the centering spring)."
+msgstr "Retour de force : ce volant ne joue pas de ressort (le ressort de centrage)."
+
+#: src/launcher/controls.cpp
+msgid "Force feedback: no wheel connected."
+msgstr "Retour de force : aucun volant connecté."
+
+#: src/launcher/controls.cpp
+msgid "Force feedback: available. The tests play on the wheel with the settings above, as the game would."
+msgstr "Retour de force : disponible. Les tests jouent sur le volant avec les réglages ci-dessus, comme le jeu."
+
+#: src/launcher/controls.cpp
+msgid "Linear"
+msgstr "Linéaire"
+
+#: src/launcher/controls.cpp
+msgid "Steering curve: linear"
+msgstr "Courbe de direction : linéaire"
+
+#: src/launcher/controls.cpp
+msgid "Steering curve: %+d, a fast ramp up"
+msgstr "Courbe de direction : %+d, montée rapide"
+
+#: src/launcher/controls.cpp
+msgid "Steering curve: %+d, a slow ramp up"
+msgstr "Courbe de direction : %+d, montée lente"
+
+#: src/launcher/controls.cpp
+msgid "Steering"
+msgstr "Direction"
+
+#: src/launcher/controls.cpp
+msgid "Wheel input"
+msgstr "Entrée du volant"
+
+#: src/launcher/controls.cpp
+msgid "Steering curve - %s"
+msgstr "Courbe de direction - %s"
+
+#: src/launcher/controls.cpp src/launcher/mod_manager.cpp src/launcher/save_manager.cpp
+#: src/launcher/song_manager.cpp src/launcher/texture_manager.cpp
+msgid "Close"
+msgstr "Fermer"
+
+#: src/launcher/controls.cpp
 msgid "Player 2 plays with"
 msgstr "Le joueur 2 joue avec"
 
@@ -608,6 +713,34 @@ msgstr "%s (clic : annuler)"
 #: src/launcher/controls.cpp
 msgid "Reset to defaults"
 msgstr "Valeurs par défaut"
+
+#: src/launcher/controls.cpp
+msgid "Steering filter"
+msgstr "Filtre de direction"
+
+#: src/launcher/controls.cpp
+msgid "On (the game's)"
+msgstr "Activé (celui du jeu)"
+
+#: src/launcher/controls.cpp
+msgid "Off (direct)"
+msgstr "Désactivé (direct)"
+
+#: src/launcher/controls.cpp
+msgid "Steering curve"
+msgstr "Courbe de direction"
+
+#: src/launcher/controls.cpp
+msgid "Graph..."
+msgstr "Graphique..."
+
+#: src/launcher/controls.cpp src/launcher/ui.cpp
+msgid "On"
+msgstr "Activé"
+
+#: src/launcher/controls.cpp
+msgid "Force feedback test"
+msgstr "Test du retour de force"
 
 #: src/launcher/controls.cpp
 msgid "The wheel (while both are connected)"
@@ -1271,11 +1404,6 @@ msgstr "&Ouvrir le dossier"
 #: src/launcher/mod_manager.cpp
 msgid "Create &template..."
 msgstr "Créer un modè&le..."
-
-#: src/launcher/mod_manager.cpp src/launcher/save_manager.cpp src/launcher/song_manager.cpp
-#: src/launcher/texture_manager.cpp
-msgid "Close"
-msgstr "Fermer"
 
 #: src/launcher/music.cpp
 msgid "The music conversion was stopped (%d files converted); it carries on with the rest the next time."
@@ -2328,10 +2456,6 @@ msgid "%s (the window's size)"
 msgstr "%s (taille de la fenêtre)"
 
 #: src/launcher/ui.cpp
-msgid "Off"
-msgstr "Désactivé"
-
-#: src/launcher/ui.cpp
 msgid "%s (not side by side)"
 msgstr "%s (pas côte à côte)"
 
@@ -2414,6 +2538,18 @@ msgstr "2 images"
 #: src/launcher/ui.cpp
 msgid "3 frames"
 msgstr "3 images"
+
+#: src/launcher/ui.cpp
+msgid "Game clock sync"
+msgstr "Synchro de l'horloge du jeu"
+
+#: src/launcher/ui.cpp
+msgid "Variable"
+msgstr "Variable"
+
+#: src/launcher/ui.cpp
+msgid "Static NTSC"
+msgstr "NTSC fixe"
 
 #: src/launcher/ui.cpp
 msgid "Menu aspect"
@@ -2514,10 +2650,6 @@ msgstr "Réduite (75 %%)"
 #: src/launcher/ui.cpp
 msgid "Menu wheels"
 msgstr "Jantes du menu"
-
-#: src/launcher/ui.cpp
-msgid "On"
-msgstr "Activé"
 
 #: src/launcher/ui.cpp
 msgid "Race wheels from"
@@ -3860,6 +3992,18 @@ msgid "Clutch pedal dead zone"
 msgstr "Zone morte embrayage"
 
 #: src/platform/input_map.cpp
+msgid "Force feedback strength"
+msgstr "Intensité du retour de force"
+
+#: src/platform/input_map.cpp
+msgid "Minimum force"
+msgstr "Force minimale"
+
+#: src/platform/input_map.cpp
+msgid "Invert force feedback"
+msgstr "Inverser le retour de force"
+
+#: src/platform/input_map.cpp
 msgid "South (A / Cross)"
 msgstr "Sud (A / Croix)"
 
@@ -4348,6 +4492,14 @@ msgid "ORIGINAL"
 msgstr "ORIGINAL"
 
 #: src/platform/settings_menu.cpp
+msgid "STATIC NTSC"
+msgstr "NTSC FIXE"
+
+#: src/platform/settings_menu.cpp
+msgid "VARIABLE"
+msgstr "VARIABLE"
+
+#: src/platform/settings_menu.cpp
 msgid "1 FRAME"
 msgstr "1 IMAGE"
 
@@ -4382,6 +4534,18 @@ msgstr "MPH, MILES"
 #: src/platform/settings_menu.cpp
 msgid "CUSTOM"
 msgstr "PERSONNALISÉ"
+
+#: src/platform/settings_menu.cpp
+msgid "FORCE FEEDBACK STRENGTH"
+msgstr "INTENSITÉ DU RETOUR DE FORCE"
+
+#: src/platform/settings_menu.cpp
+msgid "FORCE FEEDBACK STRENGTH (IN-GAME OPTION IS OFF)"
+msgstr "INTENSITÉ DU RETOUR DE FORCE (OPTION DU JEU DÉSACTIVÉE)"
+
+#: src/platform/settings_menu.cpp
+msgid "LINEAR"
+msgstr "LINÉAIRE"
 
 #: src/platform/settings_menu.cpp
 msgid "%d%% MIRRORED"
@@ -4590,6 +4754,66 @@ msgstr ""
 "ENTRÉE: 0%."
 
 #: src/platform/settings_menu.cpp
+msgid ""
+"ON: THE GAME'S - THE CAR'S STEERING LOCK SHRINKS WITH SPEED,\n"
+"FOLLOWS A SLIDE AND CHANGES AT 90 DEGREES A SECOND.\n"
+"OFF: THE CAR'S FULL LOCK FOLLOWS THE WHEEL DIRECTLY,\n"
+"ITS WHOLE TRAVEL."
+msgstr ""
+"ACTIVÉ: CELUI DU JEU - LE BRAQUAGE DIMINUE AVEC LA VITESSE,\n"
+"SUIT UNE GLISSADE ET CHANGE À 90 DEGRÉS PAR SECONDE.\n"
+"DÉSACTIVÉ: LE BRAQUAGE MAXIMAL SUIT LE VOLANT DIRECTEMENT,\n"
+"SUR TOUTE SA COURSE."
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE WHEEL'S STEERING INPUT SHAPED:\n"
+"BELOW 0 A SLOW RAMP UP (FINE NEAR\n"
+"THE CENTER, STEEP AT THE END),\n"
+"0 LINEAR, ABOVE 0 A FAST RAMP UP.\n"
+"ENTER: LINEAR."
+msgstr ""
+"L'ENTRÉE DE DIRECTION DU VOLANT:\n"
+"SOUS 0 UNE MONTÉE LENTE (FINE AU\n"
+"CENTRE, RAIDE EN FIN DE COURSE),\n"
+"0 LINÉAIRE, AU-DESSUS UNE MONTÉE\n"
+"RAPIDE. ENTRÉE: LINÉAIRE."
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"HOW STRONG THE GAME'S STEERING FORCE IS ON THE WHEEL.\n"
+"0%: NONE. ENTER: 25%. THE GAME'S OWN FORCE FEEDBACK\n"
+"OPTION (ITS OPTIONS MENU) MUST BE ON TOO."
+msgstr ""
+"L'INTENSITÉ DE LA FORCE DE DIRECTION DU JEU SUR LE VOLANT.\n"
+"0%: AUCUNE. ENTRÉE: 25%. L'OPTION RETOUR DE FORCE DU JEU\n"
+"(SON MENU OPTIONS) DOIT AUSSI ÊTRE ACTIVÉE."
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE PULL TO THE CENTER IN THE MENUS (NONE IN A RACE).\n"
+"100%: THE GAME'S OWN. ENTER: 100%."
+msgstr ""
+"LE RAPPEL AU CENTRE DANS LES MENUS (AUCUN EN COURSE).\n"
+"100%: CELUI DU JEU. ENTRÉE: 100%."
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"THE LEAST FORCE THE WHEEL GETS ONCE THERE IS ANY,\n"
+"FOR A WHEEL THAT DOES NOT MOVE BELOW IT. ENTER: 0%."
+msgstr ""
+"LA FORCE MINIMALE DU VOLANT DÈS QU'IL Y EN A UNE, POUR\n"
+"UN VOLANT QUI NE BOUGE PAS EN DESSOUS. ENTRÉE: 0%."
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"EVERY FORCE THE OTHER WAY, FOR A WHEEL PUSHED AWAY\n"
+"FROM THE CENTER (THE LAUNCHER'S TESTS SHOW WHICH)."
+msgstr ""
+"CHAQUE FORCE DANS L'AUTRE SENS, POUR UN VOLANT POUSSÉ\n"
+"LOIN DU CENTRE (LES TESTS DU LANCEUR LE MONTRENT)."
+
+#: src/platform/settings_menu.cpp
 msgid "DISPLAY"
 msgstr "AFFICHAGE"
 
@@ -4638,6 +4862,24 @@ msgstr ""
 "1-3: VSYNC ACTIVÉE, NOMBRE D'IMAGES EN TAMPON.\n"
 "1 IMAGE DONNE LA MEILLEURE RÉGULARITÉ D'AFFICHAGE\n"
 "SI LA MACHINE PEUT TENIR LA FRÉQUENCE D'IMAGES."
+
+#: src/platform/settings_menu.cpp
+msgid "GAME CLOCK SYNC"
+msgstr "SYNCHRO DE L'HORLOGE DU JEU"
+
+#: src/platform/settings_menu.cpp
+msgid ""
+"VARIABLE: GAME SPEED CHANGES BY A TINY AMOUNT TO IMPROVE FRAME PACING \n"
+" WHILE FPS IS CLOSE TO THE TICK RATE: \n"
+"59.90-60.10 / 119.80-120.20 / 179.70-180.30 / 239.60-240.40\n"
+"\n"
+"STATIC NTSC: STATIC 59.94 HZ TICK RATE (ACCURATE GAME SPEED)"
+msgstr ""
+"VARIABLE: VITESSE DU JEU AJUSTÉE D'UN RIEN POUR UN AFFICHAGE PLUS RÉGULIER\n"
+"TANT QUE LES FPS SONT PROCHES DE LA FRÉQUENCE DE TICK:\n"
+"59,90-60,10 / 119,80-120,20 / 179,70-180,30 / 239,60-240,40\n"
+"\n"
+"NTSC FIXE: FRÉQUENCE DE TICK FIXE DE 59,94 HZ (VITESSE DU JEU EXACTE)"
 
 #: src/platform/settings_menu.cpp
 msgid "FRAME RATE CAP"
@@ -5904,6 +6146,26 @@ msgid "CLUTCH PEDAL DEAD ZONE"
 msgstr "ZONE MORTE EMBRAYAGE"
 
 #: src/platform/settings_menu.cpp
+msgid "STEERING FILTER"
+msgstr "FILTRE DE DIRECTION"
+
+#: src/platform/settings_menu.cpp
+msgid "STEERING CURVE"
+msgstr "COURBE DE DIRECTION"
+
+#: src/platform/settings_menu.cpp
+msgid "CENTERING SPRING"
+msgstr "RESSORT DE CENTRAGE"
+
+#: src/platform/settings_menu.cpp
+msgid "MINIMUM FORCE"
+msgstr "FORCE MINIMALE"
+
+#: src/platform/settings_menu.cpp
+msgid "INVERT FORCE FEEDBACK"
+msgstr "INVERSER LE RETOUR DE FORCE"
+
+#: src/platform/settings_menu.cpp
 msgid "PLAYER 2'S DEVICE, CONTROLLER AND WHEEL."
 msgstr "PÉRIPHÉRIQUE, MANETTE ET VOLANT DU JOUEUR 2."
 
@@ -6342,6 +6604,21 @@ msgstr "HAUT / BAS  GAUCHE / DROITE  %s%sÉCHAP FERMER"
 #: src/platform/texture_menu.cpp
 msgid "TEXTURES"
 msgstr "TEXTURES"
+
+#~ msgid "On (the game's: the lock shrinks with speed)"
+#~ msgstr "Activé (celui du jeu : le braquage baisse avec la vitesse)"
+
+#~ msgid "Off (direct: the wheel's whole travel to full lock)"
+#~ msgstr "Désactivé (direct : toute la course du volant au braquage max)"
+
+#~ msgid ""
+#~ "VARIABLE: THE GAME'S CLOCK FOLLOWS THE DISPLAY\n"
+#~ "AT 59.90-60.10 HZ OR 2-4 TIMES THAT: STEADY PACING.\n"
+#~ "STATIC NTSC: THE ORIGINAL 59.94 HZ ALWAYS."
+#~ msgstr ""
+#~ "VARIABLE: L'HORLOGE DU JEU SUIT L'ÉCRAN\n"
+#~ "À 59,90-60,10 HZ OU 2 À 4 FOIS PLUS: CADENCE RÉGULIÈRE.\n"
+#~ "NTSC FIXE: TOUJOURS LES 59,94 HZ D'ORIGINE."
 
 #~ msgid "Test"
 #~ msgstr "TestFR"

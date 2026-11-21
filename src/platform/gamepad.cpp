@@ -10,6 +10,7 @@
 #include "platform/gamepad.h"
 #include "platform/log.h"
 #include "platform/settings_menu.h"
+#include "platform/wheel_ffb.h"                /* PC (2026-11-20): the wheels' force feedback */
 #include "platform/system_menu.h"
 #include "platform/ui_text.h"                  /* PC (2026-11-16): the interface's languages (N_) */
 #include "platform/window.h"
@@ -87,12 +88,22 @@ struct Slot {
 };
 Slot g_slots[kPorts];
 
-/* The SDL thread's view of a wheel. */
+/* The SDL thread's view of a wheel (PC 2026-11-20: and its force feedback,
+ * when it has one). */
 struct WheelSlot {
     SDL_Joystick *joy = nullptr;
     SDL_JoystickID id = 0;
+    wheel_ffb::Device ffb;
 };
 WheelSlot g_wheelSlots[kWheels];
+/* PC (2026-11-20): the force feedback GT3 asks for (set_wheel_force /
+ * spring), read by the SDL thread; a force not sent again for kForceHoldMs
+ * is let go (the game sends it every tick: 17 ms) */
+constexpr ULONGLONG kForceHoldMs = 150;
+std::mutex g_ffbMutex;
+wheel_ffb::Forces g_ffbForces[kWheels];
+ULONGLONG g_ffbForceAt[kWheels];
+bool g_haptic;                              /* SDL's haptic subsystem started */
 
 /* The SDL thread's view of a device bindings name (input_map::device_name):
  * its joystick, and its gamepad when SDL maps it as one. */
@@ -407,6 +418,15 @@ void plug_wheel(SDL_JoystickID id)
     const char *name = SDL_GetJoystickName(joy);
     pclog::write("wheel: wheel %d: %s (%d axes, %d buttons, %d hats)", w + 1, name ? name : "a wheel", st.axisCount,
                  st.buttonCount, st.hatCount);
+    /* PC (2026-11-20): its force feedback */
+    if (!g_haptic)
+        pclog::write("wheel: wheel %d: no force feedback (SDL's haptics did not start)", w + 1);
+    else if (s.ffb.open(joy))
+        pclog::write("wheel: wheel %d: force feedback (%s%s%s)", w + 1, s.ffb.has_constant() ? "the steering force" : "",
+                     s.ffb.has_constant() && s.ffb.has_spring() ? ", " : "",
+                     s.ffb.has_spring() ? "the centring spring" : "");
+    else
+        pclog::write("wheel: wheel %d: no force feedback: %s", w + 1, s.ffb.why());
 }
 
 void unplug_wheel(SDL_JoystickID id)
@@ -419,6 +439,7 @@ void unplug_wheel(SDL_JoystickID id)
             std::lock_guard<std::mutex> lock(g_mutex);
             g_wheelPresent[w] = false;
         }
+        s.ffb.close();                      /* PC (2026-11-20) */
         SDL_CloseJoystick(s.joy);
         s = WheelSlot();
         pclog::write("wheel: wheel %d: disconnected", w + 1);
@@ -571,6 +592,10 @@ void thread_main(std::promise<bool> *started)
         started->set_value(false);
         return;
     }
+    /* PC (2026-11-20): the wheels' force feedback (wheel_ffb.h) */
+    g_haptic = SDL_InitSubSystem(SDL_INIT_HAPTIC);
+    if (!g_haptic)
+        pclog::write("wheel: SDL's haptics did not start (%s): no force feedback", SDL_GetError());
     started->set_value(true);
 
     while (!g_quit) {
@@ -609,8 +634,27 @@ void thread_main(std::promise<bool> *started)
                 continue;
             Joystick st;
             poll_wheel(g_wheelSlots[w].joy, &st);
-            std::lock_guard<std::mutex> lock(g_mutex);
-            g_wheel[w] = st;
+            {
+                std::lock_guard<std::mutex> lock(g_mutex);
+                g_wheel[w] = st;
+            }
+            /* PC (2026-11-20): the forces the game asks for, with the
+             * settings as they are now (the in-game menu changes them) */
+            if (g_wheelSlots[w].ffb.is_open()) {
+                wheel_ffb::Forces f;
+                {
+                    std::lock_guard<std::mutex> lock(g_ffbMutex);
+                    f = g_ffbForces[w];
+                    if (now - g_ffbForceAt[w] > kForceHoldMs)
+                        f.force = 0.0f;     /* (not sent again: the game paused or stalled) */
+                }
+                wheel_ffb::Settings set;
+                set.strength = input_map::ffb(w, input_map::kFfbStrength);
+                set.spring = input_map::ffb(w, input_map::kFfbSpring);
+                set.minimum = input_map::ffb(w, input_map::kFfbMinimum);
+                set.invert = input_map::ffb(w, input_map::kFfbInvert);
+                g_wheelSlots[w].ffb.apply(f, set);
+            }
         }
         for (int d = 0; d < g_devCount; d++) {
             const DeviceSlot &s = g_devSlots[d];
@@ -640,6 +684,7 @@ void thread_main(std::promise<bool> *started)
         }
     for (int w = 0; w < kWheels; w++)
         if (g_wheelSlots[w].joy != nullptr) {
+            g_wheelSlots[w].ffb.close();    /* PC (2026-11-20): the forces stopped */
             SDL_CloseJoystick(g_wheelSlots[w].joy);
             g_wheelSlots[w] = WheelSlot();
         }
@@ -756,6 +801,26 @@ bool read_wheel(int wheel, Joystick *out)
         return false;
     *out = g_wheel[wheel];
     return true;
+}
+
+/* PC (2026-11-20) */
+void set_wheel_force(int wheel, float force)
+{
+    if (wheel < 0 || wheel >= kWheels)
+        return;
+    std::lock_guard<std::mutex> lock(g_ffbMutex);
+    g_ffbForces[wheel].force = force < -1.0f ? -1.0f : force > 1.0f ? 1.0f : force;
+    g_ffbForceAt[wheel] = GetTickCount64();
+}
+
+void set_wheel_spring(int wheel, bool on, float k, float clip)
+{
+    if (wheel < 0 || wheel >= kWheels)
+        return;
+    std::lock_guard<std::mutex> lock(g_ffbMutex);
+    g_ffbForces[wheel].spring = on;
+    g_ffbForces[wheel].springK = k;
+    g_ffbForces[wheel].springClip = clip;
 }
 
 void read_devices(Devices *out)
