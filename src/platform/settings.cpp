@@ -193,9 +193,9 @@ const char *const kCarTuneKeys[kCarTunes][2] = {{"TireWearPlayer", "TireWearEnem
                                                 {"GripPlayer", "GripEnemies"}};
 
 const char kRubberband[] = "Rubberband";
-const char* const kRubberbandKeys[kRubberbandCount] = { "SpeedBoost", "SpeedSlow", "CarScaling" };
-const char* const kRubberbandNames[kRubberbandCount] = { "speed boost", "speed slow", "car scaling" };
-std::atomic<bool> g_rubberband[kRubberbandCount] = { { true },{ true },{ true } };
+const char *const kRubberbandKeys[kRubberbandCount] = {"SpeedBoost", "SpeedSlow", "SpeedScaling"};
+const char *const kRubberbandNames[kRubberbandCount] = {"speed boost", "speed slow", "speed scaling"};
+std::atomic<bool> g_rubberband[kRubberbandCount] = {{true}, {true}, {true}};
 
 int clamp_car_tune(CarTune t, int p)
 {
@@ -872,7 +872,7 @@ void load()
                          g_raceCarsOverride.load() ? " (also the races of fewer)" : "");
         /* PC (2026-11-23): [AI] Rubberbanding settings. */
         for (int c = 0; c < kRubberbandCount; c++) {
-            GetPrivateProfileStringA(kRubberband, kRubberbandKeys[c], "off", on, sizeof(on), ini_path().c_str());
+            GetPrivateProfileStringA(kRubberband, kRubberbandKeys[c], "on", on, sizeof(on), ini_path().c_str());
             g_rubberband[c] = _stricmp(on, "on") == 0 || strcmp(on, "1") == 0;
             if (g_rubberband[c].load())
                 pclog::write("settings: rubberband %s on", kRubberbandNames[c]);

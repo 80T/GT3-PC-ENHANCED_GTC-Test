@@ -236,6 +236,14 @@
  *                           Game > Surfaces, GAME > EXTRAS > SURFACE GRIP /
  *                           SURFACE RESISTANCE)
  *
+ *   [Rubberband]            PC (2026-11-23): AI race speed adjustments (the
+ *                           launcher's Game > AI and the settings menu's
+ *                           GAME > AI; all three options can be changed while
+ *                           a race is in progress):
+ *   SpeedBoost=on | off     boosts cars behind the player according to the race rules
+ *   SpeedSlow=on | off      slows down cars ahead of the player according to the race rules
+ *   SpeedScaling=on | off   apply the race rules' speed scale. applies to every car and doesn't change
+ *
  *   [Challenges]            PC (2026-11-14): the challenge modes (the
  *                           launcher's Game > Challenges, the settings menu's
  *                           CHALLENGE MODES, which writes them too; game/app/
